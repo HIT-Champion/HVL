@@ -17,13 +17,15 @@
 """Ghi chú phát hành (scripts/release-notes.sh, dùng ở release.sh và .github/workflows/release.yml): lấy đúng mục
 "## [X.Y.Z]" của CHANGELOG; khối mẫu trong chú thích HTML không tính; thiếu mục, hay mục chỉ có tiêu đề nhóm, thì
 lỗi chứ không ra ghi chú rỗng. Không phát hành lại: release.sh dừng trước khi gắn khi thẻ đã có trên origin hay ở máy,
-không hỏi được origin cũng dừng; release.yml dừng khi thẻ đã có Release, kể cả nháp (chạy lệnh của bước với gh giả), và
+không hỏi được origin cũng dừng; máy không có sha256sum (macOS) thì dùng shasum -a 256, thiếu cả hai thì dừng trước khi
+gắn thẻ (#57); release.yml dừng khi thẻ đã có Release, kể cả nháp (chạy lệnh của bước với gh giả), và
 báo lỗi khi action không tải lên đủ bốn tệp (gói, SBOM, hai .sha256). Trang Release (scripts/release_body.py): dòng chỉ
 gói .tar.gz chính thức và SBOM, phần tóm tắt đầu mục, toàn bộ ghi chép gập trong <details>, dòng tiếp nối nối lại.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -42,7 +44,8 @@ release_body = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release_body)
 WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "release.yml"
 PACKAGE_FILES = ["scripts/kiem_goi.py", "scripts/license-header.sh", "VERSION", ".gitattributes", "LICENSE", "NOTICE",
-                 "LICENSES/Apache-2.0.txt", "LICENSES/LicenseRef-Logos.txt", "REUSE.toml"]
+                 "LICENSES/Apache-2.0.txt", "LICENSES/LicenseRef-Logos.txt", "LICENSES/LicenseRef-VN-SHTT-Dieu-15.txt",
+                 "REUSE.toml"]
 # repo thử không đọc cấu hình git của máy (khóa ký thẻ, hook…), tên người gắn thẻ cố định; bỏ mọi GIT_* thừa hưởng —
 # chạy từ hook git thì GIT_DIR, GIT_INDEX_FILE trỏ về repo thật và lệnh git của test sẽ ghi vào đó
 GIT_ENV = {
@@ -154,9 +157,24 @@ class NoReReleaseTest(unittest.TestCase):
         return subprocess.run(["git", *args], cwd=self.repo, env=GIT_ENV, capture_output=True, text=True,
                               check=True).stdout
 
-    def release(self, version: str = "0.2.0") -> subprocess.CompletedProcess[str]:
-        return subprocess.run(["bash", "scripts/release.sh", version], cwd=self.repo, env=GIT_ENV,
-                              capture_output=True, text=True)
+    def release(self, version: str = "0.2.0", path: str | None = None) -> subprocess.CompletedProcess[str]:
+        env = GIT_ENV if path is None else {**GIT_ENV, "PATH": path}
+        return subprocess.run(["bash", "scripts/release.sh", version], cwd=self.repo, env=env, capture_output=True,
+                              text=True)
+
+    def path_without(self, *tools: str) -> str:
+        """PATH chỉ có lối tắt tới các lệnh của PATH thật trừ tools: như máy không cài chúng (macOS thiếu sha256sum)."""
+        bin_dir = self.repo.parent / "bin"
+        bin_dir.mkdir()
+        seen = set(tools)
+        for folder in os.environ["PATH"].split(os.pathsep):
+            if not os.path.isdir(folder):
+                continue
+            for entry in os.scandir(folder):
+                if entry.name not in seen and entry.is_file() and os.access(entry.path, os.X_OK):
+                    seen.add(entry.name)
+                    (bin_dir / entry.name).symlink_to(entry.path)
+        return str(bin_dir)
 
     def assert_nothing_made(self, proc: subprocess.CompletedProcess[str], message: str) -> None:
         self.assertEqual(proc.returncode, 1, proc.stdout)
@@ -208,6 +226,21 @@ class NoReReleaseTest(unittest.TestCase):
         self.git("add", "MOI.md")
         self.git("commit", "-qm", "thay đổi")
         self.assertEqual(self.release("0.2.0").returncode, 0)
+
+    def test_shasum_when_sha256sum_is_missing(self) -> None:
+        # macOS (#57): có shasum, không có sha256sum — .sha256 vẫn đúng dòng "<băm>  <tên gói>" mà sha256sum -c đọc
+        if shutil.which("shasum") is None:
+            self.skipTest("máy này không có shasum")
+        proc = self.release(path=self.path_without("sha256sum"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        package = self.repo / "dist" / "signet-0.2.0.tar.gz"
+        digest = hashlib.sha256(package.read_bytes()).hexdigest()
+        self.assertEqual((self.repo / "dist" / "signet-0.2.0.tar.gz.sha256").read_text(), f"{digest}  {package.name}\n")
+
+    def test_no_hashing_tool_stops_before_tagging(self) -> None:
+        proc = self.release(path=self.path_without("sha256sum", "shasum"))
+        self.assert_nothing_made(proc, "không có sha256sum hay shasum")
+        self.assertEqual(self.git("tag", "-l"), "")
 
 
 def step_script(name: str) -> str:

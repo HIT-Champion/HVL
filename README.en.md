@@ -51,14 +51,17 @@ trust out of the box, without building them itself:
 
 ## Architecture
 
-[![Architecture diagram: users go through the APISIX gateway to the two Tier 2 applications and the Tier 1 core services](docs/anh/kien-truc-tong-the.en.gif)](docs/anh/kien-truc-tong-the.en.gif)
+[![Architecture diagram: users go through the APISIX gateway to the Tier 2 applications and the Tier 1 core services;
+the right column holds the outside notification channels: email, webhooks, SMS,
+Zalo](docs/anh/kien-truc-tong-the.en.gif)](docs/anh/kien-truc-tong-the.en.gif)
 
 Tier 1 is the headless core: identity, API gateway, data, workflow and the trust layer. Tier 2 holds the
-applications: the e-Office and the P.A.R.A personal space, a second application plugged into the same core without
-changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). A third application, the
-unit news board, exists only once installed with `moc app install`, so the diagram does not show it. Only the APISIX
-gateway is exposed, and every request passes its web application firewall before it reaches the core; the labels on
-its arrows are the real paths. The same holds inside the machine:
+applications: the e-Office and the P.A.R.A personal space. That second application changes no core service code, but
+it was added by hand to the core configuration (a Keycloak client, a gateway route, tables and permissions in the
+database). A third application, the unit news board, plugs in with one `moc app install` command without changing any
+core file ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). Only the APISIX gateway is exposed, and
+every request passes its web application firewall before it reaches the core; the labels on its arrows are the real
+paths. The same holds inside the machine:
 - application containers sit on their own Docker network, `apps` (no Internet access), where APISIX is the only core
   service;
 - so an application's server side also reaches the core through the gateway, with the same token check, rate limits
@@ -98,7 +101,8 @@ only their own unit's data; the e-Office interface in Vietnamese and English. Sc
 ### P.A.R.A personal space
 
 Each person's files in four folders — Projects · Areas · Resources · Archives; its own Keycloak client, calling the
-core through the gateway like any application, without changing a line of core code (`make demo-ca-nhan`).
+core through the gateway like any application, without changing core service code; its tables, permissions, client
+and route were added by hand to the core configuration (`make demo-ca-nhan`).
 
 ### Plugging in an application with one command
 
@@ -179,7 +183,7 @@ choice: [`DEPENDENCIES.md`](DEPENDENCIES.md).
 | Trust | ClamAV | 1.5.4 | GPL-2.0 | Malware scanning before storage |
 | Trust | OpenBao | 2.7.1 | MPL-2.0 | Secrets vault, encryption keys for restricted documents, internal CA and signing keys |
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | NGSI-LD digital twins of sensors (profile `iot`) |
-| Operations | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Monitoring and alerts for the API gateway and each component's status, internal network only |
+| Operations | Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Apache-2.0, AGPL-3.0 | Monitoring of the API gateway and each component's status, internal network only; alerts reach the unit admins' notification bell |
 | Operations | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Centralised logs with personal data masked, optional (profile `logs`) |
 | Operations | restic | 0.19.1 | BSD-2-Clause | Encrypted backup of databases, files and the vault |
 
@@ -196,7 +200,7 @@ package, transitive ones included, is checked automatically with `make license-a
 | Docker Engine | 24.0 | with the `docker compose` v2 plugin 2.17+ and `docker buildx` |
 | GNU Make | 4.0 | runs the commands |
 | Python | 3.10 | standard library only, nothing to install: sample data, smoke tests, demos, backup, install and operations commands |
-| RAM | 8 GB | the whole system (default profiles, 16 containers) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages) was added; the AI model needs up to 6 GB more |
+| RAM | 8 GB | the whole system (default profiles: 19 services, 18 running continuously) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages), `app-tai-lieu-api` (the API docs page, capped at 64 MB) and `alertmanager` (capped at 64 MB) were added; the AI model needs up to 6 GB more |
 | Free disk | 10 GB | images about 5 GB; AI models about 2 GB more |
 
 Every tool used to build Signet is open-source software. No closed-source or home-made tool is needed.
@@ -287,17 +291,17 @@ handle and a reply draft the team head sent back for changes.
 
 ## Operations and testing
 
-Administrator tasks on a running installation are described in [`docs/van-hanh.md`](docs/van-hanh.md) (Vietnamese):
+Administrator tasks on a running installation are described in [`docs/van-hanh.en.md`](docs/van-hanh.en.md):
 
 | Task | Main command |
 |---|---|
-| [Adding a unit](docs/van-hanh.md#thêm-đơn-vị-thuê-ước) (faculty, office, member school) | `python3 scripts/moc.py tenant create …` |
-| [Backup and restore](docs/van-hanh.md#sao-lưu-và-khôi-phục) of every database, file and the vault into an encrypted restic repository | `make backup`, `make restore` |
-| [Secrets vault](docs/van-hanh.md#két-bí-mật) OpenBao: limits, upgrading an old vault for digital signatures | `make demo-ket-bi-mat` |
-| [GitOps and self-healing](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer, applies signed commits only | `make reconcile` |
-| [Monitoring](docs/van-hanh.md#giám-sát) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
-| [Centralised logs](docs/van-hanh.md#log-tập-trung): Vector + Parseable, searched by request id `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
-| [IT/OT convergence](docs/van-hanh.md#hội-tụ-itot): NGSI-LD broker, sensors | `make demo-it-ot` |
+| [Adding a unit](docs/van-hanh.en.md#adding-a-unit-tenant) (faculty, office, member school) | `python3 scripts/moc.py tenant create …` |
+| [Backup and restore](docs/van-hanh.en.md#backup-and-restore) of every database, file and the vault into an encrypted restic repository | `make backup`, `make restore` |
+| [Secrets vault](docs/van-hanh.en.md#secrets-vault) OpenBao: limits, upgrading an old vault for digital signatures | `make demo-ket-bi-mat` |
+| [GitOps and self-healing](docs/van-hanh.en.md#gitops-and-self-healing): systemd timer; with `MOC_GITOPS_ALLOWED_SIGNERS` set, applies signed commits only | `make reconcile` |
+| [Monitoring](docs/van-hanh.en.md#monitoring) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
+| [Centralised logs](docs/van-hanh.en.md#centralised-logs): Vector + Parseable, searched by request id `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
+| [IT/OT convergence](docs/van-hanh.en.md#itot-convergence): NGSI-LD broker, sensors | `make demo-it-ot` |
 | [Plugging in an application](docs/them-ung-dung.md#1-một-lệnh-moc-app-install) from a manifest, no core changes; removal keeps data | `python3 scripts/moc.py app install …`, `app list`, `app remove` |
 | [Web application firewall](platform/apisix/README.md#tường-lửa-ứng-dụng-web--waf-f315): block, log only or off; find a block by `X-Request-Id` | `MOC_WAF=On` · `DetectionOnly` · `Off` |
 | [Checking the audit log](db/README.md) outside the database | `make audit` |
@@ -339,7 +343,7 @@ Most documents are in Vietnamese.
 
 | Group | Documents |
 |---|---|
-| Use and operations | [Demo script](docs/demo-script.md) · [Operations](docs/van-hanh.md) · [Deploying to a server](docs/trien-khai.md) · [API documentation](docs/api/README.md) · [Adding a new application on the core](docs/them-ung-dung.md) |
+| Use and operations | [Demo script](docs/demo-script.md) · [Operations](docs/van-hanh.en.md) · [Deploying to a server](docs/trien-khai.md) · [API documentation](docs/api/README.md) · [Adding a new application on the core](docs/them-ung-dung.md) |
 | Technical | [H-P-D-I architecture](docs/architecture.md) · [Data model and permissions](docs/mo-hinh-du-lieu.md) · [Product specification](docs/dac-ta-san-pham.md) · [Feature maturity with evidence](docs/muc-hoan-thien.md) · [AI evaluation](docs/danh-gia-ai.md) · ["After" metrics of spec §8](docs/so-lieu-sau.md) · [H-P-D-I self-assessment](docs/tu-chan-doan.md) · [Git workflow](docs/git_flow.md) |
 | Contest | [PoF self-assessment](docs/du-thi/pof-checklist.md) · [Likely jury questions](docs/du-thi/hoi-dap-hoi-dong.md) · [Theme, rules, judging criteria](docs/du-thi/olp-2026-brief.md) · [Problem statement analysis](docs/du-thi/olp-2026-de-thi.md) · [Development plan](docs/du-thi/ke-hoach-phat-trien.md) · [Research before the problem statement](docs/du-thi/nghien-cuu/) |
 | Project | [Copyright and third-party software](COPYRIGHT.txt) · [Dependencies and licenses](DEPENDENCIES.md) · [Change history](CHANGELOG.md) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Roadmap](ROADMAP.md) · [Code of conduct](CODE_OF_CONDUCT.md) |

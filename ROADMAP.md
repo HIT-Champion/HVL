@@ -4,12 +4,15 @@ Lộ trình bám theo nguyên lý **tiến hóa tuyến tính** của mô hình 
 danh tính, sự kiện, dữ liệu của không gian trước ([`docs/architecture.md`](docs/architecture.md) §1.2). Đây cũng là thứ
 tự mà một tổ chức áp dụng Signet nên đi theo, không chỉ là lịch phát triển nội bộ.
 
-Trạng thái ghi ngày 25/10/2026, trên nhánh `develop`, sau bản `v1.1.0` (25/10). Các giai đoạn là thứ tự phụ thuộc,
-không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ 25/10 tới
-27/10 đã ra ở `v1.2.0` (27/10, bản cho vòng trường, mục [1.2.0] của [`CHANGELOG.md`](CHANGELOG.md)), giao diện Lịch
-hạn ở bản vá `v1.2.1` (28/10); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ ra ở `v1.3.0` (03/12, bản nộp chấm). Mã
-tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và hạn
-chế đã biết của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
+Trạng thái ghi ngày 30/10/2026, trên nhánh `develop`, đúng nội dung bản `v1.3.0` (30/10). Các giai đoạn là thứ tự
+phụ thuộc, không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ
+25/10 tới 27/10 đã ra ở `v1.2.0` (27/10), giao diện Lịch hạn ở bản vá `v1.2.1` (28/10), việc làm 28/10 (cảnh báo qua
+Alertmanager, Node-RED, DokuWiki, tiếng Anh, truy vết phân tán) và đêm 29–30/10 (hai nguồn dữ liệu công khai, trợ lý
+hỏi đáp chọn đường trả lời và đếm việc, văn bản của người hỏi, tùy chọn API mô hình ngoài và GPU) ở `v1.3.0` (30/10,
+bản cho vòng trường, mục [1.3.0] của [`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ
+ra ở `v1.4.0` (03/12, bản nộp chấm).
+Mã tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và
+hạn chế đã biết của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
 
 - `[x]` — đã có: mức **Hoàn thiện** trong `docs/muc-hoan-thien.md`, hoặc có bằng chứng ghi trong dòng.
 - `[ ]` **Một phần** — có mã chạy được (mức Dùng được, Minh họa hay Một phần); phần còn thiếu ghi ngay sau.
@@ -49,15 +52,18 @@ trường số khép kín.
 - [x] Cấu trúc thư mục **P.A.R.A**: Không gian cá nhân `apps/ca-nhan` (Dự án, Lĩnh vực, Tài nguyên, Lưu trữ), ứng
       dụng thứ hai cắm vào lõi, không sửa dòng nào trong `services/`
       ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), bước CI `make demo-ca-nhan`)
-- [x] Cắm ứng dụng bằng một lệnh: `moc app install apps/<thư mục>/app.yaml`, không sửa tệp nào của lõi; ứng dụng
-      thứ ba Bảng tin đơn vị `apps/bang-tin` ([`docs/them-ung-dung.md`](docs/them-ung-dung.md) mục 1, mức Dùng
-      được, bước CI `make demo-cai-ung-dung`)
+- [x] Cắm ứng dụng bằng một lệnh: `moc app install apps/<thư mục>/app.yaml`, không sửa tệp nào của lõi; ứng dụng thứ ba
+      Bảng tin đơn vị `apps/bang-tin` ([`docs/them-ung-dung.md`](docs/them-ung-dung.md) mục 1, mức Dùng được, bước CI
+      `make demo-cai-ung-dung`); ứng dụng chạy quy trình riêng trên Flowable của lõi qua `/api/workflow/*`, ứng dụng mẫu
+      Đơn nghỉ phép `apps/nghi-phep` (#301, bước CI `make demo-quy-trinh`)
 - [ ] **Một phần** — cổng nội bộ: các ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; trang Ứng dụng
       (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng
       riêng
-- [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email và webhook
-      Mattermost, Slack, ntfy, tắt mặc định (`docs/muc-hoan-thien.md` mục 3, cụm ⑦); không có chat riêng
-- [ ] Hệ quản trị tri thức (wiki)
+- [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email, webhook
+      Mattermost, Slack, ntfy, SMS, Zalo, tắt mặc định (`docs/muc-hoan-thien.md` mục 3, cụm ⑦); không có chat riêng
+- [x] Hệ quản trị tri thức (wiki): DokuWiki ở `/wiki/`, profile `wiki` tắt mặc định; đăng nhập Keycloak, mỗi đơn vị
+      một không gian chỉ người của đơn vị đọc, sửa ([`docs/van-hanh.md`](docs/van-hanh.md) mục Wiki nội bộ, bước CI
+      `make demo-wiki`, #367). Chưa có không gian chung cả trường, trang wiki chưa vào tìm kiếm và trợ lý hỏi đáp
 - [x] Dữ liệu mẫu: `make seed` tạo đơn vị, phòng ban, tài khoản theo vai trò, văn bản ở mọi bước, qua API như người
       dùng thật (F2.10); thêm đơn vị bằng một lệnh `moc tenant create` (F3.12)
 
@@ -74,16 +80,23 @@ bộ phận.
 - [x] Ràng buộc **Poka-yoke** ba lớp — form, máy chủ, CSDL — theo một JSON Schema dùng chung
       `schemas/van-ban-den.json`; chặn vào sổ trùng (F2.2)
 - [x] Trục API giữa các thành phần: GraphQL tự sinh từ CSDL (Hasura) và REST của `svc-files`, cùng đi qua APISIX; tài
-      liệu API xuất tự động ở `docs/api/` (F1.3, F1.10)
+      liệu API xuất tự động ở `docs/api/` (F1.3, F1.10); trang Tài liệu API `/tai-lieu-api/` (Swagger UI, gọi thử qua
+      cổng, #357) và trang tài liệu Docusaurus trên GitHub Pages (#308, #342)
 - [ ] **Một phần** — API nạp lô văn bản đến `POST /api/imports/incoming` (cụm ⑤, mức Dùng được; bước CI
       `make demo-nap-lo`): mới có một loại lô, chưa có màn "Nhập lô" trên giao diện
 - [ ] **Một phần** — hướng sự kiện: các bước của văn bản ghi vào `office.document_events`, mọi thay đổi vào sổ kiểm
       toán `core.audit_log`; ứng dụng cài bằng `moc app install` nhận luồng `core.app_events` qua Hasura Event
       Triggers (đến, vào sổ, phát hành; không văn bản hạn chế). Chưa có broker streaming: không phát lại, không bảo
       đảm thứ tự (cụm ⑥)
-- [ ] Biểu mẫu low-code: form viết trong mã; JSON Schema dùng chung mới có cho form tiếp nhận văn bản đến, khuôn văn
-      bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4)
-- [ ] Tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): việc nền hiện là vòng lặp viết trong
+- [ ] **Một phần** — biểu mẫu low-code: form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form
+      (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã, JSON Schema dùng chung mới có cho form tiếp nhận văn bản
+      đến, khuôn văn bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4); chưa có trình dựng form
+      (#303)
+- [ ] **Một phần** — tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): Node-RED ở `/tu-dong/`,
+      profile `tu-dong` tắt mặc định, cho người vận hành nền tảng soạn flow; đăng nhập Keycloak, chỉ vai trò `operator`
+      ([`docs/van-hanh.md`](docs/van-hanh.md) mục Tự động hóa bằng Node-RED, bước CI `make demo-tu-dong`, #366). Flow
+      gọi lõi bằng robot của đơn vị (`moc tu-dong robot add`, vai trò Hasura `tu_dong` chỉ đọc, Action
+      `notifyFromFlow`), hai flow mẫu. Còn thiếu: webhook, bước BPMN gọi flow; việc nền của lõi vẫn viết trong
       `svc-files`, `svc-workflow`
 
 ## Giai đoạn 3 — [D] Không gian Dữ liệu
@@ -123,7 +136,8 @@ câu trả lời và tìm theo nghĩa.
       mặc định (`make ai-model`, `make up-ai`). Tìm theo nghĩa dùng lại Meilisearch, không thêm CSDL véc-tơ riêng
       (`docs/architecture.md` QĐ-004)
 - [x] Truy xuất tri thức (RAG): trợ lý hỏi đáp trên kho văn bản, trả câu trích nguyên văn kèm "số ký hiệu · tr. n",
-      lọc quyền ở bước truy xuất (F4.2). Kho tri thức hiện là văn bản của Văn phòng điện tử, vì chưa có wiki
+      lọc quyền ở bước truy xuất (F4.2). Kho tri thức hiện là văn bản của Văn phòng điện tử; wiki nội bộ (#367)
+      chưa nối vào
 - [x] Tác tử đọc văn bản đến: lớp chữ PDF hoặc OCR Tesseract, điền sẵn form, văn thư xác nhận (F4.1)
 - [x] Tác tử nghe sự kiện [P], đọc dữ liệu [D]: văn bản vừa vào sổ thì nhánh BPMN song song gợi ý đơn vị chủ trì và
       hạn từ các văn bản tương tự đã giao (F4.3)
@@ -152,36 +166,42 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       dựng lại container bị xóa (F3.3)
 - [x] Trang công khai Trạng thái hệ thống `/trang-thai`: tình trạng từng thành phần, phiên bản, giờ sao lưu gần nhất
       (`docs/van-hanh.md`, mục Trang trạng thái hệ thống)
-- [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana thu chỉ số của APISIX và trạng thái từng
-      thành phần (#274), chưa có chỉ số bên trong từng dịch vụ; có luật cảnh báo (#255, #274) nhưng chỉ xem trong
-      Grafana, Prometheus, chưa gửi ra ngoài
+- [x] Giám sát và cảnh báo (F3.13): Prometheus + Grafana thu chỉ số của APISIX và trạng thái từng thành phần (#274);
+      luật cảnh báo (#255, #274) qua Alertmanager thành thông báo ở chuông của quản trị đơn vị, kèm email, webhook nếu
+      đã bật (#284). Chưa có chỉ số bên trong từng dịch vụ
 - [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
-      định; `X-Request-Id` đi xuyên `svc-workflow`; thu 8 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202)
+      định; `X-Request-Id` đi xuyên `svc-workflow`; thu 9 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202),
+      Meilisearch (#395)
 - [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
-      văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
+      văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản nội bộ là giả lập, có thêm bốn thông tư thật của Bộ GD&ĐT lấy
+      từ Công báo (nguồn dữ liệu công khai, #424)
 - [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được), Không
       gian cá nhân và Bảng tin cũng có bản tiếng Anh (#306), `README.en.md`, hướng dẫn dịch cho người đóng góp
-      (`CONTRIBUTING.md`, mục "Dịch giao diện"); tài liệu vận hành chưa có bản tiếng Anh (issue #59)
+      (`CONTRIBUTING.md`, mục "Dịch giao diện"), hướng dẫn vận hành `docs/van-hanh.en.md` (#59); các tài
+      liệu khác chưa có bản tiếng Anh
 - [ ] **Một phần** — cộng đồng và số đo thực tế: `CONTRIBUTING.md`, mẫu issue (F2.11, mức Một phần); thu góp ý và
       trang Số đo theo đặc tả §8 (F4.6, mức Dùng được). Chưa có đơn vị chạy thử nên cột "trước" của số đo còn trống
 
 ## Sau vòng trường
 
 Việc còn thiếu thật theo `docs/muc-hoan-thien.md`, xếp theo ưu tiên, kèm lý do. Không gắn ngày: kế hoạch chỉ có hai
-mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.3.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
-Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
+mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.4.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
+Việc nào chưa xong trước 26/11 thì để sau `v1.4.0`.
 
 1. **Đơn vị chạy thử thật** (F2.11, F4.6): đo cột "trước" của số đo §8, nhận góp ý của người ngoài đội. Mọi số đo hiện
    tính trên dữ liệu mẫu; chưa có đơn vị dùng thật thì chưa biết sản phẩm giải đúng bài toán đến đâu.
 2. **Trục sự kiện** (cụm ⑥, một phần): ứng dụng cài bằng `moc app install` đã nghe được sự kiện [P] qua luồng
    `core.app_events` và Hasura Event Triggers, không đọc thẳng bảng của Văn phòng điện tử. Còn thiếu: phát lại, thứ
    tự, thêm loại sự kiện ngoài văn bản; chưa thêm broker.
-3. **Việc nền khai báo, kịch bản serverless** (cụm ⑤, chưa có): Kestra đã cân nhắc, chưa đưa vào (`DEPENDENCIES.md`).
-   Hiện thêm một việc tự động là phải sửa mã dịch vụ.
-4. **Truy vết, giám sát đủ** (cụm ⑥): tracing phân tán, chỉ số từng dịch vụ, cảnh báo — nối tiếp log tập trung (#105).
-5. **Thông báo đa kênh đủ** (cụm ⑦): SMS, Zalo; mỗi người tự chọn kênh; webhook riêng từng đơn vị thay một URL chung.
+3. **Việc nền khai báo, kịch bản serverless** (cụm ⑤, một phần): Node-RED (profile `tu-dong`, #366) cho người vận
+   hành soạn flow, gọi lõi bằng robot của đơn vị; còn thiếu webhook, bước BPMN gọi flow qua `svc-workflow`
+   (topic `moc-tu-dong`). Việc nền của lõi vẫn viết trong mã dịch vụ.
+4. **Truy vết, giám sát đủ** (cụm ⑥): span của Hasura, Flowable, Keycloak, PostgreSQL (Jaeger mới có span của cổng và
+   hai dịch vụ, #364), chỉ số từng dịch vụ, cảnh báo — nối tiếp log tập trung (#105).
+5. **Thông báo đa kênh đủ** (cụm ⑦): SMS, Zalo đã có, từng người tự bật (#365); còn cho từng người tắt email, webhook
+   riêng từng đơn vị thay một URL chung.
 6. **Lớp ngữ nghĩa báo cáo, số liệu theo kỳ** (cụm ③): chỉ số và chiều định nghĩa một lần cho mọi báo cáo; chụp số
    liệu theo kỳ để số đã chốt không đổi về sau.
 7. **Khuôn văn bản, biểu mẫu sửa được không cần sửa mã** ([P] low-code): trước hết cho quản trị đơn vị tự sửa mẫu văn

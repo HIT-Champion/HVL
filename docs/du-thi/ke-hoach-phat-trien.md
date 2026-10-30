@@ -21,9 +21,9 @@
 | **5** — Đóng gói, nộp bài                | 26/11–06/12 | Đóng băng tính năng, tự chấm PoF, gửi thư 05/12                                                                                                                                                                                                                        | `v1.3.0` |
 
 Phiên bản thực tế: các phần việc của Phase 1–4 làm xong sau `v0.1.0` được phát hành chung trong `v1.0.0` (23/10),
-`v1.1.0` (25/10) và `v1.2.0` (27/10, bản cho vòng trường 01/11, kèm bản vá `v1.2.1` ngày 28/10); không phát hành
-riêng `v0.2.0`, `v0.5.0`, `v0.9.0`.
-Bản nộp chấm của Phase 5 là `v1.3.0`.
+`v1.1.0` (25/10), `v1.2.0` (27/10, kèm bản vá `v1.2.1` ngày 28/10) và `v1.3.0` (30/10, bản cho vòng trường 01/11);
+không phát hành riêng `v0.2.0`, `v0.5.0`, `v0.9.0`.
+Bản nộp chấm của Phase 5 là `v1.4.0`.
 
 ### Ưu tiên (MoSCoW)
 
@@ -261,7 +261,7 @@ bên ngoài.
 | F2.8  | **Sổ đăng ký văn bản đến / đi** theo năm; xuất PDF để in (NĐ 30, Điều 16)                                                                                                                                                                                                                                                                                                                                                                                                                                   | Hasura, svc-files            | —                                                                                                          |
 | F2.9  | **Song ngữ** Việt/Anh: dùng khóa i18n từ ngày đầu; bản dịch tiếng Anh làm nếu kịp                                                                                                                                                                                                                                                                                                                                                                                                                             | —                           | @nuxtjs/i18n (MIT)                                                                                          |
 | F2.10 | **Dữ liệu mẫu**: `make seed` tạo người dùng (realm import), phòng ban, sổ rồi **chạy kịch bản qua API** để có ~50 văn bản ở nhiều trạng thái — không chèn thẳng vào CSDL, nếu không Flowable sẽ không có process tương ứng. Văn bản đến lấy từ công văn, thông báo trường đã công bố công khai                                                                                                                                                                  | —                           | —                                                                                                          |
-| F2.11 | **Cộng đồng**: mời đơn vị chạy thử dùng bản online; README tiếng Anh; 3–5 issue "good first issue"; bài giới thiệu kèm URL demo trong nhóm Telegram VFOSSA                                                                                                                                                                                                                                                                                                                                                | —                           | —                                                                                                          |
+| F2.11 | **Cộng đồng**: mời đơn vị chạy thử dùng bản online; README tiếng Anh; người ngoài báo lỗi, góp ý qua issue theo mẫu, đội sửa; bài giới thiệu kèm URL demo trong nhóm Telegram VFOSSA                                                                                                                                                                                                                                                                                                | —                           | —                                                                                                          |
 | F2.12 | **⑥ Sổ kiểm toán chuỗi băm** (trước là F3.5): trigger `core.audit()` ghi mọi thay đổi của bảng nghiệp vụ thành chuỗi băm SHA-256 (khóa advisory để ghi tuần tự); `dxos audit verify` tính lại chuỗi và chỉ ra dòng bị sửa; job định kỳ **neo hash đầu chuỗi ra ngoài CSDL** (bucket lạnh + tệp trong repo), để superuser không thể sửa rồi tính lại cả chuỗi; hash của mọi văn bản phát hành nằm trong chuỗi                                           | PostgreSQL (schema `core`) | —                                                                                                          |
 | F2.13 | **[D] Cổng xác thực văn bản** (trước là F3.6, `apps/verify`): mã QR trên PDF mở thẳng trang xác thực → thông tin công khai + kết quả khớp; nhập mã tay được; thả tệp PDF → trình duyệt tự tính SHA-256 (không tải tệp lên) → so khớp. `svc-files` trả `/api/verify/*`; APISIX mở route này **ẩn danh**, giới hạn tốc độ theo IP, không liệt kê được. Văn thư dùng cùng chức năng khi tiếp nhận văn bản điện tử đến                          | svc-files, APISIX            | Web Crypto API của trình duyệt                                                                           |
 
@@ -353,14 +353,14 @@ Không dùng framework AI: truy xuất, trả lời và tác tử tự viết tr
 
 ---
 
-## Phase 5 — Đóng gói và nộp bài (26/11–06/12) → `v1.3.0`
+## Phase 5 — Đóng gói và nộp bài (26/11–06/12) → `v1.4.0`
 
 | Ngày           | Việc                                                                                                                                                                                                                  |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 26/11           | **Đóng băng tính năng** — từ đây chỉ sửa lỗi                                                                                                                                                         |
 | 26–30/11       | Tự chấm theo `pof-checklist.md` (Backend chủ trì). Nhờ **một người ngoài đội** cài từ README trên máy sạch, cài ra PREFIX ngoài thư mục nguồn và chạy được (PoF #4)                  |
 | 26–30/11       | Rà tài liệu (đã viết dần theo PR): kiến trúc, API, vận hành (sao lưu/phục hồi/nâng cấp), `demo-script.md`, `ROADMAP.md` sau cuộc thi; đối chiếu `DEPENDENCIES.md` với phiên bản đã ghim |
-| 03/12           | Release `v1.3.0`: `.tar.gz` + `.sha256` + CHANGELOG. Dòng đầu ghi chú phát hành (`release.yml` tự ghi) chỉ rõ **tệp chính thức là `.tar.gz`** (GitHub luôn tự gắn "Source code (zip)" và không gỡ được) |
+| 03/12           | Release `v1.4.0`: `.tar.gz` + `.sha256` + CHANGELOG. Dòng đầu ghi chú phát hành (`release.yml` tự ghi) chỉ rõ **tệp chính thức là `.tar.gz`** (GitHub luôn tự gắn "Source code (zip)" và không gỡ được) |
 | **05/12** | **Gửi thư nộp bài**                                                                                                                                                                                          |
 | Từ 17:00 06/12 | **Không push lên nhánh chính** — kho mã được chấm 7–9/12. Slide và video làm ở nhánh hoặc repo khác                                                                                             |
 | 07–09/12       | Slide 15 phút theo 4 phần BTC yêu cầu, mở đầu bằng bài toán (§1) và kết bằng số đo trước/sau; quay video demo dự phòng; tập ít nhất 3 lần; kiểm tra VPS trước giờ thi                      |

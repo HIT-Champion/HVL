@@ -31,10 +31,13 @@ from typing import Any
 import pytest
 
 from app_fakes import DON, DUYET, form_bytes
+from svc_workflow.apps import forms as app_forms
 from svc_workflow.apps.forms import DRAFT, AppForm, bad_value, check_form, pattern_problem
 
 ROOT = Path(__file__).resolve().parents[3]          # gốc repo: CI chạy pytest trong bản checkout đầy đủ
 CASE_FILES = sorted(ROOT.glob("apps/*/forms/*.cases.json"))
+# Tệp trình dựng form của Văn phòng sinh ra (#303; tests/formBuilder.test.ts so từng byte với trình dựng)
+BUILDER_SAMPLE = ROOT / "apps/office/tests/form-builder.sample.json"
 TODAY = date(2026, 10, 26)
 
 
@@ -159,6 +162,18 @@ def with_prop(name: str, prop: Any) -> dict[str, Any]:
 
 def test_sample_forms_pass():
     assert problems(DON) == [] and problems(DUYET) == []
+
+
+def test_form_builder_output_passes_the_server_only_rules():
+    # trình duyệt không kiểm được pattern (ước lượng quay lui) và meta-schema: tệp mẫu có đủ kiểu ô và cả hai $defs mà
+    # trình dựng sinh ra, nên form dựng bằng nó không bị từ chối lúc cài vì hai luật đó
+    form, errors = check_form(BUILDER_SAMPLE.name, BUILDER_SAMPLE.read_bytes())
+    assert errors == [] and form is not None
+    ok = {"tenHang": "Giấy A4", "soLuong": 10, "loai": "thiet-bi", "mucDo": "gap", "ngayDeNghi": "2026-10-26",
+          "canTruocNgay": "2026-10-27", "daCoBaoGia": False, "lyDo": "Hết giấy\nin"}
+    assert form.errors(ok, TODAY) == {}
+    bad = {**ok, "tenHang": "Giấy\nA4", "soLuong": 2.5, "canTruocNgay": "2026-10-25"}
+    assert form.errors(bad, TODAY) == {"tenHang": "not", "soLuong": "type", "canTruocNgay": "x-moc-date"}
 
 
 @pytest.mark.parametrize("schema, needle", [
@@ -374,3 +389,106 @@ def test_not_json_or_too_big_is_reported():
     assert "không phải JSON UTF-8" in problems("{}".encode("utf-16"))[0]
     assert "cần một đối tượng JSON Schema" in problems(b"[]")[0]
     assert "lớn quá" in problems(b" " * (256 * 1024 + 1))[0]
+
+
+# --- luật lúc cài, chạy chung với trình duyệt (apps/office/app/utils/formRules.ts, #303) ------------------
+
+
+RULES = json.loads(Path(__file__).with_name("app_form_rules.cases.json").read_text(encoding="utf-8"))
+# Câu lỗi của check_form → mã luật mà bản trên trình duyệt trả. Mỗi câu phải khớp đúng một mẫu: máy chủ thêm luật mà
+# chưa có mã ở đây, trong tệp ca thử và formRules.ts thì test đỏ
+RULE_MESSAGES = {
+    "size": r"^tệp lớn quá",
+    "json": r"^không phải JSON UTF-8",
+    "depth": r"^(JSON|schema) lồng quá",
+    "root": r"^cần một đối tượng JSON Schema ở gốc",
+    "draft": r"^\$schema phải là",
+    "root-type": r"^type ở gốc phải là object",
+    "additional-properties": r"^cần additionalProperties: false",
+    "properties": r"^cần properties",
+    "reserved": r"trùng biến hệ thống",
+    "engine-name": r"trùng tên Flowable",
+    "el-keyword": r"trùng từ khóa của biểu thức",
+    "field-name": r"^tên trường .* phải dạng camelCase",
+    "field-schema": r"phải là một schema \(đối tượng\)$",
+    "scalar": r": chỉ nhận giá trị đơn",
+    "enum": r": enum chỉ gồm giá trị đơn$",
+    "x-moc-date": r": x-moc-date chỉ nhận",
+    "required": r"^required ",
+    "x-moc-range": r"^x-moc-range phải là",
+    "root-only": r" chỉ khai ở gốc form",
+    "ref-external": r" trỏ ra ngoài tệp",
+    "dynamic-ref": r"^không dùng \$(dynamicRef|recursiveRef)$",
+    "format": r"^format .* chưa hỗ trợ",
+    "pattern-properties": r"^không dùng (patternProperties|propertyNames) ",
+    "ref-target": r"chỉ nhận JSON Pointer|không trỏ tới schema nào",
+    "ref-loop": r"trỏ vòng hoặc lồng quá",
+    "steps": r"^kiểm một lần gửi ước tính",
+    "pattern": r"\(ReDoS\)$",
+    "schema": r"^Schema không hợp lệ",
+}
+
+
+def rule_value(v: Any) -> Any:
+    """DSL của tệp ca thử: {"$repeat": s, "times": n} và {"$nest": k, "times": n, "leaf": v}."""
+    if isinstance(v, dict) and "$repeat" in v:
+        return v["$repeat"] * v["times"]
+    if isinstance(v, dict) and "$nest" in v:
+        node = v["leaf"]
+        for _ in range(v["times"]):
+            node = {v["$nest"]: node}
+        return node
+    return v
+
+
+def rule_file(case: dict[str, Any]) -> bytes:
+    """Nội dung tệp form của một ca: text ghép lại, hoặc base sửa theo set, unset (JSON Pointer, "" là cả tệp)."""
+    if "text" in case:
+        return "".join(rule_value(part) for part in case["text"]).encode()
+    form: Any = copy.deepcopy(RULES["base"])
+
+    def parent(pointer: str) -> tuple[Any, str]:
+        *path, last = pointer[1:].split("/")
+        node = form
+        for part in path:
+            node = node[part]
+        return node, last
+
+    for pointer, v in case.get("set", {}).items():
+        if pointer == "":
+            form = rule_value(v)
+        else:
+            node, key = parent(pointer)
+            node[key] = rule_value(v)
+    for pointer in case.get("unset", []):
+        node, key = parent(pointer)
+        del node[key]
+    # gọn như JSON.stringify, để luật cỡ tệp so cùng số byte với trình duyệt
+    return json.dumps(form, ensure_ascii=False, separators=(",", ":")).encode()
+
+
+def rule_of(message: str) -> str:
+    found = [rule for rule, pattern in RULE_MESSAGES.items() if re.search(pattern, message)]
+    assert len(found) == 1, f"{message!r} khớp {found}"
+    return found[0]
+
+
+@pytest.mark.parametrize("case", [pytest.param(c, id=c["name"]) for kind in ("valid", "invalid") for c in RULES[kind]])
+def test_rule_cases_give_the_rules_the_browser_reports(case):
+    form, errors = check_form("f.json", rule_file(case))
+    assert (form is None) == bool(errors)
+    assert sorted(rule_of(e.removeprefix("f.json: ")) for e in errors) == sorted(case.get("errors", []))
+
+
+def test_rule_cases_cover_every_rule_and_match_the_constants():
+    assert list(RULE_MESSAGES) == RULES["rules"]
+    assert {r for c in RULES["invalid"] for r in c["errors"]} == set(RULES["rules"])
+    for name, expected in RULES["constants"].items():
+        value = getattr(app_forms, name)
+        if isinstance(value, re.Pattern):
+            value = value.pattern
+        elif isinstance(value, (set, frozenset)):
+            value = sorted(value)
+        elif isinstance(value, tuple):
+            value = list(value)
+        assert value == expected, name

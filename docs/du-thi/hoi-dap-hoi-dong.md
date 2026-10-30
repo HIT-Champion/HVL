@@ -190,11 +190,11 @@ mục "Checklist trước giờ trình diễn".
 ## 9. Tốn bao nhiêu, máy tối thiểu thế nào?
 
 Không có tiền giấy phép: mọi thành phần là phần mềm nguồn mở, GitHub và Cloudflare gói Free đủ dùng; chi phí là máy và
-điện. Hệ thống mặc định (16 container) dùng khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình — số đo từ trước khi thêm
-`app-ca-nhan`, một nginx phục vụ trang tĩnh; máy chủ đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa, nhưng chưa đo thật trên máy
-8 GB. Bật mô hình AI cần máy 16 GB (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng `MOC_AI_MEM_LIMIT`,
-`MOC_AI_CPUS`). Bản online <https://signet.htechcs.com> chạy trên một laptop của đội (i5-12500H) qua Cloudflare
-Tunnel, không cần IP công khai.
+điện. Hệ thống mặc định (19 dịch vụ, 18 chạy liên tục) dùng khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình — số đo từ
+trước khi thêm `app-ca-nhan`, `app-tai-lieu-api`, hai trang tĩnh nhỏ; máy chủ đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa, nhưng
+chưa đo thật trên máy 8 GB. Bật mô hình AI cần máy 16 GB (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng
+`MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`). Bản online <https://signet.htechcs.com> chạy trên một laptop của đội (i5-12500H) qua
+Cloudflare Tunnel, không cần IP công khai.
 
 **Bằng chứng:** README mục "Yêu cầu hệ thống"; [`docs/trien-khai.md`](../trien-khai.md) §1, §5b, §8;
 `docker-compose.yml` (dịch vụ `ollama`); `docs/architecture.md` §1.3.
@@ -217,7 +217,7 @@ image dùng nguyên bản; CI kiểm các điều này ở mọi pull request.
 
 `git clone` → `make env` (sinh `.env`, mật khẩu ngẫu nhiên; không sửa tệp mã nào) → `make up` → `make seed`; chỉ cần
 Docker, Make và Python 3.10 thư viện chuẩn, đều là phần mềm nguồn mở. CI làm đúng chuỗi đó trên máy sạch ở mọi pull
-request, rồi smoke, e2e trên trình duyệt thật và 12 màn demo. `make install PREFIX=…` cài ra ngoài thư mục mã nguồn,
+request, rồi smoke, e2e trên trình duyệt thật và 21 màn demo. `make install PREFIX=…` cài ra ngoài thư mục mã nguồn,
 CI smoke lại từ bản cài. Bản phát hành là gói `.tar.gz` kèm `.sha256` (`make release`). Chưa có người ngoài đội tự cài
 từ README trên máy sạch: việc này còn trong kế hoạch.
 
@@ -251,7 +251,8 @@ chính tệp đó, không viết mã giao diện (`apps/nghi-phep/public/schema-
 của Văn phòng điện tử vẫn viết trong mã (#303), chưa có trình thiết kế quy trình hay form trên giao diện (bpmn-js bị
 loại vì giấy phép). Quy trình của ứng dụng cắm thêm mới là quy trình duyệt: chưa có timer, bước tự động, gọi API ra
 ngoài; form chưa có tệp đính kèm (#325). Thông báo gửi trong ứng dụng qua
-WebSocket (Centrifugo) và, khi cấu hình, qua email và webhook chat; chưa có SMS, Zalo, chưa cho từng người chọn kênh.
+WebSocket (Centrifugo) và, khi cấu hình, qua email, webhook chat, SMS, Zalo; SMS, Zalo do từng người tự bật, email
+chưa cho từng người tắt, SMS và Zalo chưa thử với tài khoản thật.
 Một máy, không chịu lỗi nhiều nút, chưa đo tải; bản online chạy trên laptop qua Cloudflare Tunnel, chưa lên VPS thật.
 Ký số chỉ minh họa bằng CA nội bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên
 kho văn bản giả lập, chưa có đơn vị dùng thật.

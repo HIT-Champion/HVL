@@ -28,6 +28,7 @@ import sys
 import types
 import unicodedata
 import unittest
+from collections import Counter
 from typing import Any
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
@@ -100,6 +101,20 @@ POSITIVE = {"id": "q01", "user": "vanthu", "question": "Phải đăng ký tối 
             "expect": [{"symbol": "15/QĐ-ĐHM", "page": 1}], "keywords": ["15 tín chỉ"]}
 GUARDED = {"id": "q19", "user": "giangvienktpm", "question": "Điều kiện xét học bổng?", "expect": "none",
            "forbid": ["15/QĐ-ĐHM", "88/CTSV"]}
+INTRO_PATH = "services/svc-files/src/svc_files/assist/gioi_thieu/vi.md#lam-duoc-gi"
+INTRO = {"id": "g01", "user": "vanthu", "loai": "gioi_thieu", "route": "gioi_thieu", "question": "Bạn làm được gì?",
+         "expect": [{"guide": INTRO_PATH}]}
+AWAY = {"id": "o01", "user": "vanthu", "loai": "ngoai_pham_vi", "route": "ngoai_pham_vi", "question": "Thời tiết?",
+        "expect": "none"}
+
+
+def guide_src(path: str) -> dict[str, Any]:
+    return {**src(None, None, kind="guide"), "path": path}
+
+
+def routed(status: str, sources: list[dict], text: str | None = None, *, route: str, rewritten: str | None = None,
+           **extra: Any) -> dict[str, Any]:
+    return {**result(status, sources, text, **extra), "route": route, "rewritten": rewritten}
 
 
 class MatchTest(unittest.TestCase):
@@ -123,6 +138,13 @@ class MatchTest(unittest.TestCase):
         self.assertTrue(demo.matches(src(None, 1, summary=nfd), want), "NFD và NFC là cùng chữ")
         self.assertFalse(demo.matches(src("05/TB-CNTT", 2, summary=notice), want))
         self.assertFalse(demo.matches(src("05/TB-CNTT", 1, summary="Thông báo lịch họp giao ban tháng 12"), want))
+
+    def test_guide(self) -> None:
+        want = {"guide": "docs/huong-dan/viec-chung.md#đơn-nghỉ-phép"}
+        self.assertTrue(demo.matches(guide_src(want["guide"]), want))
+        self.assertFalse(demo.matches(guide_src("docs/huong-dan/lanh-dao-phong.md#duyệt-đơn-nghỉ-phép"), want))
+        self.assertFalse(demo.matches({**src("15/QĐ-ĐHM", 1), "path": want["guide"]}, want), "chỉ nguồn guide")
+        self.assertFalse(demo.matches(guide_src(want["guide"]), {"symbol": "15/QĐ-ĐHM"}))
 
     def test_rank_forbidden_keywords(self) -> None:
         sources = [src("88/CTSV"), src("15/QĐ-ĐHM", 3), src("15/QĐ-ĐHM", 1)]
@@ -172,6 +194,63 @@ class ScoreTest(unittest.TestCase):
                             restricted=["53/PA-ĐHM"])
         self.assertEqual(sealed["forbidden"], ["53/PA-ĐHM · tr. 1"], "văn bản hạn chế bị cấm ở mọi câu")
 
+    def test_routes(self) -> None:
+        got = routed("answered", [guide_src(INTRO_PATH)], "“Tôi tìm …” [1]", route="gioi_thieu")
+        row = demo.score(INTRO, got, 0.1, restricted=[])
+        self.assertEqual((row["loai"], row["route"], row["route_ok"], row["correct"]), ("gioi_thieu", "gioi_thieu",
+                                                                                         True, True))
+        searched = demo.score(INTRO, routed("answered", [src("15/QĐ-ĐHM", 1)], "…", route="van_ban"), 0.1,
+                              restricted=[])
+        self.assertEqual((searched["route_ok"], searched["correct"]), (False, False))
+        follow = {**POSITIVE, "id": "n01", "loai": "noi_tiep", "route": "van_ban", "previous": "Câu trước?"}
+        spliced = routed("answered", [src("15/QĐ-ĐHM", 1)], "15 tín chỉ", route="van_ban", rewritten="Câu ghép")
+        self.assertEqual(demo.score(follow, spliced, 0.1, restricted=[])["route_ok"], True)
+        alone = demo.score(follow, {**spliced, "rewritten": None}, 0.1, restricted=[])
+        self.assertEqual((alone["route_ok"], alone["correct"]), (False, True), "tìm trúng nhưng không ghép câu")
+        fixed = routed("no_evidence", [], "Câu này nằm ngoài phạm vi của tôi.", source="fixed", route="ngoai_pham_vi")
+        away = demo.score(AWAY, fixed, 0.1, restricted=[])
+        self.assertEqual((away["route_ok"], away["correct"]), (True, True))
+        self.assertFalse(demo.score(AWAY, routed("no_evidence", [], route="van_ban"), 0.1, restricted=[])["route_ok"],
+                         "từ chối vì không tìm thấy, không phải vì ngoài phạm vi")
+        old = demo.score(POSITIVE, result("answered", [src("15/QĐ-ĐHM", 1)], "15 tín chỉ"), 0.1, restricted=[])
+        self.assertEqual((old["loai"], old["route_ok"]), ("van_ban", True), "câu không ghi loại là van_ban")
+
+    def test_data_routes(self) -> None:
+        """Đường dữ liệu (#441): đúng khi câu có số và mọi số, bộ lọc bằng đáp án đếm thẳng qua GraphQL."""
+        want = {"data": "documents", "directions": ["in"], "from": "2026-10-01", "to": "2026-11-01", "type_code": None}
+        q = {"id": "d01", "user": "vanthu", "loai": "dem_van_ban", "route": "dem_van_ban", "question": "Bao nhiêu?",
+             "expect": [want]}
+        direct = {"counts": {"in": 3}, "type_code": None, "from": "2026-10-01", "to": "2026-11-01"}
+        data = {"kind": "documents", **direct}
+        got = {**routed("answered", [], "Có 3 văn bản đến …", source="data", route="dem_van_ban"), "data": data}
+        row = demo.score(q, got, 0.1, restricted=[], direct=direct)
+        self.assertEqual((row["route_ok"], row["correct"]), (True, True))
+        wrong = demo.score(q, {**got, "data": {**data, "counts": {"in": 2}}}, 0.1, restricted=[], direct=direct)
+        self.assertFalse(wrong["correct"], "số khác số đếm thẳng")
+        shifted = demo.score(q, {**got, "data": {**data, "from": "2026-09-01"}}, 0.1, restricted=[], direct=direct)
+        self.assertFalse(shifted["correct"], "đếm sai khoảng ngày")
+        self.assertFalse(demo.score(q, got, 0.1, restricted=[], direct=None)["correct"], "chưa đếm thẳng được")
+        searched = demo.score(q, routed("passages_only", [src("15/QĐ-ĐHM", 1)], route="van_ban"), 0.1, restricted=[],
+                              direct=direct)
+        self.assertEqual((searched["route_ok"], searched["correct"]), (False, False))
+        self.assertEqual(demo.direct_where("in", want), {"_and": [
+            {"direction": {"_eq": "in"}},
+            {"registered_at": {"_gte": "2026-10-01T00:00:00+07:00", "_lt": "2026-11-01T00:00:00+07:00"}}]})
+        self.assertEqual(demo.direct_where("out", {**want, "type_code": "QĐ"}), {"_and": [
+            {"direction": {"_eq": "out"}}, {"type_code": {"_eq": "QĐ"}},
+            {"issued_on": {"_gte": "2026-10-01", "_lt": "2026-11-01"}}]})
+        self.assertEqual(demo.direct_where("in", {**want, "from": None, "to": None}),
+                         {"_and": [{"direction": {"_eq": "in"}}]})
+
+    def test_direct_tasks_count_like_the_deadline_calendar(self) -> None:
+        class Asker:
+            def gql(self, query: str, variables: dict | None = None) -> dict:
+                return {"myTasks": [{"id": "a", "due_on": "2026-10-27"}, {"id": "b", "due_on": "2026-10-30"},
+                                    {"id": "c", "due_on": "2026-11-01"}, {"id": "d", "due_on": "2026-11-02"},
+                                    {"id": "e", "due_on": None}]}
+        got = demo.direct_data(Asker(), {"data": "tasks"}, demo.date(2026, 10, 30))
+        self.assertEqual(got, {"tasks": 5, "overdue": 1, "today": 1, "soon": 1, "no_due": 1})
+
     def test_model(self) -> None:
         written = result("answered", [src("15/QĐ-ĐHM", 1), src("88/CTSV", cited=False)], "Cần 15 tín chỉ [1].",
                          source="model", model="qwen3:1.7b")
@@ -220,6 +299,19 @@ class SummaryTest(unittest.TestCase):
         self.assertEqual(s["recall"], 10)
         self.assertEqual(s["violations"], ["q19 (giangvienktpm): 88/CTSV · tr. 1"])
         self.assertTrue(demo.verdict(s)[0].startswith("nguồn bị cấm"))
+
+    def test_types_and_route_errors(self) -> None:
+        rows = self.rows(10, 0)
+        good = routed("answered", [guide_src(INTRO_PATH)], "“Tôi …” [1]", route="gioi_thieu")
+        rows.append(demo.score(INTRO, good, 0.1, restricted=[]))
+        rows.append(demo.score({**INTRO, "id": "g02"}, {**good, "route": "van_ban"}, 0.1, restricted=[]))
+        rows.append(demo.score({**INTRO, "id": "g03"}, {**good, "sources": []}, 0.1, restricted=[]))
+        s = demo.summarize(rows)
+        self.assertEqual((s["positives"], s["recall"], s["negatives"]), (10, 10, 1), "recall chỉ trên câu van_ban")
+        self.assertEqual(s["by_type"], {"van_ban": {"asked": 11, "route_ok": 11, "correct": 11},
+                                        "gioi_thieu": {"asked": 3, "route_ok": 2, "correct": 2}})
+        self.assertEqual(demo.verdict(s), ["đường sai — g02 (gioi_thieu): van_ban",
+                                           "sai câu trả lời tất định — g03"])
 
     def test_model_totals_and_table(self) -> None:
         rows = self.rows(2, 1)
@@ -328,18 +420,20 @@ class SamplesTest(unittest.TestCase):
                                  "người xử lý thuộc đơn vị chủ trì")
 
     def test_questions(self) -> None:
-        qs = self.data["questions"]
+        everything = self.data["questions"]
+        self.assertEqual(len({q["id"] for q in everything}), len(everything))
+        for q in everything:
+            self.assertIn(q["user"], self.users)
+            self.assertIn(self.users[q["user"]][3], ("clerk", "staff", "manager", "director"), "vai trò được hỏi")
+        # câu hỏi về nội dung văn bản; các loại khác: test_question_types
+        qs = [q for q in everything if q["loai"] in ("van_ban", "noi_tiep")]
         docs = {d["symbol"]: d for d in self.data["documents"]}
         sealed = [s for s, d in docs.items() if d["restricted"]]
-        self.assertEqual(len({q["id"] for q in qs}), len(qs))
         positives = [q for q in qs if isinstance(q["expect"], list)]
         negatives = [q for q in qs if q["expect"] == "none"]
         self.assertEqual(len(positives) + len(negatives), len(qs))
         self.assertGreaterEqual(len(positives), 10)
         self.assertGreaterEqual(len(negatives), 2)
-        for q in qs:
-            self.assertIn(q["user"], self.users)
-            self.assertIn(self.users[q["user"]][3], ("clerk", "staff", "manager", "director"), "vai trò được hỏi")
         for q in positives:
             self.assertTrue(q["keywords"], q["id"])
             for want in q["expect"]:
@@ -362,6 +456,31 @@ class SamplesTest(unittest.TestCase):
         for name in ("q01", "q02", "q10", "q14", "q18"):
             self.assertIn(name, {q["id"] for q in qs}, "demo.py hoi-dap dùng câu này")
 
+    def test_question_types(self) -> None:
+        """Loại câu và đường bộ định tuyến phải chọn (#423): bộ cũ giữ 19 câu van_ban, ≥ 5 câu mỗi loại mới; chỉ câu nối
+        tiếp có câu trước; đáp án guide trỏ tới mục có thật. Đường đi qua API: test_assist_routes_api.py (svc-files)."""
+        qs = self.data["questions"]
+        counts = Counter(q["loai"] for q in qs)
+        self.assertEqual(set(counts), set(mau.ROUTES))
+        self.assertEqual(counts["van_ban"], 19, "bộ cũ giữ nguyên để recall@3 so được với số đo trước")
+        for loai in ("noi_tiep", "gioi_thieu", "huong_dan", "ngoai_pham_vi", "viec_cua_toi", "dem_van_ban"):
+            self.assertGreaterEqual(counts[loai], 5, loai)
+        for q in qs:
+            self.assertEqual(q["route"], mau.ROUTES[q["loai"]], q["id"])
+            self.assertEqual("previous" in q, q["loai"] == "noi_tiep", q["id"])
+            wants = q["expect"] if isinstance(q["expect"], list) else []
+            self.assertEqual(any("guide" in w for w in wants), q["loai"] in ("gioi_thieu", "huong_dan"), q["id"])
+            self.assertEqual(any("data" in w for w in wants), q["loai"] in demo.DATA_TYPES, q["id"])
+            self.assertEqual(q["expect"] == "none", q["loai"] == "ngoai_pham_vi" or q["id"] in ("q17", "q18", "q19"))
+            for want in wants:
+                if "guide" not in want:
+                    continue
+                path, anchor = want["guide"].split("#")
+                lines = (ROOT / path).read_text(encoding="utf-8").splitlines()
+                slugs = {"-".join("".join(c for c in line.lstrip("#").strip().lower() if c.isalnum() or c == " ")
+                                  .split()) for line in lines if line.startswith("#")}
+                self.assertTrue(anchor in slugs or any(f"{{#{anchor}}}" in line for line in lines), q["id"])
+
     def test_seed_evidence(self) -> None:
         """Câu trả lời về văn bản của make seed có nguyên văn trong nội dung seed_documents.py in ra PDF (một trang)."""
         bodies = {s.symbol: s.body for s in seed.CNTT}
@@ -380,6 +499,22 @@ class SamplesTest(unittest.TestCase):
                     continue
                 self.assertEqual(want["page"], 1)
                 self.assertIn(demo.flat(q["evidence"]), demo.flat(body), q["id"])
+
+    @unittest.skipUnless(importlib.util.find_spec("pypdf"), "cần pypdf (môi trường test svc-files)")
+    def test_open_data_evidence(self) -> None:
+        """Câu về nguồn công khai A (#446): câu bằng chứng có trên đúng trang của tệp PDF bản Công báo mà make seed nạp
+        (số ký hiệu lấy từ manifest.json như du_lieu_mo.py)."""
+        import pypdf
+
+        folder = ROOT / "seed" / "du-lieu-mo" / "cong-bao-gddt"
+        files = {f["meta"]["symbol"]: folder / f["file"]
+                 for f in json.loads((folder / "manifest.json").read_text(encoding="utf-8"))["files"]}
+        asked = [q for q in self.data["questions"] if q["expect"] != "none" and q["expect"][0].get("symbol") in files]
+        self.assertGreaterEqual(len(asked), 3)
+        for q in asked:
+            want = q["expect"][0]
+            text = pypdf.PdfReader(files[want["symbol"]]).pages[want["page"] - 1].extract_text()
+            self.assertIn(demo.flat(q["evidence"]), demo.flat(text), q["id"])
 
     @unittest.skipUnless(importlib.util.find_spec("pypdf"), "cần pypdf (môi trường test svc-files)")
     def test_pdf_pages(self) -> None:

@@ -62,9 +62,11 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         được xem; nội dung văn bản hạn chế không ai hỏi ra; sổ kiểm toán ghi lượt hỏi của tác tử, không có câu hỏi,
         câu trả lời; bật profile ai thì mô hình viết câu trả lời có trích dẫn. (make demo-hoi-dap)
     python3 scripts/demo.py do-hoi-dap
-        Đo trợ lý trên mọi câu trong seed/hoi-dap/cau-hoi.json (đúng người hỏi): bảng trạng thái, nguồn top-3, đúng /
-        sai, từ khóa, thời gian; recall@3, tỉ lệ từ chối đúng; có mô hình thì đo thêm câu trả lời của mô hình. Thoát 1
-        khi có nguồn bị cấm ở bất kỳ câu nào (quyền, văn bản hạn chế), hoặc recall@3 dưới ngưỡng. (make do-hoi-dap)
+        Đo trợ lý trên mọi câu trong seed/hoi-dap/cau-hoi.json (đúng người hỏi, câu nối tiếp kèm câu trước): bảng
+        trạng thái, nguồn top-3, đúng / sai, đường, từ khóa, thời gian; recall@3, tỉ lệ từ chối đúng của câu van_ban;
+        đường đúng, trả lời đúng theo loại câu; có mô hình thì đo thêm câu trả lời của mô hình. Thoát 1 khi có nguồn
+        bị cấm ở bất kỳ câu nào (quyền, văn bản hạn chế), recall@3 dưới ngưỡng, hoặc một câu đi sai đường hay trả lời
+        sai ở đường tất định (giới thiệu, hướng dẫn, ngoài phạm vi). (make do-hoi-dap)
     python3 scripts/demo.py giao-viec
         Gợi ý giao việc (F4.3, không cần mô hình): văn thư nạp lịch sử giao việc mẫu seed/giao-viec; văn bản mới vào sổ
         thì lãnh đạo khoa có việc chỉ đạo ngay, vài giây sau tác tử moc-assigner gợi ý đơn vị chủ trì và hạn kèm căn
@@ -118,6 +120,11 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         gửi đơn qua API chung bằng token app-nghi-phep (dữ liệu sai → 422 đúng mã từng trường); chỉ trưởng phòng cùng
         phòng thấy và duyệt được; token của client khác → 403; hộp việc Văn phòng điện tử không lẫn việc nghỉ phép;
         duyệt → đơn kết thúc với quyết định đồng ý; cài lại không đổi gì; gỡ giữ lịch sử đơn. (make demo-quy-trinh)
+    python3 scripts/demo.py canh-bao
+        Cảnh báo vận hành (F3.13, #284): Prometheus nối Alertmanager; một cảnh báo giả đẩy vào Alertmanager thành thông
+        báo ở chuông của quản trị mọi đơn vị (quantri thấy qua GraphQL), không ai khác nhận; hết cảnh báo thì mỗi quản
+        trị thêm đúng một thông báo; gọi svc-workflow bằng token sai → 401; dịch vụ ngoài mạng alerts không tới được
+        API của Alertmanager. Thông báo của màn đánh dấu đã đọc ở cuối. (make demo-canh-bao)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -136,7 +143,7 @@ import time
 import unicodedata
 import uuid
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
@@ -966,6 +973,16 @@ def ngsi(path: str, tenant: str) -> tuple[int, Any]:
         return int(code) if code.isdigit() else 0, body
 
 
+def ngsi_points(history: Any, attr: str) -> set[tuple[Any, Any]]:
+    """(giá trị, giờ đo) của ``attr`` trong một thực thể của temporal API. Bản JSON-LD rút gọn trả một đối tượng thay vì
+    danh sách khi lịch sử mới có một lần đo (broker ghi lịch sử bất đồng bộ, #432)."""
+    items = history.get(attr, []) if isinstance(history, dict) else []
+    if isinstance(items, dict):
+        items = [items]
+    return {(v.get("value"), v.get("observedAt")) for v in items if isinstance(v, dict)} \
+        if isinstance(items, list) else set()
+
+
 def ot_drafts(staff: Session, sensor: str) -> list[dict[str, Any]]:
     return staff.gql(OT_DRAFTS, {"sensor": {"sensor": sensor}})["office_documents"]
 
@@ -1046,8 +1063,7 @@ def it_ot() -> None:
     deadline = time.monotonic() + 30
     while True:
         code, history = ngsi(f"/temporal/entities/{sensor}?attrs=temperature&lastN=50", tenant)
-        points = {(v.get("value"), v.get("observedAt")) for v in (history or {}).get("temperature", [])} \
-            if code == 200 and isinstance(history, dict) else set()
+        points = ngsi_points(history, "temperature") if code == 200 else set()
         if want <= points:
             break
         if time.monotonic() > deadline:
@@ -1615,6 +1631,17 @@ REFUSED = ("no_evidence", "passages_only")
 # Ngưỡng của make do-hoi-dap: recall@3 trên các câu dương — chốt lại sau lần đo đầu trên bản cài (số đo ghi ở
 # services/svc-files/README.md). Câu quyền, câu hạn chế có nguồn bị cấm thì luôn là lỗi
 RECALL_MIN = 0.8
+# Đường dữ liệu (#441): số trong câu trả lời phải bằng số đếm thẳng qua GraphQL bằng token người hỏi (direct_data)
+DATA_TYPES = ("viec_cua_toi", "dem_van_ban")
+# Loại câu trả lời không qua tìm kiếm (kho tĩnh trong svc-files, câu cố định, số đếm): sai một câu là lỗi, không có
+# ngưỡng
+FIXED_TYPES = ("gioi_thieu", "huong_dan", "ngoai_pham_vi", *DATA_TYPES)
+# Đường không gọi lượt generate: trang Hỏi đáp cũng không gọi (hợp đồng API trợ lý, #423)
+NO_GENERATE = ("gioi_thieu", "ngoai_pham_vi", *DATA_TYPES)
+DIRECT_TASKS = "{ myTasks { id due_on } }"
+DIRECT_COUNT = """query ($w: office_documents_bool_exp!) {
+  office_documents_aggregate(where: $w) { aggregate { count } } }"""
+SOON_DAYS = 2           # như dueState của Lịch hạn và data.py của svc-files: còn 1–2 ngày là sắp đến hạn
 # Trưởng đơn vị phân công người xử lý sau khi lãnh đạo khoa giao (seed/users.csv); tên đơn vị trong ý kiến chỉ đạo
 MANAGERS = {"ĐT": "totruongdt", "KTPM": "truongbmktpm"}
 UNIT_NAMES = {"ĐT": "Tổ Đào tạo", "KTPM": "Bộ môn Kỹ thuật phần mềm", "HTTT": "Bộ môn Hệ thống thông tin",
@@ -1668,7 +1695,10 @@ def source_label(src: dict[str, Any]) -> str:
 
 def matches(src: dict[str, Any], want: dict[str, Any]) -> bool:
     """Nguồn khớp một đáp án: cùng số ký hiệu (văn bản đi lấy số lúc phát hành, không biết trước: trích yếu chứa
-    chuỗi cho trước) và cùng trang; đoạn "trích yếu" không có trang nên không khớp đáp án có trang."""
+    chuỗi cho trước) và cùng trang; đoạn "trích yếu" không có trang nên không khớp đáp án có trang. Đáp án ``guide``
+    (câu giới thiệu, hướng dẫn, #423): nguồn ``kind`` guide có đúng đường dẫn tệp kèm neo mục."""
+    if "guide" in want:
+        return src.get("kind") == "guide" and src.get("path") == want["guide"]
     if "symbol" in want:
         same = same_symbol(src.get("symbol"), want["symbol"])
     else:
@@ -1703,19 +1733,65 @@ def restricted_symbols(data: dict[str, Any]) -> list[str]:
     return [d["symbol"] for d in data["documents"] if d.get("restricted")]
 
 
-def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str]) -> dict:
+def vn_today() -> date:
+    return datetime.now(timezone(timedelta(hours=7))).date()
+
+
+def direct_where(direction: str, want: dict[str, Any]) -> dict[str, Any]:
+    """Điều kiện đếm theo đáp án của câu (không theo svc-files): đến theo giờ vào sổ, đi theo ngày ban hành."""
+    parts: list[dict[str, Any]] = [{"direction": {"_eq": direction}}]
+    if want.get("type_code"):
+        parts.append({"type_code": {"_eq": want["type_code"]}})
+    if want.get("from") and direction == "in":
+        parts.append({"registered_at": {"_gte": f"{want['from']}T00:00:00+07:00",
+                                        "_lt": f"{want['to']}T00:00:00+07:00"}})
+    elif want.get("from"):
+        parts.append({"issued_on": {"_gte": want["from"], "_lt": want["to"]}})
+    return {"_and": parts}
+
+
+def direct_data(session: Session, want: dict[str, Any], today: date) -> dict[str, Any]:
+    """Đáp án của câu đường dữ liệu: đếm thẳng qua GraphQL của Hasura bằng token người hỏi, không qua svc-files."""
+    if want["data"] == "tasks":
+        days = [(date.fromisoformat(t["due_on"][:10]) - today).days if t.get("due_on") else None
+                for t in session.gql(DIRECT_TASKS)["myTasks"]]
+        return {"tasks": len(days), "overdue": sum(d is not None and d < 0 for d in days),
+                "today": sum(d == 0 for d in days), "soon": sum(d is not None and 0 < d <= SOON_DAYS for d in days),
+                "no_due": sum(d is None for d in days)}
+    counts = {d: session.gql(DIRECT_COUNT, {"w": direct_where(d, want)})["office_documents_aggregate"]["aggregate"]
+              ["count"] for d in want["directions"]}
+    return {"counts": counts, "type_code": want.get("type_code"), "from": want.get("from"), "to": want.get("to")}
+
+
+def data_ok(result: dict[str, Any], direct: dict[str, Any] | None) -> bool:
+    """Câu trả lời đường dữ liệu đúng: câu có số (answer.source data) và mọi số, bộ lọc bằng đáp án đếm thẳng."""
+    got = result.get("data") or {}
+    return ((result.get("answer") or {}).get("source") == "data" and direct is not None
+            and all(got.get(k) == v for k, v in direct.items()))
+
+
+def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str],
+          direct: dict[str, Any] | None = None) -> dict:
     """Chấm một lượt extract theo đáp án: câu dương đúng khi nguồn đáp án nằm trong 3 nguồn đầu; câu âm đúng khi
     trợ lý không trả lời — no_evidence, hoặc passages_only (chỉ đưa đoạn liên quan trong văn bản được xem, không câu
     trích nào đủ khớp: ngưỡng điểm tìm kiếm quyết định, không phải chuyện quyền); nguồn bị cấm (danh sách của câu +
-    văn bản hạn chế) ghi riêng, luôn là lỗi."""
+    văn bản hạn chế) ghi riêng, luôn là lỗi. Câu đường dữ liệu đúng khi số bằng ``direct`` (đếm thẳng, direct_data)."""
     expect = question["expect"]
     sources = result.get("sources") or []
     positive = isinstance(expect, list)
     rank = hit_rank(sources, expect)
     status = result.get("status") or "?"
+    loai = question.get("loai", "van_ban")
+    route_ok = result.get("route", "van_ban") == question.get("route", "van_ban")
+    if loai == "noi_tiep":
+        route_ok = route_ok and result.get("rewritten") is not None     # câu nối tiếp phải được ghép
+    elif loai == "ngoai_pham_vi":
+        route_ok = route_ok and (result.get("answer") or {}).get("source") == "fixed"
     return {"id": question["id"], "user": question["user"], "question": question["question"], "positive": positive,
+            "loai": loai, "route": result.get("route"), "route_ok": route_ok,
             "status": status, "top": [source_label(s) for s in sources[:TOP]], "rank": rank,
-            "correct": (rank is not None and rank <= TOP) if positive else status in REFUSED,
+            "correct": data_ok(result, direct) if loai in DATA_TYPES else
+            (rank is not None and rank <= TOP) if positive else status in REFUSED,
             "keywords": keywords_in(answer_text(result), question.get("keywords", [])) if positive else None,
             "forbidden": forbidden(sources, [*question.get("forbid", []), *restricted]),
             "guarded": bool(question.get("forbid")), "seconds": seconds, "server_ms": result.get("duration_ms"),
@@ -1746,8 +1822,10 @@ def percentile(values: list[float], p: float) -> float | None:
 
 
 def summarize(rows: list[dict]) -> dict[str, Any]:
-    pos = [r for r in rows if r["positive"]]
-    neg = [r for r in rows if not r["positive"]]
+    """recall@3, từ chối đúng tính trên câu ``van_ban`` (bộ cũ, ngưỡng RECALL_MIN); các loại khác đếm riêng ở
+    ``by_type``: đường đúng, câu trả lời đúng."""
+    pos = [r for r in rows if r["positive"] and r["loai"] == "van_ban"]
+    neg = [r for r in rows if not r["positive"] and r["loai"] == "van_ban"]
     gen = [r for r in rows if r["model"]]
     gen_pos = [r for r in gen if r["positive"]]
     violations = [f"{r['id']} ({r['user']}): {', '.join(r['forbidden'])}" for r in rows if r["forbidden"]]
@@ -1760,7 +1838,13 @@ def summarize(rows: list[dict]) -> dict[str, Any]:
         "no_evidence": sum(r["status"] == "no_evidence" for r in neg), "guarded": sum(r["guarded"] for r in rows),
         "violations": violations, "semantic": sum(r["semantic"] for r in rows), "asked": len(rows),
         "p50": percentile([r["seconds"] for r in rows], 50), "p95": percentile([r["seconds"] for r in rows], 95),
-        "server_p50": percentile(server, 50), "server_p95": percentile(server, 95), "model": None}
+        "server_p50": percentile(server, 50), "server_p95": percentile(server, 95), "model": None,
+        "by_type": {loai: {"asked": sum(r["loai"] == loai for r in rows),
+                           "route_ok": sum(r["route_ok"] for r in rows if r["loai"] == loai),
+                           "correct": sum(r["correct"] for r in rows if r["loai"] == loai)}
+                    for loai in dict.fromkeys(r["loai"] for r in rows)},
+        "route_errors": [f"{r['id']} ({r['loai']}): {r['route']}" for r in rows if not r["route_ok"]],
+        "type_errors": [r["id"] for r in rows if r["loai"] in FIXED_TYPES and r["route_ok"] and not r["correct"]]}
     if gen:
         out["model"] = {
             "asked": len(gen), "by_model": sum(r["model"]["by_model"] for r in gen), "positives": len(gen_pos),
@@ -1775,8 +1859,12 @@ def summarize(rows: list[dict]) -> dict[str, Any]:
 
 
 def verdict(summary: dict[str, Any]) -> list[str]:
-    """Lý do thoát 1 (rỗng: đạt): mọi nguồn bị cấm; recall@3 câu dương dưới RECALL_MIN."""
+    """Lý do thoát 1 (rỗng: đạt): mọi nguồn bị cấm; recall@3 câu dương dưới RECALL_MIN; bộ định tuyến chọn sai đường
+    hay không ghép câu nối tiếp; câu giới thiệu, hướng dẫn, ngoài phạm vi trả lời sai (các đường này tất định)."""
     problems = [f"nguồn bị cấm — {v}" for v in summary["violations"]]
+    problems += [f"đường sai — {e}" for e in summary.get("route_errors", [])]
+    if summary.get("type_errors"):
+        problems.append(f"sai câu trả lời tất định — {', '.join(summary['type_errors'])}")
     if summary["positives"] and summary["recall"] < RECALL_MIN * summary["positives"]:
         problems.append(f"recall@3 {summary['recall']}/{summary['positives']} dưới ngưỡng {RECALL_MIN:.0%}")
     return problems
@@ -1808,12 +1896,16 @@ def result_table(rows: list[dict]) -> str:
     return "\n".join(out)
 
 
-def ask(session: Session, question: str, *, mode: str = "extract", ask_id: str | None = None) -> tuple[dict, float]:
+def ask(session: Session, question: str, *, mode: str = "extract", ask_id: str | None = None,
+        previous: str | None = None) -> tuple[dict, float]:
     """POST /api/documents/ask qua APISIX bằng token người hỏi → (kết quả, số giây). Token hết hạn giữa lượt đo dài
-    thì đăng nhập lại một lần; hết lượt sinh (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần."""
+    thì đăng nhập lại một lần; hết lượt sinh (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần.
+    ``previous``: câu hỏi lượt trước, cho câu nối tiếp."""
     body: dict[str, Any] = {"question": question, "mode": mode}
     if ask_id:
         body["ask_id"] = ask_id
+    if previous:
+        body["previous"] = previous
     attempts = 0
     while True:
         started = time.monotonic()
@@ -2060,25 +2152,36 @@ def do_hoi_dap() -> None:
     for q in data["questions"]:
         session = who(q["user"])
         try:
-            got, seconds = ask(session, q["question"])
+            got, seconds = ask(session, q["question"], previous=q.get("previous"))
         except (HTTPError, OSError) as exc:
             got, seconds = {"status": failure(exc)}, 0.0
-        row = score(q, got, seconds, restricted=sealed)
-        if got.get("ai_available") and got.get("status") not in (None, "no_evidence"):
+        direct = None
+        if q.get("loai") in DATA_TYPES:
             try:
-                gen, gen_seconds = ask(session, q["question"], mode="generate", ask_id=got.get("ask_id"))
+                direct = direct_data(session, q["expect"][0], vn_today())
+            except (HTTPError, OSError, RuntimeError) as exc:
+                print(f"   {q['id']}: chưa đếm thẳng được qua GraphQL — {exc}")
+        row = score(q, got, seconds, restricted=sealed, direct=direct)
+        if got.get("ai_available") and got.get("status") not in (None, "no_evidence") \
+                and got.get("route") not in NO_GENERATE:
+            try:
+                gen, gen_seconds = ask(session, q["question"], mode="generate", ask_id=got.get("ask_id"),
+                                       previous=q.get("previous"))
             except (HTTPError, OSError) as exc:
                 gen, gen_seconds = {"status": failure(exc)}, 0.0
             row["model"] = score_model(q, gen, gen_seconds, restricted=sealed)
         rows.append(row)
         print(f"   {q['id']} {q['user']:<14} {row['status']:<14} {'✓' if row['correct'] else '✗'}"
-              f" {seconds:4.1f} s  {'; '.join(row['top']) or '—'}")
+              f" {row['route'] or '?'}{'' if row['route_ok'] else ' ✗đường'} {seconds:4.1f} s"
+              f"  {'; '.join(row['top']) or '—'}")
 
     s = summarize(rows)
     print("\n" + result_table(rows))
-    print(f"\nrecall@3 (câu dương): {s['recall']}/{s['positives']} · câu trích có từ khóa:"
+    print(f"\nrecall@3 (câu dương van_ban): {s['recall']}/{s['positives']} · câu trích có từ khóa:"
           f" {s['keywords']}/{s['positives']} · từ chối đúng (câu âm, câu bị cấm không được trả lời):"
           f" {s['refused']}/{s['negatives']}, trong đó no_evidence {s['no_evidence']}")
+    print("theo loại (đường đúng · trả lời đúng / số câu): " + " · ".join(
+        f"{loai} {t['route_ok']}·{t['correct']}/{t['asked']}" for loai, t in s["by_type"].items()))
     print(f"an toàn: {len(s['violations'])} lượt có nguồn bị cấm ({s['guarded']} câu có danh sách cấm, văn bản hạn chế"
           f" {', '.join(sealed)} cấm ở mọi câu) · tìm theo nghĩa {s['semantic']}/{s['asked']} lượt")
     print(f"thời gian extract: p50 {s['p50']:.1f} s, p95 {s['p95']:.1f} s"
@@ -2095,7 +2198,8 @@ def do_hoi_dap() -> None:
     problems = verdict(s)
     if problems:
         raise DemoFailed("; ".join(problems))
-    print(f"\n✓ không nguồn bị cấm nào; recall@3 {s['recall']}/{s['positives']} ≥ {RECALL_MIN:.0%}")
+    print(f"\n✓ không nguồn bị cấm nào; mọi câu đi đúng đường; recall@3 {s['recall']}/{s['positives']}"
+          f" ≥ {RECALL_MIN:.0%}")
 
 
 # --- F4.3 · Gợi ý giao việc -----------------------------------------------------------------------------------------
@@ -3622,13 +3726,23 @@ def nap_lo() -> None:
 
 # --- F3.14 · Log tập trung (make demo-log-tap-trung) ------------------------------------------------------------
 # Dịch vụ log tập trung thu (LOGGED_SERVICES của Makefile, tệp phủ platform/logs/docker-compose.logs.yml)
-LOG_COLLECTED = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres")
+LOG_COLLECTED = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres",
+                 "meilisearch")
 # Một yêu cầu phát hành đi qua: APISIX (dòng truy cập, mã ở cuối dòng), svc-workflow (office.action.done), Hasura
 # (svc-workflow, svc-files gửi mã kèm lời gọi GraphQL: hasura.http-log), svc-files (office.document.rendered…)
 LOG_TRACED = ("apisix", "svc-workflow", "hasura", "svc-files")
 # Không dòng nào trong kho log được có: token (Bearer, JWT), chuỗi truy vấn của ô tìm kiếm hay của lần đăng nhập
 LOG_FORBIDDEN = ("Bearer ey", "eyJ", "?q=", "?code=", "?state=")
 LOGS_WAIT_S = 60.0
+# Gọi thẳng Meilisearch từ container svc-files, không khóa: 401, dòng HTTP của Meilisearch mang chuỗi truy vấn q=…
+MEILI_PROBE = """
+import sys, urllib.error, urllib.parse, urllib.request
+url = "http://meilisearch:7700/indexes/demo-log/search?" + urllib.parse.urlencode({"q": sys.argv[1]})
+try:
+    print(urllib.request.urlopen(url, timeout=10).status)
+except urllib.error.HTTPError as exc:
+    print(exc.code)
+"""
 
 
 def traced_services(rows: list[dict[str, Any]]) -> set[str]:
@@ -3689,8 +3803,8 @@ def log_tap_trung() -> None:
     from moc_env import load_env
 
     print("Màn F3.14 · Log tập trung — một mã X-Request-Id đi qua APISIX → svc-workflow → Hasura, svc-files; Vector"
-          " thu log, che lần hai (Hasura, Keycloak, PostgreSQL không tự che: luật riêng), gửi Parseable; tra theo mã ra"
-          " dòng của cả bốn; câu SQL lỗi, lần đăng nhập sai vào kho đã che")
+          " thu log, che lần hai (Hasura, Keycloak, PostgreSQL, Meilisearch không tự che: luật riêng), gửi Parseable;"
+          " tra theo mã ra dòng của cả bốn; câu SQL lỗi, lần đăng nhập sai, câu tìm vào kho đã che")
 
     say(1, f"Log tập trung (profile logs): Vector, Parseable chạy; {len(LOG_COLLECTED)} dịch vụ gửi log qua driver"
            " fluentd của Docker")
@@ -3706,7 +3820,7 @@ def log_tap_trung() -> None:
             raise DemoFailed("log tập trung chưa bật và đây là bản cài (không có Makefile): thêm logs vào"
                              " MOC_EXTRA_PROFILES rồi cài lại (make install) — docs/van-hanh.md mục Log tập trung")
         print(f"   chưa bật: make logs-up (tạo lại {len(LOG_COLLECTED)} container, giữ nguyên dữ liệu; CSDL, Hasura,"
-              " Keycloak gián đoạn vài giây)")
+              " Keycloak, tìm kiếm gián đoạn vài giây)")
         subprocess.run(["make", "--no-print-directory", "logs-up"], cwd=ROOT, check=True)
         turned_on = True
         drivers = {s: log_driver(s) for s in LOG_COLLECTED}
@@ -3756,7 +3870,8 @@ def log_tap_trung() -> None:
         raise DemoFailed(f"core.audit_log không có dòng nào mang request_id {rid} (văn bản {doc_id})")
     ok("psql core.audit_log: " + ", ".join(f"{a} ×{n}" for a, n in audit))
 
-    say(5, "PostgreSQL, Keycloak không tự che: một câu SQL lỗi có giá trị giả, một lần đăng nhập bằng tên không có")
+    say(5, "PostgreSQL, Keycloak, Meilisearch không tự che: một câu SQL lỗi có giá trị giả, một lần đăng nhập bằng tên"
+           " không có, một câu tìm gọi thẳng Meilisearch")
     since = utc_mark()
     fake = f"Nguyen Van A {uuid.uuid4().hex[:8]}"           # giá trị trong câu lệnh lỗi: kho log không được có
     try:
@@ -3773,31 +3888,42 @@ def log_tap_trung() -> None:
     except HTTPError as exc:
         if exc.status not in (400, 401):
             raise
+    query = uuid.uuid4().hex[:12]                           # câu tìm gửi Meilisearch: kho không được có
+    status = compose("exec", "-T", "svc-files", "python", "-c", MEILI_PROBE, f"Tran Thi B {query}").decode().strip()
+    if status != "401":
+        raise DemoFailed(f"Meilisearch trả {status} cho câu tìm không khóa, cần 401")
     deadline = time.monotonic() + LOGS_WAIT_S
     while True:
         try:
             pg = logged_since(api.recent("postgres", 10), since)
             kc = logged_since(api.recent("keycloak", 10), since)
+            ms = logged_since(api.recent("meilisearch", 10), since)
         except lt.ParseableError as exc:
             raise DemoFailed(str(exc)) from exc
         entry = postgres_entry(pg, rid)
         statement = [r for r in entry if " STATEMENT:  " in str(r.get("message"))]
         failed = [r for r in kc if "LOGIN_ERROR" in str(r.get("message") or "")]
-        if (statement and failed) or time.monotonic() > deadline:
+        searched = [r for r in ms if "/indexes/demo-log/search" in str(r.get("message") or "")]
+        if (statement and failed and searched) or time.monotonic() > deadline:
             break
         time.sleep(2)
-    cli_lines(lt.table(entry + failed, 70))
+    cli_lines(lt.table(entry + failed + searched, 70))
     if not entry:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng ERROR của postgres mang {rid}")
     if not statement or not all(str(r.get("message")).endswith(" STATEMENT:  do [REDACTED]") for r in statement):
         raise DemoFailed("dòng STATEMENT của câu lỗi không có hoặc không bị che")
     if not failed:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng LOGIN_ERROR của keycloak")
-    for service, value, rows_ in (("postgres", fake, pg), ("keycloak", user, kc)):
+    if not searched:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng HTTP của meilisearch cho câu tìm thử")
+    if not all('"query_parameters":"[REDACTED]"' in str(r.get("message")) and '"error":"[REDACTED]"'
+               in str(r.get("message")) for r in searched):
+        raise DemoFailed("dòng HTTP của meilisearch không che chuỗi truy vấn hay lời lỗi")
+    for service, value, rows_ in (("postgres", fake, pg), ("keycloak", user, kc), ("meilisearch", query, ms)):
         if any(value in json.dumps(r, ensure_ascii=False) for r in rows_):
             raise DemoFailed(f"kho log có nguyên văn giá trị {service} phải che")
     ok(f"postgres: {len(entry)} dòng của mục lỗi (ERROR giữ lời báo, câu lệnh chỉ còn từ đầu); keycloak: LOGIN_ERROR"
-       " không còn tên gõ vào")
+       " không còn tên gõ vào; meilisearch: dòng HTTP 401 của câu tìm không còn chuỗi truy vấn, lời lỗi")
 
     say(6, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
     for who_, auth in (("không đăng nhập", None), ("sai mật khẩu", lt.auth_header(lt.USER, uuid.uuid4().hex))):
@@ -3809,7 +3935,7 @@ def log_tap_trung() -> None:
             if exc.status not in (401, 403):
                 raise
             ok(f"{who_}: HTTP {exc.status}")
-    leaked = log_leaks(rows + pg + kc, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""),
+    leaked = log_leaks(rows + pg + kc + ms, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""),
                                         env.get("HASURA_ADMIN_SECRET", ""), env.get("MOC_ACTION_SECRET", "")])
     if leaked:
         raise DemoFailed(f"kho log có dấu hiệu cấm: {', '.join(leaked[:6])}")
@@ -3873,11 +3999,137 @@ def log_tap_trung() -> None:
     else:
         print("   Tắt: bỏ logs khỏi MOC_EXTRA_PROFILES (nếu có) rồi make logs-down")
 
+# --- F3.13 · Cảnh báo vận hành ra chuông (make demo-canh-bao) ---------------------------------------------------------
+
+ALERT_BELL = """query Alerts {
+  core_notifications(where: {kind: {_eq: "ops.alert"}}, order_by: {id: desc}, limit: 20) { id data }
+}"""
+# Alertmanager gom 30 giây trước lần gửi đầu của một nhóm, gửi phần đổi (hết cảnh báo) mỗi phút (alertmanager.yml)
+ALERT_WAIT_S = 120
+# Gọi API của Alertmanager từ một container chỉ ở mạng moc (svc-files): tới được thì in "reached"
+ALERTMANAGER_PROBE = """
+import urllib.error, urllib.request
+try:
+    urllib.request.urlopen("http://alertmanager:9093/-/ready", timeout=5)
+    print("reached")
+except urllib.error.HTTPError:
+    print("reached")
+except OSError as exc:
+    print(type(exc).__name__)
+"""
+
+
+def in_alertmanager(url: str, body: Any, *headers: str) -> bytes:
+    """POST JSON bằng wget trong container alertmanager: Alertmanager, svc-workflow không mở cổng ra ngoài."""
+    args = ["exec", "-T", "alertmanager", "wget", "-q", "-O", "-", "--header", "Content-Type: application/json"]
+    for header in headers:
+        args += ["--header", header]
+    return compose(*args, "--post-data", json.dumps(body), url)
+
+
+def alert_rows(component: str, status: str) -> list[dict[str, str]]:
+    """Người nhận thông báo ops.alert của thành phần giả, theo vai trò và đơn vị (đọc thẳng CSDL)."""
+    out = psql("select u.role, n.tenant_id from core.notifications n join core.users u on u.tenant_id = n.tenant_id"
+               f" and u.id = n.user_id where n.kind = 'ops.alert' and n.data->>'component' = '{component}'"
+               f" and n.data->>'status' = '{status}'")
+    return [dict(zip(("role", "tenant"), line.split("|"))) for line in out.splitlines() if line]
+
+
+def canh_bao() -> None:
+    print("Màn F3.13 · Cảnh báo vận hành — Prometheus tính luật, Alertmanager gom rồi gọi svc-workflow: mỗi cảnh báo"
+          " thành thông báo ở chuông của quản trị mọi đơn vị (kèm email, webhook… nếu đã bật kênh); hết sự cố có thông"
+          " báo hết cảnh báo; gọi svc-workflow bằng token sai bị từ chối")
+
+    say(1, "Prometheus gửi cảnh báo đang bật cho Alertmanager; Alertmanager có token gọi svc-workflow")
+    try:
+        raw = compose("exec", "-T", "prometheus", "wget", "-q", "-O", "-", "http://localhost:9090/api/v1/alertmanagers")
+        urls = [a.get("url", "") for a in json.loads(raw)["data"]["activeAlertmanagers"]]
+    except (subprocess.CalledProcessError, ValueError, KeyError) as exc:
+        raise DemoFailed(f"không hỏi được Prometheus: {exc}") from exc
+    if not any("alertmanager:9093" in u for u in urls):
+        raise DemoFailed(f"Prometheus chưa nối Alertmanager: {urls}")
+    try:
+        compose("exec", "-T", "alertmanager", "test", "-s", "/tmp/moc-alert-token")
+    except subprocess.CalledProcessError as exc:
+        raise DemoFailed("Alertmanager chạy cấu hình không gửi: .env chưa có MOC_ALERT_TOKEN — make up (tự thêm), bản"
+                         " cài thì make install lại (docs/van-hanh.md mục Cảnh báo)") from exc
+    ok(f"Prometheus → {', '.join(urls)}; Alertmanager có token (tệp trên tmpfs, không in ra)")
+
+    say(2, "Giả một sự cố: đẩy cảnh báo ComponentDown của một thành phần giả vào Alertmanager")
+    component = f"demo-{uuid.uuid4().hex[:6]}"
+    starts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    alert = {"labels": {"alertname": "DemoCanhBao", "severity": "warning", "component": component},
+             "annotations": {"summary": f"Thành phần {component} gián đoạn (màn demo, không phải sự cố thật)"},
+             "startsAt": starts}
+    tenants = set(psql("select distinct tenant_id from core.users where role = 'tenant_admin' and enabled").split())
+    in_alertmanager("http://localhost:9093/api/v2/alerts", [alert])
+    admin = Session("quantri")
+    started = time.monotonic()
+    # svc-workflow ghi lần lượt từng đơn vị: chờ tới khi chuông của quantri có và mọi đơn vị đã có dòng
+    while True:
+        rows = [r for r in admin.gql(ALERT_BELL)["core_notifications"]
+                if r["data"].get("component") == component and r["data"].get("status") == "firing"]
+        got = alert_rows(component, "firing")
+        if rows and {r["tenant"] for r in got} >= tenants:
+            break
+        if time.monotonic() - started > ALERT_WAIT_S:
+            raise DemoFailed(f"sau {ALERT_WAIT_S} giây chuông của quantri {'có' if rows else 'chưa có'} cảnh báo"
+                             f" {component}, {len({r['tenant'] for r in got})}/{len(tenants)} đơn vị có thông báo")
+        time.sleep(3)
+    ok(f"sau {time.monotonic() - started:.0f} giây chuông của quantri (quản trị đơn vị): «Cảnh báo vận hành:"
+       f" {rows[0]['data']['message']}»")
+    if {r["role"] for r in got} != {"tenant_admin"} or {r["tenant"] for r in got} != tenants:
+        raise DemoFailed(f"cảnh báo phải tới quản trị của mọi đơn vị ({len(tenants)}), không ai khác: {got}")
+    ok(f"{len(got)} thông báo cho quản trị của {len(tenants)} đơn vị; văn thư, lãnh đạo, chuyên viên không nhận")
+
+    say(3, "Hết sự cố: Alertmanager gửi «đã hết», mỗi quản trị thêm một thông báo; gửi lại không thêm dòng")
+    alert["endsAt"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    in_alertmanager("http://localhost:9093/api/v2/alerts", [alert])
+    started = time.monotonic()
+    while len(alert_rows(component, "resolved")) < len(got):
+        if time.monotonic() - started > ALERT_WAIT_S:
+            raise DemoFailed(f"sau {ALERT_WAIT_S} giây chưa có thông báo hết cảnh báo {component}")
+        time.sleep(3)
+    if len(alert_rows(component, "firing")) != len(got):
+        raise DemoFailed("cảnh báo đang bật bị ghi thêm lần nữa")
+    ok(f"sau {time.monotonic() - started:.0f} giây: «Hết cảnh báo: {alert['annotations']['summary']}»; mỗi quản trị"
+       " đúng một thông báo bật, một thông báo hết")
+
+    say(4, "Gọi thẳng svc-workflow POST /ops/alerts bằng token sai (từ trong mạng nội bộ)")
+    try:
+        in_alertmanager("http://svc-workflow:8000/ops/alerts", {"alerts": [alert]}, "Authorization: Bearer sai-token")
+    except subprocess.CalledProcessError as exc:
+        if b"401" not in (exc.stderr or b""):
+            raise DemoFailed(f"svc-workflow trả lỗi khác 401: {exc.stderr!r}") from exc
+    else:
+        raise DemoFailed("svc-workflow nhận cảnh báo với token sai")
+    ok("401 — gọi thẳng svc-workflow mà không có token thì không ghi được thông báo")
+
+    say(5, "API của Alertmanager (đẩy cảnh báo, tạo silence, không đăng nhập) chỉ ở mạng alerts: svc-files không tới")
+    reached = compose("exec", "-T", "svc-files", "python", "-c", ALERTMANAGER_PROBE).decode().strip()
+    if reached == "reached":
+        raise DemoFailed("svc-files (mạng moc) gọi được API của Alertmanager: alertmanager phải chỉ ở mạng alerts")
+    ok(f"svc-files → alertmanager:9093: {reached}; chỉ Prometheus, svc-workflow chung mạng với Alertmanager")
+    # thông báo giả của màn: đánh dấu đã đọc để chuông của quản trị không đếm (email, SMS… đã gửi nếu kênh đang bật)
+    psql(f"update core.notifications set read_at = now() where kind = 'ops.alert' and read_at is null"
+         f" and data->>'component' = '{component}'")
+
+
 # ------------------------------------------------------------------------------------------- cắm ứng dụng bằng manifest
 
 APP_MANIFEST = "apps/bang-tin/app.yaml"
 APP_NAME, APP_PATH = "bang-tin", "/bang-tin/"
 APP_CALLBACK = f"{PUBLIC_URL}/bang-tin/dang-nhap"
+
+
+def need_sources(screen: str, *rels: str) -> None:
+    """Màn cắm ứng dụng đọc gói ứng dụng mẫu trong apps/ của thư mục mã nguồn; bản cài (make install) không chép apps/,
+    vì gói ứng dụng nằm ngoài lõi. Kiểm trước khi gỡ hay đổi gì: thiếu tệp mà vẫn chạy thì màn gỡ ứng dụng đang cài
+    rồi mới dừng."""
+    missing = [rel for rel in rels if not (ROOT / rel).exists()]
+    if missing:
+        raise DemoFailed(f"không có {', '.join(missing)}: bản cài không chép apps/ (gói ứng dụng nằm ngoài lõi). Chạy "
+                         f"make demo-{screen} trong thư mục mã nguồn; chưa gỡ hay đổi gì")
 
 
 def app_query() -> str:
@@ -4001,6 +4253,7 @@ def cai_ung_dung() -> None:
     from demo_ca_nhan import OWNER, Browser, as_session, claims_of, exchange
 
     print("Cắm ứng dụng thứ ba bằng một lệnh — Bảng tin đơn vị (apps/bang-tin): không sửa tệp nào của lõi")
+    need_sources("cai-ung-dung", APP_MANIFEST, "apps/bang-tin/public/tin.js", "apps/office/app/utils/apps.ts")
     listed = json.loads(moc_app("list", "--json"))["apps"]
     if any(a["name"] == APP_NAME and (a["installed"] or a["removing"]) for a in listed):
         moc_app("remove", APP_NAME)
@@ -4317,6 +4570,7 @@ def quy_trinh() -> None:
 
     print("Quy trình của ứng dụng chạy trên lõi — Đơn nghỉ phép (apps/nghi-phep): ứng dụng mang BPMN và form, lõi "
           "triển khai, kiểm form, giao việc theo phòng; không sửa tệp nào của lõi")
+    need_sources("quy-trinh", QT_MANIFEST, f"apps/{QT_NAME}/forms")
     listed = json.loads(moc_app("list", "--json"))["apps"]
     if any(a["name"] == QT_NAME and (a["installed"] or a["removing"]) for a in listed):
         moc_app("remove", QT_NAME)
@@ -4469,7 +4723,7 @@ DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ke
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
          "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
          "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung,
-         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh}
+         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh, "canh-bao": canh_bao}
 
 
 def main(argv: list[str] | None = None) -> int:

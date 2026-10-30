@@ -53,6 +53,9 @@ Chuông trên thanh trên cùng báo việc mới, việc hoặc văn bản quá
 2. Gõ câu hỏi, bấm **Hỏi** (hoặc Enter).
 3. Câu trả lời gồm **Câu trích nguyên văn** lấy từ văn bản. Nếu đơn vị bật mô hình ngôn ngữ thì có thêm **Trả lời của
    trợ lý**. Mỗi ý đều ghi văn bản nguồn: bấm **Mở văn bản** để đối chiếu trước khi dùng.
+4. Hỏi về việc của bạn ("Việc nào của tôi sắp quá hạn?") hay số văn bản ("Có bao nhiêu văn bản đến trong tháng
+   này?") thì trợ lý đếm thẳng trong dữ liệu bạn được xem, ghi căn cứ, kèm liên kết **Mở Hộp việc** hoặc **Mở danh
+   sách văn bản**.
 
 ![Hỏi đáp: câu trích nguyên văn và hai văn bản nguồn](../anh/huong-dan/hoi-dap.png)
 
@@ -80,7 +83,7 @@ bản đến vừa vào sổ và văn bản đi vừa phát hành, chỉ gồm v
 
 ## Đơn nghỉ phép
 
-Chỉ có khi đơn vị đã cài ứng dụng này. Giao diện chỉ có tiếng Việt.
+Chỉ có khi đơn vị đã cài ứng dụng này.
 
 1. Mở **Ứng dụng**, ở thẻ **Đơn nghỉ phép** bấm **Mở**.
 2. Ở phần **Gửi đơn**, điền Loại nghỉ, Từ ngày, Đến ngày, Lý do rồi bấm **Gửi đơn**.
@@ -104,8 +107,8 @@ mục "Hội tụ IT/OT".
 
 ## Đổi ngôn ngữ
 
-Bấm **EN** trên thanh trên cùng để chuyển sang tiếng Anh, bấm **VI** để về tiếng Việt. Không gian cá nhân và Bảng tin
-dùng chung lựa chọn này: nút ở đó ghi **English** / **Tiếng Việt**. Đơn nghỉ phép chỉ có tiếng Việt.
+Bấm **EN** trên thanh trên cùng để chuyển sang tiếng Anh, bấm **VI** để về tiếng Việt. Không gian cá nhân, Bảng tin
+và Đơn nghỉ phép dùng chung lựa chọn này: nút ở đó ghi **English** / **Tiếng Việt**.
 
 ## Xác thực một văn bản đã phát hành
 

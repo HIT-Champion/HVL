@@ -95,6 +95,7 @@ create table core.users (                   -- danh bạ, đồng bộ từ Keyc
   username       text not null,
   full_name      text not null,                 -- "firstName lastName" của Keycloak: họ đệm + tên
   email          text,
+  phone          text,                          -- số nhận SMS, E.164 (+84…): phone_number của Keycloak (#365)
   role           text not null check (role in ('clerk', 'staff', 'manager', 'director', 'tenant_admin')),
   enabled        boolean not null default true  -- bị xóa hoặc khóa trong Keycloak: false, không xóa dòng
 );
@@ -193,8 +194,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   thời gian, lý do của lượt đọc văn bản đến `intake.suggested` — migration 1792281601900, các khóa này chỉ hiện ở
   dòng sự kiện đó; mã lượt hỏi, chế độ, nguồn câu trả lời, số đoạn, số nguồn được trích, có tìm theo nghĩa không, tên
   mô hình sinh và mô hình nhúng, thời gian, mã cảnh báo của câu trả lời `assistant.answered` — migration
-  1792281602000, cũng chỉ ở dòng sự kiện đó; id các văn bản nguồn vẫn ẩn; kết quả, lý do không gợi ý, số ngày đề xuất,
-  độ tin cậy, số căn cứ, số văn bản tương tự, có tìm theo nghĩa không, thời gian của gợi ý giao việc
+  1792281602000, cũng chỉ ở dòng sự kiện đó (thêm đường, mã lý do của bộ định tuyến, có ghép câu nối tiếp không,
+  nơi chạy mô hình — migration 1792281604100, #423, #430); id các văn bản nguồn vẫn ẩn; kết quả, lý do không gợi ý,
+  số ngày đề xuất, độ tin cậy, số căn cứ, số văn bản tương tự, có tìm theo nghĩa không, thời gian của gợi ý giao việc
   `assignment.suggested` — migration 1792281602100, chỉ ở dòng sự kiện đó; loại lô, định dạng, có vào sổ không, số
   dòng, số đạt / trùng / lỗi của lô nạp `import.created`, `import.finished` — migration 1792281602800, tên tệp vẫn
   ẩn). Lãnh đạo không đọc được văn bản hạn chế
@@ -364,6 +366,14 @@ Kênh ngoài (email, webhook; migration 1792281602600): svc-workflow khai ở c�
 `sent_at`; unique `(notification_id, channel)`). Bảng này gắn sổ kiểm toán — lần gửi ra ngoài hệ thống phải truy được
 — và không có địa chỉ email, URL hay nội dung: người nhận đọc từ `core.users` lúc gửi. Chỉ `service` của đơn vị đọc và
 ghi kết quả; người dùng không đọc (mô tả: `services/svc-workflow/README.md`).
+SMS, Zalo (#365, migration 1792281603700) chỉ gửi cho người tự bật: `core.notification_subscriptions` một dòng mỗi
+(người, kênh `sms` | `zalo`) — `enabled`, với Zalo thêm `zalo_chat_id` (đã liên kết) hoặc mã liên kết 8 ký tự còn
+hạn (`link_code`, `link_expires_at`, chỉ mục duy nhất). Ràng buộc: Zalo bật thì phải có chat_id; SMS không có chat_id
+hay mã. Trigger xếp hàng chỉ thêm dòng `sms`, `zalo` khi người nhận còn bật kênh, tài khoản còn hoạt động và — với
+SMS — `core.users.phone` có số. Bảng gắn sổ kiểm toán; chỉ `service` đọc, ghi (qua Action `myChannels`,
+`setMyChannel`), người dùng không đọc thẳng; `phone` của `core.users` cũng chỉ `service` đọc. Sổ kiểm toán chỉ ghi
+thêm, nên `diff` giữ mãi số điện thoại, chat_id và mã liên kết cũ. Không vai trò người dùng nào đọc `diff` thô:
+`overview` của lãnh đạo, quản trị đơn vị lấy theo danh sách cho phép (`core.audit_overview`), không có ba trường này.
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
 
 **Lô nạp khối lớn** (cụm ⑤, migration 1792281602800; mô tả: `services/svc-files/README.md`, mục Nạp lô văn bản
@@ -516,6 +526,7 @@ create table office.documents (
   recipients       text[] not null default '{}',        -- nơi nhận, như in trên văn bản
   recipient_tenant_ids uuid[] not null default '{}',    -- đơn vị nhận trong hệ thống (F3.12, migration 1792281601800)
   body             text check (char_length(body) <= 20000),  -- nội dung văn bản đi; mỗi dòng một đoạn
+  language         text not null default 'vi' check (language in ('vi', 'en')),  -- ngôn ngữ in (F2.9)
   reply_to_id      uuid references office.documents,    -- trả lời văn bản đến nào
   content_sha256   bytea unique check (content_sha256 is null or octet_length(content_sha256) = 32),
   verify_code      text unique check (verify_code is null or verify_code ~ '^[A-Z2-7]{10}$'),
@@ -1147,7 +1158,7 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 
 | Action | Ai gọi | Làm gì |
 |---|---|---|
-| `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến (F2.2). Kiểm `data` theo `schemas/van-ban-den.json` — cùng tệp form đã kiểm — rồi tra loại văn bản, tệp do chính người gọi tải lên, văn bản trùng (cùng cơ quan, số ký hiệu, ngày; kể cả văn bản hạn chế văn thư không thấy). Ghi văn bản `received` kèm tệp (tệp đầu là bản chính) bằng vai trò `service`, người tạo là người gọi. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`). Văn bản hạn chế phải kèm toàn tệp đã mã hóa, văn bản thường không được kèm tệp mã hóa (`file_ids`: `not_sealed`, `sealed`). Văn thư không có quyền ghi thẳng bảng văn bản lẫn bảng tệp đính kèm |
+| `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến (F2.2). Kiểm `data` theo `schemas/van-ban-den.json` — cùng tệp form đã kiểm — rồi tra loại văn bản, tệp do chính người gọi tải lên, văn bản trùng (cùng cơ quan, số ký hiệu, ngày; kể cả văn bản hạn chế văn thư không thấy). Ghi văn bản `received` kèm tệp (tệp đầu là bản chính) bằng vai trò `service`, người tạo là người gọi. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`). Văn bản hạn chế phải kèm toàn tệp đã mã hóa, văn bản thường không được kèm tệp mã hóa (`file_ids`: `not_sealed`, `sealed`). Văn thư không có quyền ghi thẳng bảng văn bản lẫn bảng tệp đính kèm. Trigger `documents_received` ghi sự kiện `office.document.received` cùng giao dịch (#381) |
 | `registerIncoming(documentId)` | `clerk` | Gọi hàm `office.register_incoming` (một giao dịch: khóa văn bản, lấy số kế tiếp của sổ năm nay, `received → registered`, ghi sự kiện), rồi khởi chạy `van-ban-den` với `businessKey = documentId`. Flowable lỗi thì vẫn giữ số đã cấp; job đối soát (5 phút) khởi chạy sau |
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
@@ -1373,7 +1384,7 @@ chống trùng bằng `event.data.new.id`.
 
 | `type` | Phát khi |
 |---|---|
-| `office.document.received` | Văn thư thêm văn bản đến |
+| `office.document.received` | Văn thư thêm văn bản đến: trigger `documents_received` (migration `1792281603800_document_received`, #381), lúc xảy ra là `created_at` của văn bản; văn bản nhận liên thông có `office.document.arrived` thay cho sự kiện này |
 | `office.document.registered` | Vào sổ, có số đến |
 | `office.document.directed` | Lãnh đạo ghi ý kiến chỉ đạo |
 | `office.document.assigned` | Có việc giao cho một người hoặc phòng |
@@ -1444,16 +1455,21 @@ có giá trị vô hướng, **không** câu hỏi, câu trả lời, số ký h
 {
   "user_id": "<sub người hỏi>", "ask_id": "5d1e…", "mode": "generate", "status": "answered",
   "answer_source": "model", "hits": 5, "cited": 2, "documents": "<id>,<id>", "semantic": true,
-  "model": "qwen3:1.7b", "embed_model": "qwen3-embedding:0.6b", "duration_ms": 18230, "warnings": ""
+  "model": "qwen3:1.7b", "embed_model": "qwen3-embedding:0.6b", "duration_ms": 18230, "warnings": "",
+  "route": "van_ban", "route_reason": "mac-dinh", "followup": false, "model_where": "local"
 }
 ```
 
 `mode`: `extract` | `generate`; `status`: `answered` | `passages_only` | `no_evidence`; `answer_source`: `extract` |
-`model` | `none`; `hits`: số đoạn sau hậu kiểm; `cited`: số nguồn được trích; `documents`: id các văn bản nguồn,
-cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`, `embed_model`: tên mô hình hoặc null; `warnings`:
+`model` | `fixed` | `data` | `none`; `hits`: số đoạn sau hậu kiểm; `cited`: số nguồn được trích; `documents`: id
+các văn bản nguồn, cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`, `embed_model`: tên mô hình
+hoặc null; `model_where`: `local` (Ollama) | `external` (API ngoài, #430), null khi không gọi mô hình viết; `warnings`:
 mã cảnh báo cách nhau dấu phẩy (`embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`,
-`model_declined`), rỗng nếu không có. Lãnh đạo xem sổ thấy mọi khóa qua `overview` (§1) trừ `documents`: id văn bản
-nguồn chỉ vai trò `service` đọc được.
+`model_declined`), rỗng nếu không có; `route`: đường bộ định tuyến chọn (`van_ban` | `gioi_thieu` | `huong_dan` |
+`ngoai_pham_vi`, #423; `viec_cua_toi` | `dem_van_ban`, #441); `route_reason`: mã của mẫu đã khớp (`kw:lam-duoc-gi`…)
+hoặc `mac-dinh`, không bao giờ là chữ của câu hỏi; `followup`: câu hỏi được ghép với câu trước (câu trước, câu ghép
+không lưu). Lãnh đạo xem sổ thấy mọi khóa qua `overview` (§1) trừ `documents`: id văn bản nguồn chỉ vai trò `service`
+đọc được.
 
 **Gợi ý giao việc** (F4.3): mỗi văn bản đến tác tử xét xong (có gợi ý, không gợi ý được, hay `svc-files` không trả
 lời), `svc-workflow` ghi một dòng `core.audit_log` bằng vai trò `agent`, **cùng giao dịch** với dòng

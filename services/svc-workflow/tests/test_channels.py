@@ -15,9 +15,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Định tuyến thông báo đa kênh (channels.py): cấu hình, chọn kênh lúc ghi, gửi email qua một máy chủ SMTP nhỏ chạy
-thật trên 127.0.0.1, webhook tới http.server cục bộ, thử lại có giới hạn, nhật ký không có thông tin cá nhân.
+thật trên 127.0.0.1, webhook tới http.server cục bộ, SMS, Zalo qua transport giả của httpx2, thử lại có giới hạn, nhật
+ký không có thông tin cá nhân. Bật, tắt, liên kết kênh cá nhân: test_subscriptions.py.
 
-Địa chỉ email, tên người trong tệp này là giả lập (miền example.com dành cho ví dụ, RFC 2606).
+Địa chỉ email, số điện thoại, tên người, token trong tệp này là giả lập (miền example.com dành cho ví dụ, RFC 2606).
 """
 
 from __future__ import annotations
@@ -50,12 +51,16 @@ from svc_workflow.channels import (
     KINDS,
     MAX_ATTEMPTS,
     NOTE,
+    OPS_RESOLVED,
     RESTRICTED,
     SOMEONE,
     TITLES,
     Router,
+    SmsConfig,
     SmtpConfig,
     WebhookConfig,
+    ZaloBot,
+    ZaloConfig,
     describe,
     send_smtp,
 )
@@ -65,6 +70,10 @@ from svc_workflow.notify import Notifier
 EMAIL = "lethihoa@example.com"          # giả lập
 NAME = "Lê Thị Hoa"                     # giả lập
 SECRET = "bi-mat-webhook-77"            # phần khóa trong đường dẫn webhook (giả lập)
+PHONE = "+84912345678"                  # giả lập
+CHAT = "zl-chat-5566"                   # chat_id Zalo (giả lập)
+TOKEN = "1234567890:token-bot-gia-lap"  # token bot Zalo (giả lập)
+SMS_PASSWORD = "mat-khau-cong-sms"      # giả lập
 VI = Path(__file__).resolve().parents[3] / "apps" / "office" / "app" / "locales" / "vi.json"
 ENV = {
     "HASURA_ADMIN_SECRET": "h", "MOC_ACTION_SECRET": "bi-mat-action", "FLOWABLE_ADMIN_PASSWORD": "f",
@@ -186,10 +195,12 @@ def test_texts_match_the_web_bell():
     assert FORMS == forms
     keys = {"task.assigned": "taskAssigned", "task.overdue": "taskOverdue", "task.escalated": "taskEscalated",
             "document.issued": "documentIssued", "document.processed": "documentProcessed",
-            "document.overdue": "documentOverdue", "ot.alarm": "otAlarm", "document.incoming": "documentIncoming"}
+            "document.overdue": "documentOverdue", "ot.alarm": "otAlarm", "document.incoming": "documentIncoming",
+            "ops.alert": "opsAlert", "flow.message": "flowMessage"}
     assert set(keys) == set(KINDS) == set(TITLES)
     for kind, key in keys.items():
         assert TITLES[kind] == vi["notify"][key], kind
+    assert OPS_RESOLVED == vi["notify"]["opsResolved"]
     assert (SOMEONE, RESTRICTED, NOTE.replace("{note}", "{note}")) == (
         vi["notify"]["someone"], vi["notify"]["restricted"], vi["notify"]["note"])
 
@@ -205,6 +216,11 @@ def test_describe_like_the_bell_and_without_names_for_the_webhook():
     assert describe("ot.alarm", {"name": "Phòng máy\n1", "temperature": 1234.5}).title == (
         "Cảnh báo nhiệt độ Phòng máy 1: 1.234,5 °C — đã có dự thảo báo cáo sự cố")
     assert describe("document.issued", {"symbol": "05/TB", "summary": "Lịch họp"}).detail == "Lịch họp"
+    alert = {"status": "firing", "message": "Thành phần Hasura\nngừng chạy", "component": "hasura"}
+    shown = describe("ops.alert", alert, names=False)
+    assert (shown.title, shown.detail, shown.note) == ("Cảnh báo vận hành: Thành phần Hasura ngừng chạy", "", "")
+    assert make_router()._link({"kind": "ops.alert", "document_id": None}) == "https://signet.example.com/trang-thai"
+    assert describe("ops.alert", {**alert, "status": "resolved"}).title == "Hết cảnh báo: Thành phần Hasura ngừng chạy"
 
 
 # --- gửi: Hasura giả của hộp thư đi --------------------------------------------------------------------------------
@@ -220,7 +236,7 @@ class Outbox:
         assert "query DueDeliveries" in query
         now = datetime.fromisoformat(variables["now"])
         due = [r for r in self.rows.values() if r["status"] == "pending" and r["next_attempt_at"] <= now]
-        keys = ("id", "tenant_id", "channel", "attempts", "notification", "recipient")
+        keys = ("id", "tenant_id", "channel", "attempts", "notification", "recipient", "subscriptions")
         return {"core_notification_deliveries": [{k: copy.deepcopy(r[k]) for k in keys}
                                                  for r in due[:variables["limit"]]]}
 
@@ -239,12 +255,18 @@ class Outbox:
 
 
 def due(id_: int = 1, channel: str = "email", *, kind: str = "task.overdue", data: dict[str, Any] | None = None,
-        recipient: dict[str, Any] | None = None, attempts: int = 0) -> dict[str, Any]:
+        recipient: dict[str, Any] | None = None, attempts: int = 0,
+        subscriptions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    # mặc định người nhận đã bật SMS và đã liên kết Zalo (DUE đọc kèm core.notification_subscriptions)
+    subs = [{"channel": "sms", "enabled": True, "zalo_chat_id": None},
+            {"channel": "zalo", "enabled": True, "zalo_chat_id": CHAT}]
     return {"id": id_, "tenant_id": str(TENANT), "channel": channel, "attempts": attempts, "status": "pending",
             "next_attempt_at": LONG_AGO,
             "notification": {"kind": kind, "document_id": DOC, "data": BRIEF if data is None else data,
                              "created_at": "2026-10-23T02:00:00+00:00"},
-            "recipient": {"full_name": NAME, "email": EMAIL, "enabled": True} if recipient is None else recipient}
+            "recipient": ({"full_name": NAME, "email": EMAIL, "enabled": True, "phone": PHONE} if recipient is None
+                          else recipient),
+            "subscriptions": subs if subscriptions is None else subscriptions}
 
 
 # --- máy chủ SMTP nhỏ trên 127.0.0.1 -----------------------------------------------------------------------------
@@ -700,3 +722,186 @@ def test_app_starts_the_loop_only_when_configured(hasura, flowable, smtp_server)
     with TestClient(app):
         pass                                        # vòng nền chạy rồi dừng cùng ứng dụng, không treo
     assert datetime.now(UTC) > LONG_AGO
+
+
+# --- SMS, Zalo (#365) ---------------------------------------------------------------------------------------------
+
+SMS_ENV = {"MOC_SMS_GATEWAY_URL": "http://192.168.1.50:8080/", "MOC_SMS_GATEWAY_USER": "sms",
+           "MOC_SMS_GATEWAY_PASSWORD": SMS_PASSWORD}
+ZALO_ENV = {"MOC_ZALO_BOT_TOKEN": TOKEN, "MOC_ZALO_BOT_URL": "https://zalo.me/signet-bot"}
+
+
+def test_personal_channels_from_settings_keep_secrets_out_of_repr():
+    settings = Settings.from_env({**ENV, **SMS_ENV, **ZALO_ENV, "MOC_NOTIFY_SMS_KINDS": "task.overdue"})
+    router = Router.from_settings(object(), settings)  # type: ignore[arg-type]
+    assert router is not None and router.smtp is None and router.personal == ("sms", "zalo")
+    assert router.sms == SmsConfig("http://192.168.1.50:8080", "sms", SMS_PASSWORD)
+    assert router.zalo is not None and router.zalo.bot_url == "https://zalo.me/signet-bot"
+    assert router.sms_kinds == {"task.overdue"} and not router.zalo_kinds
+    for text in (repr(settings), repr(router.sms), repr(router.zalo)):
+        assert SMS_PASSWORD not in text and TOKEN not in text
+    only_zalo = Router.from_settings(object(), Settings.from_env({**ENV, **ZALO_ENV}))  # type: ignore[arg-type]
+    assert only_zalo is not None and only_zalo.personal == ("zalo",)
+    run(router.aclose())
+    run(only_zalo.aclose())
+
+
+@pytest.mark.parametrize(("extra", "message"), [
+    ({"MOC_SMS_GATEWAY_URL": "ftp://192.168.1.50"}, "MOC_SMS_GATEWAY_URL"),
+    ({**SMS_ENV, "MOC_SMS_GATEWAY_URL": f"http://sms:{SMS_PASSWORD}@192.168.1.50:8080"}, "MOC_SMS_GATEWAY_URL"),
+    ({"MOC_SMS_GATEWAY_URL": "http://192.168.1.50:8080"}, "MOC_SMS_GATEWAY_PASSWORD"),
+    ({"MOC_ZALO_BOT_TOKEN": "token/../../khac"}, "MOC_ZALO_BOT_TOKEN"),
+    ({**ZALO_ENV, "MOC_ZALO_BOT_URL": "http://zalo.me/signet-bot"}, "MOC_ZALO_BOT_URL"),
+    ({"MOC_NOTIFY_ZALO_KINDS": "task.lost"}, "MOC_NOTIFY_ZALO_KINDS"),
+])
+def test_wrong_personal_channel_settings_stop_at_startup(extra, message):
+    with pytest.raises(ConfigError, match=message) as err:
+        Settings.from_env({**ENV, **extra})
+    assert SMS_PASSWORD not in str(err.value) and "../" not in str(err.value)
+
+
+def test_personal_channels_go_to_every_recipient_but_not_for_restricted_documents():
+    router = make_router(sms=SmsConfig("http://sms", "u", "p"), zalo=ZaloConfig(TOKEN), zalo_kinds=("task.overdue",))
+    rows = [{"user_id": "a"}, {"user_id": "b"}]
+    assert router.route("task.overdue", BRIEF, rows)
+    assert [r["channels"] for r in rows] == [["email", "sms", "zalo"], ["email", "sms", "zalo"]]
+    rows = [{"user_id": "a"}]
+    router.route("task.assigned", BRIEF, rows)
+    assert rows[0]["channels"] == ["email", "sms"]
+    rows = [{"user_id": "a"}]
+    router.route("task.overdue", {"form_key": "vbden.xuLy", "restricted": True}, rows)
+    assert rows[0]["channels"] == ["email"]
+    run(router.aclose())
+
+
+class Gateway:
+    """Cổng SMS và API bot Zalo giả (transport của httpx2): ghi yêu cầu, trả lời theo hàng đợi."""
+
+    def __init__(self, *replies: httpx2.Response) -> None:
+        self.replies = list(replies)
+        self.requests: list[httpx2.Request] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        return self.replies.pop(0) if self.replies else httpx2.Response(202, json={"state": "Pending"})
+
+
+def personal_router(outbox: Outbox, gateway: Gateway, clock, **kwargs: Any) -> Router:
+    return Router(outbox, sms=SmsConfig("http://192.168.1.50:8080", "sms", SMS_PASSWORD),
+                  zalo=ZaloConfig(TOKEN), public_url="https://signet.example.com", clock=clock,
+                  transport=httpx2.MockTransport(gateway), **kwargs)
+
+
+def test_sms_goes_to_the_gateway_with_basic_auth_short_text_and_link(clock):
+    gateway = Gateway()
+    outbox = Outbox(due(1, "sms", data={**BRIEF, "assignee_name": NAME, "note": "Gấp"}, kind="task.escalated"))
+    router = personal_router(outbox, gateway, clock)
+    run(router.run())
+    run(router.aclose())
+    (request,) = gateway.requests
+    assert str(request.url) == "http://192.168.1.50:8080/message"
+    assert request.headers["authorization"].startswith("Basic ")
+    body = json.loads(request.content)
+    assert body["phoneNumbers"] == [PHONE]
+    text = body["textMessage"]["text"]
+    assert text == f"Signet: {describe('task.escalated', BRIEF, names=False).title}\n" \
+                   f"https://signet.example.com/van-ban/{DOC}"
+    assert NAME not in text and "Gấp" not in text and BRIEF["summary"] not in text
+    assert outbox.rows[1]["status"] == "sent"
+
+
+def test_zalo_message_goes_to_the_linked_chat(clock):
+    gateway = Gateway(httpx2.Response(200, json={"ok": True, "result": {"message_id": "m1", "date": 1}}))
+    outbox = Outbox(due(1, "zalo"))
+    router = personal_router(outbox, gateway, clock)
+    run(router.run())
+    run(router.aclose())
+    (request,) = gateway.requests
+    assert str(request.url) == f"https://bot-api.zaloplatforms.com/bot{TOKEN}/sendMessage"
+    assert json.loads(request.content) == {"chat_id": CHAT, "text": router.short(outbox.rows[1]["notification"])}
+    assert outbox.rows[1]["status"] == "sent"
+
+
+@pytest.mark.parametrize(("channel", "reply", "outcome", "reason"), [
+    ("sms", httpx2.Response(500), "pending", "HTTP 500"),
+    ("sms", httpx2.Response(429), "pending", "HTTP 429"),
+    ("sms", httpx2.Response(401), "failed", "HTTP 401"),
+    ("zalo", httpx2.Response(200, json={"ok": False, "error_code": 429, "description": f"chat {CHAT}"}),
+     "pending", "Zalo 429"),
+    ("zalo", httpx2.Response(200, json={"ok": False, "error_code": 403, "description": "Internal server error"}),
+     "pending", "Zalo 403"),
+    ("zalo", httpx2.Response(200, json={"ok": False, "error_code": 401, "description": "token"}), "failed",
+     "Zalo 401"),
+    ("zalo", httpx2.Response(400, json={"ok": False, "error_code": 400, "description": f"chat {CHAT}"}), "failed",
+     "Zalo 400"),
+    ("zalo", httpx2.Response(502, text="<html>"), "pending", "HTTP 502"),
+])
+def test_gateway_and_bot_errors_decide_retry(clock, channel, reply, outcome, reason):
+    outbox = Outbox(due(1, channel))
+    router = personal_router(outbox, Gateway(reply), clock)
+    run(router.run())
+    run(router.aclose())
+    row = outbox.rows[1]
+    assert (row["status"], row["last_error"]) == (outcome, reason)
+
+
+@pytest.mark.parametrize(("channel", "change", "reason"), [
+    ("sms", {"subscriptions": [{"channel": "sms", "enabled": False, "zalo_chat_id": None}]}, "Người nhận đã tắt SMS"),
+    ("sms", {"recipient": {"full_name": NAME, "email": EMAIL, "enabled": True, "phone": None}},
+     "Người nhận chưa có số điện thoại trong danh bạ"),
+    ("sms", {"data": {"form_key": "vbden.xuLy", "restricted": True}}, "Văn bản hạn chế không gửi qua SMS"),
+    ("zalo", {"subscriptions": []}, "Người nhận đã tắt Zalo"),
+    ("zalo", {"recipient": {"full_name": NAME, "email": EMAIL, "enabled": False, "phone": PHONE}},
+     "Người nhận đã khóa hoặc không còn trong danh bạ"),
+])
+def test_personal_rows_are_checked_again_when_sending(clock, channel, change, reason):
+    gateway = Gateway()
+    outbox = Outbox(due(1, channel, **change))
+    router = personal_router(outbox, gateway, clock)
+    run(router.run())
+    run(router.aclose())
+    assert (outbox.rows[1]["status"], outbox.rows[1]["last_error"]) == ("skipped", reason)
+    assert gateway.requests == []
+
+
+def test_channel_unset_after_queueing_skips_sms_and_zalo(clock):
+    outbox = Outbox(due(1, "sms"), due(2, "zalo"))
+    run(make_router(outbox, clock=clock).run())
+    assert [(r["status"], r["last_error"]) for r in outbox.rows.values()] == [
+        ("skipped", "Kênh SMS đã tắt"), ("skipped", "Kênh Zalo đã tắt")]
+
+
+def test_sms_and_zalo_failures_log_no_phone_chat_or_token(clock):
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        if request.url.host == "192.168.1.50":
+            raise httpx2.ConnectError(f"không nối được {request.url}")
+        return httpx2.Response(400, json={"ok": False, "error_code": 400, "description": f"chat_id {CHAT} sai"})
+
+    outbox = Outbox(due(1, "sms"), due(2, "zalo"))
+    router = personal_router(outbox, refuse, clock)  # type: ignore[arg-type]
+    with raw_log() as stream:
+        run(router.run())
+        run(router.aclose())
+    text = stream.getvalue()
+    for value in (PHONE, CHAT, TOKEN, SMS_PASSWORD, "192.168.1.50"):
+        assert value not in text
+        assert all(value not in str(r.get("last_error")) for r in outbox.results)
+    assert [(r["id"], r["last_error"]) for r in outbox.results] == [(1, "ConnectError"), (2, "Zalo 400")]
+
+
+def test_bot_updates_wait_and_accept_one_event_or_a_list():
+    event = {"event_name": "message.text.received", "message": {"text": "ABCD2345", "chat": {"id": CHAT}}}
+    gateway = Gateway(httpx2.Response(200, json={"ok": False, "error_code": 408, "description": "timeout"}),
+                      httpx2.Response(200, json={"ok": True, "result": event}),
+                      httpx2.Response(200, json={"ok": True, "result": [event, "rác"]}))
+    bot = ZaloBot(ZaloConfig(TOKEN), transport=httpx2.MockTransport(gateway))
+
+    async def scenario() -> list[list[dict[str, Any]]]:
+        try:
+            return [await bot.updates(5) for _ in range(3)]
+        finally:
+            await bot.aclose()
+
+    assert run(scenario()) == [[], [event], [event]]
+    assert str(gateway.requests[0].url).endswith("/getUpdates")
+    assert json.loads(gateway.requests[0].content) == {"timeout": "5"}

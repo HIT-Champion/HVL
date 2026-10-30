@@ -283,7 +283,7 @@ export function lineageLayout(graph: LineageGraph): Placed[] {
   }))
 }
 
-const PRODUCER = 'https://github.com/HIT-Champion/HVL/tree/main/apps/office'
+const PRODUCER = 'https://github.com/HIT-Champion/Signet/tree/main/apps/office'
 const JOB_EVENT = 'https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/JobEvent'
 
 function pgDataset(name: string) {

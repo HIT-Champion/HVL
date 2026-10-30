@@ -1,9 +1,11 @@
 # Vận hành Signet
 
+**English:** [van-hanh.en.md](van-hanh.en.md)
+
 Các việc của người quản trị trên một bản cài đang chạy: thêm đơn vị, sao lưu và khôi phục, két bí mật, GitOps và tự phục
-hồi, giám sát, trang trạng thái hệ thống, hội tụ IT/OT. Cài lần đầu: [README](../README.md), mục "Cài đặt từ mã nguồn";
-lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md). Lệnh vận hành là `python3 scripts/moc.py …` (tên mã
-kỹ thuật `moc` giữ từ tên cũ của sản phẩm).
+hồi, giám sát, trang trạng thái hệ thống, wiki nội bộ, tự động hóa bằng Node-RED, hội tụ IT/OT. Cài lần đầu:
+[README](../README.md), mục "Cài đặt từ mã nguồn"; lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md).
+Lệnh vận hành là `python3 scripts/moc.py …` (tên mã kỹ thuật `moc` giữ từ tên cũ của sản phẩm).
 
 ## Thêm đơn vị (thuê ước)
 
@@ -33,6 +35,8 @@ python3 scripts/moc.py tenant check KTCK     # Organization, thành viên, danh 
   hóa gắn với đơn vị — lý do ở [`docs/mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md) §1. Riêng khóa ký số văn bản đi
   (F4.5, minh họa) là của từng đơn vị, để chứng thư nói được đơn vị nào phát hành; `svc-files` tự tạo nó trong két ở
   lần phát hành đầu của đơn vị.
+- Đã bật wiki nội bộ thì chạy thêm `python3 scripts/moc.py wiki sync` để đơn vị mới có không gian riêng (mục Wiki
+  nội bộ); chưa chạy thì người của đơn vị mới chỉ đọc được trang đầu của wiki.
 
 ## Sao lưu và khôi phục
 
@@ -61,6 +65,11 @@ python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lư
   root trong container (để đọc tệp của SeaweedFS): ổ NFS phải cho root ghi (`no_root_squash`).
 - Chỉ mục tìm kiếm và chữ ký ClamAV không sao lưu: `svc-files` dựng lại chỉ mục từ CSDL khi khởi động, ClamAV tự
   tải chữ ký.
+- Wiki nội bộ (profile `wiki`): volume `wiki_data` vào cùng lượt, wiki tạm dừng trong lúc chép volume của nó (CSDL,
+  tệp không chờ). Khôi phục thay cả volume đó; wiki đang chạy thì dừng trước, chạy lại sau. Lượt sao lưu có từ trước
+  khi có wiki thì giữ nguyên wiki đang có.
+- Tự động hóa Node-RED (profile `tu-dong`): volume `tu_dong_data` vào cùng lượt theo đúng cách đó (Node-RED tạm dừng
+  lúc chép, dừng trước khi khôi phục, chạy lại sau).
 - Lượt sao lưu xong ghi dòng `system.backed_up` vào sổ kiểm toán; trang trạng thái hệ thống hiện giờ của lượt gần
   nhất từ dòng đó. Ghi không được thì lệnh chỉ cảnh báo, bản sao lưu vẫn dùng được.
 
@@ -361,6 +370,31 @@ Cách nhận ra và xử lý:
   - **Đã mới nhất** thì lệnh chỉ báo "database is up-to-date".
   - **Vẫn báo lỗi khóa** thì có thể freshclam nền đang tự cập nhật: chờ 1 phút rồi chạy lại.
 
+## Lịch nghỉ lễ chính thức (nguồn công khai B)
+
+Hạn gợi ý giao việc (F4.3) tránh Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù và coi thứ Bảy làm bù là ngày làm việc, theo lịch
+nghỉ chính thức của cán bộ, công chức, viên chức (#427). Bản chụp nằm ở `seed/du-lieu-mo/ngay-nghi-le/`:
+
+- `ngay-nghi.json`: ngày lễ cố định (Điều 112 Bộ luật Lao động, Ngày Văn hóa Việt Nam 24/11), các khoảng nghỉ theo
+  năm, ngày làm bù; mỗi mục ghi văn bản căn cứ;
+- `trich/*.txt`: câu trích các bài trên Báo Điện tử Chính phủ nêu đúng các ngày đó, kèm URL bài;
+- `manifest.json`: URL, ngày lấy, SHA-256 từng tệp, căn cứ dùng lại (Điều 15 Luật Sở hữu trí tuệ), tuổi tối đa 400
+  ngày.
+
+`docker-compose.yml` gắn thư mục này chỉ đọc vào svc-workflow; `MOC_HOLIDAYS_FILE` (mặc định
+`/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json`, rỗng thì tắt) cộng lịch đó vào `MOC_HOLIDAYS`. Không có tệp thì chỉ còn
+`MOC_HOLIDAYS` như trước; tệp hỏng thì svc-workflow dừng lúc khởi động và báo `MOC_HOLIDAYS_FILE`.
+
+Lấy mới khi Chính phủ công bố lịch nghỉ năm sau (thường vào tháng 10), không cần Docker:
+
+1. thêm một mục vào `PAGES` của `scripts/nguon_ngay_nghi_le.py`: URL bài, tệp trích, khoảng ngày, chuỗi ngày đúng như
+   bài viết;
+2. `python3 scripts/nguon_ngay_nghi_le.py` đọc lại mọi bài, kiểm từng ngày có trên bài rồi mới thay bản chụp. Trang
+   không tải được hay không còn ngày nào đó thì lệnh thoát 1, bản chụp cũ giữ nguyên;
+3. `docker compose restart svc-workflow`. Gợi ý đã lưu giữ hạn cũ.
+
+Nguồn ngừng hoạt động thì gợi ý vẫn chạy bằng bản chụp; năm bản chụp chưa có thì thêm ngày vào `MOC_HOLIDAYS`.
+
 ## Giám sát
 
 APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 không publish: chỉ container ở mạng
@@ -378,8 +412,9 @@ bảng điều khiển **Signet — cổng API** nạp sẵn: yêu cầu mỗi g
   `platform/monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Signet chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
-- Prometheus chỉ đọc `platform/monitoring/prometheus.yml` và `canh-bao.yml` lúc khởi động. Sửa tay trên máy đang chạy
-  thì khởi động lại nó: `docker compose restart prometheus` trong thư mục cài. Lúc nâng cấp, `scripts/nang_cap.sh` đã
+- Prometheus chỉ đọc `platform/monitoring/prometheus.yml` và `canh-bao.yml` lúc khởi động, Alertmanager cũng vậy với
+  `alertmanager.yml`. Sửa tay trên máy đang chạy thì khởi động lại dịch vụ đó: `docker compose restart prometheus`
+  (`alertmanager`) trong thư mục cài. Lúc nâng cấp, `scripts/nang_cap.sh` đã
   dừng rồi chạy lại cả hệ thống nên bản mới tự nạp tệp mới.
 
 ### Cảnh báo
@@ -403,7 +438,28 @@ thống.
 - Xem ở hàng "Cảnh báo đang bật" cuối bảng điều khiển Grafana. `pending` là điều kiện đã đúng nhưng chưa đủ thời
   gian của luật. Trên máy chủ, trong thư mục cài:
   `docker compose exec -T prometheus wget -q -O - http://localhost:9090/api/v1/alerts`.
-- Chưa có Alertmanager: cảnh báo không gửi email hay chat, người vận hành phải mở Grafana để thấy.
+- Cảnh báo đang bật đi tiếp sang Alertmanager (#284, `platform/monitoring/alertmanager.yml`): gom theo tên cảnh báo,
+  chờ 30 giây trước lần gửi đầu, gửi phần đổi mỗi phút, còn bật thì nhắc lại sau 12 giờ. Alertmanager gọi
+  `svc-workflow` (`POST /ops/alerts`, token `MOC_ALERT_TOKEN`): mỗi lần bật, mỗi lần hết là một thông báo ở chuông của
+  mọi quản trị đơn vị (vai trò `tenant_admin`) của mọi đơn vị, bấm vào mở trang `/trang-thai`. Bản cài đã bật email,
+  webhook, SMS, Zalo (mục Thông báo đa kênh) thì cảnh báo đi cả kênh đó, trừ khi `MOC_NOTIFY_*_KINDS` liệt kê loại mà
+  không có `ops.alert`.
+- Thông báo chỉ mang câu `summary` của luật, mức, nhãn `component`, `route`. Alertmanager gửi lại (nhắc 12 giờ, khởi
+  động lại mất nhật ký gửi) không thêm dòng: khóa chống trùng là fingerprint, thời điểm bật và trạng thái.
+- `MOC_ALERT_TOKEN`: `make env` sinh; `.env` cũ thiếu dòng này thì `make up`, `make install` (cả `scripts/nang_cap.sh`)
+  tự thêm một chuỗi ngẫu nhiên. Để trống là tắt: Alertmanager chạy `alertmanager-khong-gui.yml` (nhận mà không gửi),
+  `POST /ops/alerts` trả 404. Token là bí mật của svc-workflow trong két; đổi token: sửa `.env`, `docker compose up -d`
+  (tạo lại `openbao`, `alertmanager`) rồi `docker compose restart svc-workflow`.
+- API 9093 của Alertmanager không đăng nhập (đẩy cảnh báo, tạo silence): Alertmanager chỉ ở mạng `alerts`
+  (`internal`) cùng Prometheus, `svc-workflow`; dịch vụ khác của mạng `moc` không tới được.
+- Hạn chế: PostgreSQL, Hasura hay `svc-workflow` gián đoạn thì cảnh báo về chính sự cố đó chưa vào chuông được
+  (`svc-workflow` trả 503, Alertmanager gửi lại ở các lần sau); trong lúc đó chỉ Grafana, Prometheus thấy. Gửi lỗi vì
+  token sai (401) không có cảnh báo riêng: Prometheus chưa thu chỉ số của Alertmanager. Tắt tạm một cảnh báo phải dùng
+  `amtool` trong container: `docker compose exec alertmanager amtool silence add alertname=<tên> --comment=<lý do>
+  --alertmanager.url=http://localhost:9093`.
+- Thử cả đường đi: `make demo-canh-bao` (cảnh báo giả, không đụng dịch vụ thật). Cảnh báo Alertmanager đang giữ:
+  `docker compose exec -T alertmanager wget -q -O - http://localhost:9093/api/v2/alerts`. Gửi lỗi thì xem
+  `docker compose logs alertmanager` và dòng `ops.alert.failed` của svc-workflow.
 - 503 không tính là "không trả lời". svc-files trả 503 có chủ ý (`busy`, `scanner_unavailable`… kèm `Retry-After`),
   nên 503 chỉ tính vào tỉ lệ 5xx. Độ trễ của svc-files không xét: tải lên, đọc văn bản đến, hỏi đáp vốn chậm theo
   thiết kế.
@@ -416,6 +472,63 @@ thống.
   được), và thành phần `off` không có dòng `moc_component_up`.
 - Đổi ngưỡng: sửa `canh-bao.yml` cùng ca tương ứng trong `platform/monitoring/kiem-tra/canh-bao.test.yml`, chạy
   `promtool test rules` như bước "Giám sát" của job build trong `.github/workflows/ci.yml`, rồi cài lại.
+
+## Dữ liệu công khai
+
+Signet kèm bản chụp dữ liệu từ nguồn công khai của nhà nước trong `seed/du-lieu-mo/<mã nguồn>/` (#424): tệp gốc và
+`manifest.json` ghi URL, ngày lấy, căn cứ dùng lại, SHA-256 từng tệp. Nguồn A `cong-bao-gddt`: bốn thông tư của Bộ
+GD&ĐT về giáo dục đại học, bản Công báo (`seed/du-lieu-mo/cong-bao-gddt/README.md`).
+
+- **Bản cài không gọi nguồn lúc chạy.** `svc-files` đọc các manifest qua mount chỉ đọc `/srv/du-lieu-mo`, so SHA-256
+  rồi báo ở `GET /api/status` (khóa `open_data`: `ok`, `stale` khi quá `max_age_days`, `broken` khi thiếu tệp hay sai
+  băm) và trang `/trang-thai`. Nguồn ngừng hoạt động thì Signet vẫn dùng bản chụp gần nhất, trang trạng thái cho biết
+  dữ liệu đã bao nhiêu ngày.
+- **Nạp:** `make seed` nạp mỗi tệp thành một văn bản đến của Khoa CNTT qua API nạp lô (CSV + zip, ClamAV, như văn
+  thư nạp tay), loại "Thông tư" (migration `1792281604000_document_type_tt`). Bản cài đã có dữ liệu mẫu thì chạy
+  riêng `python3 scripts/moc.py du-lieu-mo nap`; chạy lại không tạo trùng. Trang văn bản nhận ra văn bản từ nguồn công
+  khai nhờ SHA-256 của tệp đính kèm trùng với manifest; trợ lý hỏi đáp trích được như mọi văn bản đến.
+- **Kiểm:** `make du-lieu-mo` (`python3 scripts/moc.py du-lieu-mo kiem`) so băm, in tuổi dữ liệu; thoát 1 khi bản
+  chụp hỏng.
+- **Lấy mới** (máy của đội, cần Internet, không chạy trên máy chủ): `make du-lieu-mo-lay`. Lệnh chỉ thay bản chụp khi
+  mọi tệp tải xong, khớp manifest và tổng không quá 3 MB; nguồn lỗi thì giữ bản cũ, thoát 1. Bản chụp mới đi qua PR
+  như mọi tệp `seed/`.
+- **Thêm nguồn:** một module `scripts/nguon_<mã>.py` có `NGUON`, `TEN`, `lay(thu_muc)` trả manifest (khuôn trong
+  `scripts/du_lieu_mo.py`). Chỉ dùng nguồn có căn cứ dùng lại rõ (giấy phép mở, hoặc Điều 15 Luật Sở hữu trí tuệ với
+  văn bản nhà nước), đúng `robots.txt` và điều khoản trang, không dữ liệu cá nhân; khai giấy phép tệp trong
+  `REUSE.toml`.
+
+## Trợ lý hỏi đáp qua API ngoài
+
+Mặc định trợ lý hỏi đáp (F4.2) viết câu trả lời bằng mô hình chạy tại chỗ trong Ollama. Máy yếu (CPU chậm) hay muốn
+mô hình lớn hơn thì cho bước viết đi tới một máy chủ nói chuẩn OpenAI (#430): vLLM hay llama.cpp trên máy có GPU của
+đơn vị, hoặc dịch vụ đám mây. Đặt trong `.env`:
+
+```
+MOC_ASK_API=openai
+MOC_ASK_API_URL=https://may-chu-mo-hinh/v1
+MOC_ASK_MODEL=<tên mô hình máy chủ đó nhận>
+MOC_ASK_API_KEY=<khóa, để trống nếu máy chủ không đòi>
+```
+
+rồi `docker compose up -d` (tạo lại `openbao`, `svc-files`). Đổi khóa về sau: sửa `.env`, `docker compose up -d` rồi
+`docker compose restart svc-files`.
+
+- **Cái gì rời máy:** chỉ lời gọi viết câu trả lời: câu hỏi và tối đa 4 đoạn văn bản làm căn cứ, **đã che** số điện
+  thoại, CCCD, email, số tài khoản (F4.4). Tìm theo nghĩa (mô hình nhúng) và trích yếu văn bản đến vẫn ở Ollama; không
+  bật profile `ai` thì trợ lý tìm theo từ khóa, chỉ bước viết dùng API. Mô hình nguồn mở chạy tại chỗ vẫn là mặc
+  định khuyên dùng: gửi văn bản tới dịch vụ đám mây là quyết định của đơn vị về dữ liệu của mình.
+- **Kiểm như cũ:** đầu ra ép theo JSON Schema (`response_format`), máy chủ Signet vẫn kiểm từng câu với đoạn nguồn và
+  con số rồi mới gắn trích dẫn; không đạt thì trả câu trích nguyên văn.
+- **Khóa:** là bí mật của `svc-files` trong két như các khóa khác (mục Két bí mật), không nằm trong biến môi trường của
+  container `svc-files`, không vào nhật ký. Chỉ đi trong tiêu đề `Authorization` tới `MOC_ASK_API_URL`. URL dạng
+  `http://` thì `svc-files` ghi `config.warning` lúc khởi động: khóa và đoạn văn bản đi không mã hóa, chỉ hợp với máy
+  chủ trong mạng nội bộ tin cậy.
+- **Tên mô hình:** `MOC_ASK_MODEL` bắt buộc, đúng tên máy chủ đó nhận (vd. `Qwen/Qwen3-4B` của vLLM); không lấy
+  `MOC_AI_MODEL` như khi viết tại chỗ. Thiếu thì `svc-files` dừng lúc khởi động.
+- **Sẵn sàng:** `svc-files` hỏi `GET {MOC_ASK_API_URL}/models` lúc khởi động và mỗi 60 giây; khóa sai (401, 403) hay
+  sai tên mô hình (404) thì coi như chưa sẵn sàng tới lượt dò sau. Nhật ký: `office.assist.ai_ready`,
+  `office.assist.ai_unavailable` có `"where": "external"` và mã HTTP, không có khóa.
+- **Sổ kiểm toán:** dòng `assistant.answered` ghi `model` và `model_where` (`local`: Ollama; `external`: API ngoài).
 
 ## Trang trạng thái hệ thống
 
@@ -432,7 +545,7 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
   thì *Một số thành phần đang gặp sự cố*: văn bản hạn chế và ký số (két), tìm kiếm, hỏi đáp tạm không dùng được, còn
   lại vẫn chạy. Trợ lý AI *Tắt* khi chưa bật profile `ai`, tắt hỏi đáp, hoặc Ollama không trả lời: trang không phân
   biệt được ba trường hợp này, nên *Tắt* mà profile `ai` đang bật thì xem `docker compose logs ollama`. Trợ lý vẫn tìm
-  theo từ khóa.
+  theo từ khóa. Viết câu trả lời qua API ngoài (mục dưới) thì phần mềm của thành phần ghi "API ngoài".
 - **Không lộ gì:** chỉ có nhãn cố định và trạng thái; không tên máy, địa chỉ IP, URL nội bộ, phiên bản từng thành phần,
   số người dùng hay số văn bản, thông báo lỗi. Lý do cụ thể nằm trong nhật ký của `svc-files` (sự kiện
   `core.status.changed`, ghi khi một thành phần đổi trạng thái): `docker compose logs svc-files | grep status.changed`.
@@ -442,6 +555,33 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
   địa chỉ IP, vượt thì `429`.
 - Trang chỉ trả lời "đang chạy hay không" ngay lúc này; diễn biến theo thời gian, độ trễ, tỉ lệ lỗi xem ở Grafana (mục
   Giám sát). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
+
+## Chạy mô hình bằng GPU
+
+Mặc định Ollama (profile `ai`) chạy mô hình trên CPU, trong giới hạn `MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`. Máy chủ có
+card NVIDIA thì đặt `MOC_AI_DEVICE=gpu` trong `.env` (#442): Makefile thêm tệp phủ `docker-compose.gpu.yml` vào
+`COMPOSE_FILE` để cấp mọi GPU NVIDIA của máy cho `ollama`; dịch vụ khác, giới hạn RAM và CPU không đổi. Trích yếu văn
+bản đến (F4.1), nhúng và viết câu trả lời của trợ lý (F4.2) cùng chạy trong Ollama nên cùng nhanh lên.
+
+- **Máy chủ cần:**
+  - Driver NVIDIA đủ mới. Theo docs.ollama.com/gpu (đọc ngày 30/10/2026): card compute capability 5.0 trở lên với
+    driver 550 trở lên; card 5.0–6.2 (Maxwell, Pascal; vd. Quadro M4000 là 5.2) cần driver 570 trở lên. Compute
+    capability của từng card: developer.nvidia.com/cuda-gpus.
+  - NVIDIA Container Toolkit, rồi `sudo nvidia-ctk runtime configure --runtime=docker` và khởi động lại Docker để Docker
+    có runtime `nvidia`. Thử: `docker run --rm --gpus all ubuntu nvidia-smi` phải in ra card.
+  - WSL 2: driver NVIDIA chỉ cài bên Windows, không cài driver Linux trong WSL; NVIDIA Container Toolkit cài trong bản
+    phân phối WSL khi chạy Docker Engine trong đó.
+- **Bật:** `./scripts/co-gpu.sh` in `gpu` khi `nvidia-smi` thấy card và Docker có runtime `nvidia`; `make env`,
+  `make install` cũng gọi nó để gợi ý. Đặt `MOC_AI_DEVICE=gpu` trong `.env` rồi `make up-ai`. Bản cài: đặt trong `.env`
+  của bản cài rồi `make install` lại để ghi `COMPOSE_FILE`; máy chưa dùng được GPU thì `make install` cảnh báo. Tắt: đặt
+  lại `MOC_AI_DEVICE=cpu`, làm như trên.
+- **Kiểm:** `GET /api/status`, khối `ai`, trường `device`: `gpu` (mô hình nằm hết trong bộ nhớ GPU), `gpu+cpu` (GPU
+  thiếu bộ nhớ, một phần chạy CPU, vẫn chậm), `cpu`; `null` khi Ollama chưa nạp mô hình nào hay trợ lý tắt. `svc-files`
+  đọc `size_vram` trong `/api/ps` của Ollama mỗi lần dò. Trên máy chủ: `docker compose exec ollama ollama ps`, cột
+  `PROCESSOR`.
+- **Đặt `gpu` mà Docker chưa có runtime `nvidia`:** `ollama` không khởi động (`could not select device driver
+  "nvidia"`), trang trạng thái báo Trợ lý AI *Tắt*; trợ lý vẫn tìm theo từ khóa và trả câu trích. Cài đủ các bước trên
+  hoặc đặt lại `cpu`.
 
 ## Log tập trung
 
@@ -458,10 +598,10 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
 (Docker giữ bản cục bộ 10 MB × 3 cho driver ngoài).
 
 - **Thu:** `apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow` — các dịch vụ tự che thông tin cá nhân
-  trong nhật ký (F4.4) — cùng `hasura`, `keycloak`, `postgres`: ba dịch vụ này không tự che, Vector che bằng luật
-  riêng (dưới đây) trước bước che chung. **Không thu** Meilisearch, OpenBao, Flowable…: chưa có luật riêng, đưa vào kho
-  log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
-- **Luật riêng** cho ba dịch vụ không tự che, mỗi luật có ca trong `vector.test.yaml`:
+  trong nhật ký (F4.4) — cùng `hasura`, `keycloak`, `postgres`, `meilisearch`: bốn dịch vụ này không tự che, Vector
+  che bằng luật riêng (dưới đây) trước bước che chung. **Không thu** OpenBao, Flowable, SeaweedFS…: chưa có luật riêng,
+  đưa vào kho log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
+- **Luật riêng** cho bốn dịch vụ không tự che, mỗi luật có ca trong `vector.test.yaml`:
   - **Hasura** (dòng JSON): `event` là `hasura.<loại log>` (`hasura.http-log`, `hasura.websocket-log`…);
     `request_id` lấy trong `detail` (`detail.request_id`, `detail.operation.request_id`, ở `websocket-log` là
     `detail.event.detail.request_id`). Đó là `X-Request-Id` mà APISIX, `svc-workflow`, `svc-files` gửi kèm lời gọi
@@ -485,8 +625,16 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
     hàm trong `db/migrations` chỉ có mã, trạng thái, số hồ sơ. Đổi `log_line_prefix` thì mọi dòng bị bỏ.
   - **Keycloak**: `username="…"` ở sự kiện `LOGIN_ERROR` (tên người dùng gõ vào: gõ nhầm mật khẩu vào ô tên thì
     lộ). `userId`, `clientId`, `error` giữ lại. `sessionId`, chuỗi truy vấn của `redirect_uri` đã bị bước che chung che.
+  - **Meilisearch** ghi JSON (`MEILI_EXPERIMENTAL_LOGS_MODE=json` trong `docker-compose.yml`): mỗi yêu cầu HTTP một
+    dòng lúc đóng span `HTTP request`, `event` là `meilisearch.http` (dòng khác: `meilisearch.<target>`). Thay cả giá
+    trị `query_parameters` (gọi `GET` thì có câu tìm `q=…`, biểu thức `filter=…`) và `error` (lời lỗi trích giá trị
+    tài liệu, biểu thức lọc, có khi nhiều dòng); bỏ `spans` (lặp lại `span`). Chuỗi khác che từ dấu `` ` `` đầu tiên
+    tới hết chuỗi: Meilisearch trích giá trị trong dấu đó (``Document identifier `…` is invalid``). `route`, `method`,
+    `status_code`, thời gian xử lý giữ lại. Dòng `/health` trả 200 (bảng trạng thái hỏi liên tục) bị bỏ. Bỏ chế độ
+    JSON thì luật chữ cùng nội dung vẫn chạy, nhưng dòng tiếp của lời lỗi nhiều dòng không che được. Đừng đặt
+    `MEILI_LOG_LEVEL=DEBUG` khi đang thu log: mức đó ghi câu tìm và kết quả vào `fields`, luật không che.
 - **Che lần hai** ([`platform/logs/vector.yaml`](../platform/logs/vector.yaml)), mỗi dạng dưới đây có ca trong
-  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (39 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
+  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (43 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
   - token `Bearer`/`Basic` (từ 8 ký tự, kể cả có dấu `=` đệm ở cuối như `Basic dXNlcjpwYXNzd29yZA==`), chuỗi dạng JWT;
   - giá trị của khóa có chữ `password`, `passwd`, `pwd`, `secret`, `token`, `api key`, `private key`, `credential`,
     `session`, kể cả có tiền tố, hậu tố (`HASURA_ADMIN_SECRET=`, `POSTGRES_PASSWORD=`, `access_token`,
@@ -565,16 +713,16 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
   `p_user_agent` (của Vector).
 
 ```bash
-make logs-up                       # bật: Vector, Parseable; tạo lại 8 container; đặt giữ log; tới lần make up sau
+make logs-up                       # bật: Vector, Parseable; tạo lại 9 container; đặt giữ log; tới lần make up sau
 make logs-tra ID=<mã>              # dòng của mọi dịch vụ mang mã, 60 phút gần nhất (PHUT=… để đổi)
 make demo-log-tap-trung            # màn demo: một mã qua APISIX → svc-workflow → Hasura, svc-files; SQL lỗi…
-make logs-down                     # tắt: 8 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
+make logs-down                     # tắt: 9 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
 ```
 
 - **Bật lâu dài:** thêm `logs` vào `MOC_EXTRA_PROFILES` trong `.env` (vd `MOC_EXTRA_PROFILES=tunnel,logs`) rồi chạy
   `make up` (hoặc `make logs-up`); từ đó `make up`, `make down`, `make ps`… tự nạp tệp phủ và profile, và mỗi lần
   `make up` thêm mật khẩu vào `.env` cũ nếu thiếu, tạo luồng, đặt lại thời gian giữ log (kể cả sau khi xóa volume
-  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 8 dịch vụ về
+  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 9 dịch vụ về
   `json-file` (Vector, Parseable vẫn chạy nhưng không nhận gì).
 - **Mật khẩu:** `MOC_LOGS_PASSWORD` do `make env` sinh; `.env` sinh trước F3.14 thiếu dòng này thì `make logs-up` (và
   `make up` khi `logs` có trong `MOC_EXTRA_PROFILES`) tự thêm một chuỗi ngẫu nhiên đúng như `make env` (không in ra).
@@ -610,11 +758,11 @@ make logs-down                     # tắt: 8 dịch vụ về json-file, dừng
 
 **Rủi ro, hạn chế người vận hành cần biết:**
 
-- **Bật hay tắt phải tạo lại 8 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`,
-  `hasura`, `keycloak`, `postgres`): đổi driver log chỉ có hiệu lực khi tạo lại container. `make logs-up`,
-  `make logs-down` (và `make up` lần đầu sau khi thêm hay bỏ `logs` trong `MOC_EXTRA_PROFILES`) khởi động lại cả CSDL,
-  Hasura, Keycloak: vài giây không đăng nhập, không ghi được; dịch vụ khác giữ kết nối tới CSDL (Flowable) phải tự
-  nối lại. Nên bật, tắt ngoài giờ làm việc.
+- **Bật hay tắt phải tạo lại 9 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`,
+  `hasura`, `keycloak`, `postgres`, `meilisearch`): đổi driver log chỉ có hiệu lực khi tạo lại container.
+  `make logs-up`, `make logs-down` (và `make up` lần đầu sau khi thêm hay bỏ `logs` trong `MOC_EXTRA_PROFILES`) khởi
+  động lại cả CSDL, Hasura, Keycloak, Meilisearch: vài giây không đăng nhập, không ghi được, không tìm được; dịch vụ
+  khác giữ kết nối tới CSDL (Flowable) phải tự nối lại. Nên bật, tắt ngoài giờ làm việc.
 - **Cổng fluent `127.0.0.1:24224` không cần đăng nhập** (driver `fluentd` của Docker không có xác thực): tiến trình
   nào trên máy chủ cũng gửi được dòng giả vào kho log (dòng giả vẫn qua bước che). Máy chủ dùng chung nhiều người thì
   đây là hạn chế thật.
@@ -651,9 +799,183 @@ make logs-down                     # tắt: 8 dịch vụ về json-file, dừng
   `[A-Za-z0-9._:-]{1,128}`, mã khác thì thay bằng mã mới (trả lại ở header); `svc-files` chưa kiểm (như từ trước):
   chuỗi tùy ý vào nhật ký và các dòng sổ kiểm toán nó ghi. Vector chỉ đưa mã đúng dạng đó vào cột `request_id`;
   `make logs-tra` kiểm mã trước khi ghép vào câu SQL.
-- Không có tracing (span, thời gian từng chặng): chỉ nối dòng theo mã. Docker rootless và Docker Desktop (dockerd
-  không chung mạng với máy chủ): chưa thử cổng `127.0.0.1:24224`. RAM lúc nghỉ khoảng 18 MiB (Vector) và 45 MiB
-  (Parseable) — `docker stats` trên máy dev ngày 23/10/2026; dưới tải chưa đo.
+- Log chỉ nối dòng theo mã; thời gian từng chặng xem ở mục Truy vết phân tán dưới đây. Docker rootless và Docker
+  Desktop (dockerd không chung mạng với máy chủ): chưa thử cổng `127.0.0.1:24224`. RAM lúc nghỉ khoảng 18 MiB
+  (Vector) và 45 MiB (Parseable) — `docker stats` trên máy dev ngày 23/10/2026; dưới tải chưa đo.
+
+## Truy vết phân tán
+
+Profile `trace` (tắt mặc định, #364) cho thấy một yêu cầu đi qua những chặng nào, mỗi chặng mất bao lâu: APISIX →
+`svc-files` hay Hasura → `svc-workflow` → các lời gọi HTTP của dịch vụ (Hasura, Meilisearch, OpenBao, Ollama,
+Flowable…).
+**Jaeger** 2.22 nhận span qua OTLP/HTTP (cổng 4318, chỉ trong mạng `moc`), giữ 10 000 trace mới nhất trong RAM
+([`platform/trace/jaeger.yaml`](../platform/trace/jaeger.yaml)) và mở giao diện ở `127.0.0.1:16686` trên máy chủ.
+
+```bash
+# .env: thêm trace vào MOC_EXTRA_PROFILES (vd MOC_EXTRA_PROFILES=tunnel,trace) và đặt tỉ lệ, rồi
+MOC_TRACE_RATIO=0.1
+make up
+ssh -L 16686:127.0.0.1:16686 <máy chủ>   # xem từ xa: http://127.0.0.1:16686
+```
+
+- **Lấy mẫu ở APISIX:** plugin `opentelemetry` (global rule trong `apisix.yaml`) chọn `MOC_TRACE_RATIO` yêu cầu (0–1)
+  theo `trace_id`, gửi `traceparent` cho dịch vụ phía sau. `svc-files`, `svc-workflow` không tự chọn: chỉ ghi span khi
+  `traceparent` mang cờ đã chọn, nên việc nền (đồng bộ danh bạ, gửi thông báo, lập chỉ mục) không sinh span. Hasura
+  chuyển tiếp `traceparent` sang Action (`forward_client_headers`), nên span của `svc-workflow` nằm cùng trace với
+  APISIX; Hasura không có span riêng (bản CE không hỗ trợ OpenTelemetry).
+- **Tìm theo mã yêu cầu:** span của APISIX có thẻ `x-request-id`; trên giao diện Jaeger chọn dịch vụ `apisix`, ô Tags
+  gõ `x-request-id=<mã>`. Mã này cũng là mã của `make logs-tra` (mục Log tập trung).
+- **Tắt** (`MOC_TRACE_RATIO=0`, mặc định): APISIX không ghi span nào, hai dịch vụ không nạp OpenTelemetry. Giữ `0` khi
+  không bật profile `trace`: tỉ lệ khác 0 mà không có Jaeger thì APISIX và dịch vụ ghi lỗi gửi span vào nhật ký.
+  Giá trị phải là số từ 0 tới 1 (`0`, `0.1`, `1`); sai thì `make up`, reconciler GitOps và chính container APISIX
+  dừng và báo lỗi, vì APISIX gặp giá trị sai sẽ bỏ cả global rule chung với WAF và mã yêu cầu.
+- **Che dữ liệu, hai lớp:**
+  - `svc-files`, `svc-workflow` (`tracing.py`) chỉ gửi thuộc tính trong danh sách trắng: phương thức, mã trạng thái,
+    route, đường dẫn không có chuỗi truy vấn, tên máy. Chuỗi qua bộ che thông tin cá nhân (F4.4). Lời gọi tới máy
+    ngoài mạng của Signet (tên có dấu chấm hay địa chỉ IP: webhook, liên thông) không có span và không
+    mang `traceparent`, nên mã trace không ra khỏi các dịch vụ nội bộ. Lỗi chỉ giữ tên loại ngoại lệ, không giữ
+    thông điệp hay traceback. Không ghi header nào (`Authorization`, cookie).
+  - Jaeger bỏ `http.target` (đường dẫn kèm chuỗi truy vấn) trong span của APISIX, giữ `url.path`.
+- **Giới hạn:**
+  - span của APISIX vẫn có `user_agent.original` và `x-request-id` do client gửi (chuỗi tùy ý);
+  - client tự gửi `traceparent` thì APISIX nối vào `trace_id` đó, và chọn theo chính `trace_id` đó: client chọn được
+    `trace_id` rơi vào tỉ lệ, chỉ làm tăng số span (giới hạn tốc độ vẫn áp);
+  - Flowable, Keycloak, PostgreSQL chưa gửi span;
+  - Jaeger 2.22 bỏ API HTTP v1 mà nguồn dữ liệu Jaeger của Grafana dùng, nên chưa xem trace trong Grafana;
+  - trace mất khi container Jaeger khởi động lại; giao diện không có tài khoản, như Grafana.
+- **RAM** (máy dev, 28/10/2026): Jaeger nghỉ 11 MiB, đỉnh 123 MiB khi đầy 10 000 trace 6 span (bộ nhớ cgroup của
+  container; trần compose 256m). Mỗi tiến trình `svc-files`, `svc-workflow` thêm khoảng 15 MiB khi bật (RSS, đo
+  trước và sau khi nạp OpenTelemetry); tắt thì không thêm gì.
+
+## Wiki nội bộ
+
+Profile `wiki` (tắt mặc định, #367) thêm **DokuWiki** ở `/wiki/`: sổ tay, quy trình, hướng dẫn nội bộ viết dạng trang
+wiki, không phải văn bản có số. Mỗi đơn vị một không gian `don-vi:<mã>` chỉ người của đơn vị đó đọc, sửa, tải tệp
+lên; trang đầu liệt kê không gian của các đơn vị. Đăng nhập chỉ qua Keycloak (cùng tài khoản, cùng bước đăng nhập như
+Văn phòng điện tử); chưa đăng nhập thì vào `/wiki/` chuyển sang trang đăng nhập. Trang Ứng dụng của Văn phòng điện tử
+có thẻ "Wiki nội bộ" khi wiki đang trả lời.
+
+```bash
+# bật lâu dài: .env thêm wiki vào MOC_EXTRA_PROFILES (vd MOC_EXTRA_PROFILES=tunnel,wiki), rồi
+make up                                 # dựng image, chạy wiki, chạy moc wiki sync
+# hoặc bật một lần (make down tắt, make up sau đó không bật lại)
+make wiki-up
+make demo-wiki                          # kiểm: hai đơn vị không đọc, không sửa được trang của nhau
+python3 scripts/moc.py wiki sync        # sau mỗi lần thêm đơn vị (moc tenant create)
+make wiki-down                          # tắt: bỏ wiki khỏi MOC_EXTRA_PROFILES trước; giữ trang, tệp đã lưu
+```
+
+- **`moc wiki sync`** thêm client Keycloak `wiki` (confidential, bí mật `MOC_WIKI_CLIENT_SECRET` — `make up`, `make
+  wiki-up` thêm vào `.env` cũ nếu thiếu) hoặc đặt lại bí mật, đường chuyển hướng và mapper `groups` (= `tenant_id`)
+  của nó; rồi ghi danh sách quyền `conf/acl.auth.php` và trang đầu từ `core.tenants`. Chạy lại được; `--dry-run` chỉ
+  in việc sẽ làm. Mã đơn vị thành tên không gian như alias của Organization (`KTCK` → `ktck`, `ĐT` → `dt`).
+- **Quyền:** DokuWiki xét từ không gian sâu nhất lên. Mỗi đơn vị có đúng một dòng cho không gian của mình; không gian
+  cha `don-vi` không cấp cho ai, nên không gian không còn dòng (đơn vị đổi mã, đơn vị mới chưa chạy `wiki sync`) rơi
+  về dòng `* @ALL 0`: không ai đọc, không ai tạo trang. Người đăng nhập đọc được trang đầu và các trang hướng dẫn cú
+  pháp đi kèm DokuWiki (`wiki:*`), không sửa được. Nhóm của một người lấy lại từ Keycloak mỗi lần đăng nhập: chuyển
+  sang đơn vị khác thì lần đăng nhập sau mất quyền ở đơn vị cũ.
+- **Không có tài khoản quản trị DokuWiki** (quản trị đọc được mọi không gian): trang quản trị, cài plugin, sửa cấu
+  hình trên giao diện đều tắt. Cấu hình nằm ở
+  [`platform/wiki/signet.protected.php`](../platform/wiki/signet.protected.php) (gắn chỉ đọc), plugin đi theo image;
+  trình cài đặt `install.php` đã bỏ. Tài khoản trong wiki do plugin oauth tạo ở
+  lần đăng nhập đầu, không đăng ký, không đặt lại mật khẩu trong wiki.
+- **Sơ đồ trang** (`?do=index`) hiện tên không gian của mọi đơn vị (trang đầu vốn liệt kê chúng), không hiện trang
+  của đơn vị khác. Tìm kiếm chỉ trả trang người tìm đọc được.
+- **Mạng, tài nguyên:** container ở mạng `apps` như ứng dụng cắm thêm, chạy uid 33, bỏ mọi capability, trần 256 MiB
+  (issue #367 đo container trống 37–70 MiB; chưa đo dưới tải); tệp tải lên tới 64 MB như mọi đường qua APISIX. Wiki
+  gọi Keycloak qua `http://apisix:9080`, không tới thẳng dịch vụ lõi nào. WAF bỏ một số luật trên ô nội dung trang
+  và tham số đăng nhập (loại trừ 10070, [`platform/apisix/README.md`](../platform/apisix/README.md)): chọn theo các
+  loại trừ đã đo ở Văn phòng điện tử, chưa đo chặn nhầm trên chính wiki.
+- **Sao lưu:** volume `wiki_data` (trang, bản cũ của trang, tệp tải lên, tài khoản, danh sách quyền) vào `moc backup`
+  (mục Sao lưu và khôi phục).
+- **Giới hạn:** chưa có không gian chung cả trường cùng sửa; đơn vị đổi mã thì trang cũ còn trong volume nhưng không
+  ai đọc được tới khi chuyển tay sang không gian mới; trang wiki không vào ô tìm kiếm của Văn phòng điện tử.
+  - Plugin oauth nối tài khoản wiki với tài khoản Keycloak theo email: người không có email trong Keycloak không đăng
+    nhập được wiki; xóa một tài khoản Keycloak rồi tạo người khác cùng email thì người mới dùng lại tên wiki cũ (lịch
+    sử sửa trang ghi chung một tên), còn quyền vẫn theo đơn vị của người mới. Email, `tenant_id` chỉ quản trị sửa
+    được trong Keycloak, nên người dùng không tự nhận tài khoản wiki của người khác.
+  - Nội dung trang vẫn qua các luật SQLi, XSS của WAF như ô chữ tự do của Văn phòng điện tử: trang có ví dụ câu SQL,
+    mã HTML có thể bị chặn (403) khi lưu; gặp thì người quản trị thêm loại trừ trong `apisix.yaml`.
+
+## Tự động hóa bằng Node-RED
+
+Profile `tu-dong` (tắt mặc định, #366) thêm **Node-RED 5.0.8** ở `/tu-dong/`: người vận hành nền tảng kéo thả flow
+(hẹn giờ, gọi HTTP, hàm JavaScript, mẫu chữ) thay vì viết thêm vòng lặp trong mã dịch vụ. Đăng nhập chỉ qua Keycloak
+(client công khai `tu-dong`, PKCE), và chỉ người có vai trò `operator` của client đó vào được trình soạn; không ai có
+sẵn vai trò này, kể cả quản trị đơn vị.
+
+```bash
+# bật lâu dài: .env thêm tu-dong vào MOC_EXTRA_PROFILES (vd MOC_EXTRA_PROFILES=wiki,tu-dong), rồi
+make up                                 # dựng image, chạy Node-RED, chạy moc tu-dong sync
+# hoặc bật một lần (make down tắt, make up sau đó không bật lại)
+make tu-dong-up
+python3 scripts/moc.py tu-dong operator add <tên đăng nhập>      # cấp vai trò; remove gỡ, list liệt kê
+make demo-tu-dong                       # kiểm: chưa đăng nhập, không có vai trò thì không vào; triển khai flow qua cổng
+make tu-dong-down                       # tắt: bỏ tu-dong khỏi MOC_EXTRA_PROFILES trước; giữ flow đã lưu
+```
+
+- **`moc tu-dong sync`** thêm client Keycloak `tu-dong`, vai trò `operator` và mapper `tu-dong-roles` (đưa vai trò
+  vào ID token), hoặc đặt lại đường chuyển hướng khi đổi `MOC_PUBLIC_URL`. Chạy lại được; `--dry-run` chỉ in việc sẽ
+  làm. Node-RED chỉ tin vai trò trong ID token, thứ thư viện `openid-client` đã kiểm chữ ký, `iss`, `aud`.
+- **Gỡ vai trò** có hiệu lực ở lần đăng nhập sau: token trình soạn còn hạn (8 giờ) vẫn dùng được tới khi hết hạn hoặc
+  Node-RED khởi động lại (`docker compose --profile tu-dong restart tu-dong`).
+- **Khóa sẵn trong [`platform/tu-dong/settings.js`](../platform/tu-dong/settings.js)** (gắn vào image, không sửa trên
+  giao diện): không có node `exec` (chạy lệnh shell), không có node đọc, ghi, theo dõi tệp (`file`, `file in`, `watch`);
+  không cài, không tải node lên từ trình soạn; node Function không nạp module ngoài; flow chưa mở endpoint HTTP
+  (`httpNodeRoot` tắt); không gửi số liệu chẩn đoán ra ngoài. Lúc dựng image, `kiem-tra.cjs` nạp thật tệp này và kiểm
+  các khóa đó, kiểm cả hàm xét vai trò.
+- **`MOC_TU_DONG_SECRET`** mã hóa thông tin đăng nhập lưu trong flow (mật khẩu, token của node): `make up`,
+  `make tu-dong-up` thêm vào `.env` cũ nếu thiếu. Đổi khóa thì Node-RED không mở được thông tin đăng nhập đã lưu;
+  khôi phục sang máy mới cũng cần đúng khóa này, nên nó đi cùng bản chép `.env` (mục Sao lưu và khôi phục).
+- **Mạng, tài nguyên:** container ở mạng `apps` như ứng dụng cắm thêm: flow chỉ tới lõi qua `http://apisix:9080`
+  (kiểm token, giới hạn tốc độ, WAF như với trình duyệt), không tới CSDL hay dịch vụ lõi nào. Rootfs chỉ đọc (ghi
+  vào `/data`, `/tmp`), bỏ mọi capability, trần 256 MiB (issue #366 đo container trống khoảng 75 MiB; chưa đo dưới
+  tải). WAF gỡ ba luật bắt nhầm token đăng nhập (loại trừ 10080) và không soi thân của API lưu flow, thư viện (10081),
+  vì thân đó là mã JavaScript, HTML ([`platform/apisix/README.md`](../platform/apisix/README.md)).
+- **Sao lưu:** volume `tu_dong_data` (flow, thông tin đăng nhập đã mã hóa, phiên trình soạn) vào `moc backup`
+  (mục Sao lưu và khôi phục). Ai sửa flow nào ghi vào nhật ký container (`docker compose --profile tu-dong logs
+  tu-dong`, dòng audit của Node-RED), chưa vào sổ kiểm toán.
+- **Giới hạn:**
+  - Node-RED là một không gian flow chung, không tách theo đơn vị: người có vai trò `operator` sửa được mọi flow, và
+    flow gọi được mọi API qua cổng mà thông tin đăng nhập trong flow cho phép. Vì vậy đây là công cụ của người vận
+    hành nền tảng, không phải của từng đơn vị.
+  - Chưa có: endpoint nhận webhook (`/tu-dong/hook/…`) và bước BPMN gọi flow qua `svc-workflow` — bước tiếp theo
+    của #366.
+
+### Robot của flow và hai flow mẫu
+
+Flow gọi API của lõi bằng **robot của một đơn vị**, không mượn tài khoản người (#366):
+
+```bash
+python3 scripts/moc.py tu-dong robot add CNTT     # in ROBOT_ID, ROBOT_SECRET; chạy lại thì đặt lại cấu hình, giữ bí mật
+python3 scripts/moc.py tu-dong robot list         # robot đang có, đơn vị của từng robot
+python3 scripts/moc.py tu-dong robot rotate CNTT  # bí mật lộ: Keycloak sinh bí mật mới, bí mật cũ hết dùng ngay
+python3 scripts/moc.py tu-dong robot remove CNTT  # gỡ robot; token đã cấp còn dùng được tới khi hết hạn (5 phút)
+```
+
+- **Robot là gì:** client Keycloak confidential `tu-dong-robot-<mã>` chỉ có luồng `client_credentials` (không đăng
+  nhập trình duyệt, không mật khẩu người), không full scope. Access token mang cố định vai trò Hasura `tu_dong`, đơn
+  vị của robot và `x-hasura-user-id` là chính tên robot. Tài khoản dịch vụ của client không vào danh bạ người dùng.
+- **Robot được làm gì:** đọc văn bản **không hạn chế** của đơn vị mình, kể cả dự thảo văn bản đi (`draft`, `returned`)
+  như lãnh đạo, văn thư thấy (số ký hiệu, trích yếu, độ khẩn, trạng thái, hạn, ngày vào sổ, phòng xử lý; không có nội
+  dung, người tạo, người nhận), và gọi Action `notifyFromFlow` báo người trong đơn vị theo vai trò. Không ghi bảng nào,
+  không đọc danh bạ, thông báo, văn bản hạn chế hay của đơn vị khác
+  ([`db/tests/test_tu_dong.py`](../db/tests/test_tu_dong.py)).
+- **`notifyFromFlow(roles, title, text, document_id, key)`** (svc-workflow): gửi thông báo loại `flow.message` vào
+  chuông, đẩy tức thời như thông báo khác; cùng `key` thì không gửi lại (flow chạy lại không báo trùng). Gắn
+  `document_id` thì chỉ gửi được cho `director`, `clerk` — hai vai trò xem được mọi văn bản không hạn chế của đơn vị,
+  để trích yếu không tới người không được xem văn bản đó. Văn bản của đơn vị khác, văn bản hạn chế bị từ chối.
+  Luật này chỉ giữ văn bản gắn kèm: flow tự chép trích yếu, số ký hiệu vào `title`, `text` thì chúng tới mọi vai trò
+  đã chọn — người viết flow chỉ gửi những thông tin đó cho `director`, `clerk`, như hai flow mẫu.
+- **Kênh ngoài:** `flow.message` đi chuông và cả email, webhook, SMS, Zalo khi `MOC_NOTIFY_*_KINDS` để trống (mọi
+  loại); danh sách văn bản sắp hạn mang theo nhiều trích yếu. Muốn tin của flow chỉ ở chuông thì liệt kê các loại
+  khác vào `MOC_NOTIFY_*_KINDS`, bỏ `flow.message`.
+- **Hai flow mẫu** ([`platform/tu-dong/flow-mau.json`](../platform/tu-dong/flow-mau.json), tab "Signet — flow mẫu",
+  để tắt): (1) 07:00 hằng ngày gom văn bản đến chưa xong có hạn trong 3 ngày tới, báo lãnh đạo đơn vị một tin; (2) mỗi
+  phút tìm văn bản Hỏa tốc vừa vào sổ, báo lãnh đạo mỗi văn bản một tin, bấm vào mở văn bản. Dùng: trình soạn → menu
+  ☰ → Import → chọn tệp; mở tab, điền `ROBOT_ID`, `ROBOT_SECRET` (biến bí mật, mã hóa bằng `MOC_TU_DONG_SECRET`)
+  trong phần Environment của tab; bật tab, Deploy. Một đơn vị một robot: muốn chạy cho đơn vị khác thì nhân bản tab,
+  điền robot của đơn vị đó.
 
 ## Hội tụ IT/OT
 

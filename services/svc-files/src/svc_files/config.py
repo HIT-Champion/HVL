@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 REQUIRED = (
     "MOC_OIDC_ISSUER",
@@ -134,11 +134,20 @@ class Settings:
     ask_min_score_semantic: float = 0.75
     ask_semantic_ratio: float = 0.5     # tỷ trọng tìm theo nghĩa
     ask_deadline_s: float = 50.0        # hạn tổng một yêu cầu (dưới 60 giây của APISIX)
-    ask_model: str = "qwen3:1.7b"       # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL
+    # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL, trừ MOC_ASK_API=openai (bắt buộc ghi rõ)
+    ask_model: str = "qwen3:1.7b"
+    # Nơi viết câu trả lời (#430): ollama (tại chỗ, mặc định) hoặc openai — máy chủ nói chuẩn OpenAI ở
+    # MOC_ASK_API_URL (…/v1). Chỉ bước viết đi ra ngoài; nhúng, trích yếu văn bản đến vẫn ở Ollama. Khóa
+    # MOC_ASK_API_KEY là bí mật tùy chọn, đến từ két (platform/openbao/start.sh), không in ra repr hay nhật ký
+    ask_api: str = "ollama"
+    ask_api_url: str = ""
+    ask_api_key: str = field(default="", repr=False)
     ask_model_timeout_s: float = 40.0
     ask_context_chars: int = 2800       # tổng ký tự nguồn gửi mô hình
     ask_concurrency: int = 1            # số lượt sinh câu trả lời cùng lúc
     ask_queue_s: float = 20.0           # chờ lượt sinh quá thì 503 busy
+    # hướng dẫn sử dụng cho đường huong_dan của trợ lý (#423): compose gắn docs/huong-dan vào đây, chỉ đọc
+    ask_guide_dir: str = "/app/huong-dan"
     ai_embed_model: str = "qwen3-embedding:0.6b"    # rỗng: không nhúng, chỉ tìm từ khóa
     ai_embed_dims: int = 1024
     ai_embed_batch: int = 8             # số đoạn mỗi lô nhúng nền
@@ -149,6 +158,9 @@ class Settings:
     workflow_url: str = "http://svc-workflow:8000"                  # /readyz của svc-workflow: Flowable và Hasura
     status_cache_s: float = 10.0        # lưu đệm kết quả gom cho mọi người gọi: gọi dồn không thành lời gọi vào lõi
     status_timeout_s: float = 3.0       # hạn mỗi lần dò một thành phần, quá thì báo gián đoạn
+    # #424: bản chụp nguồn dữ liệu công khai (seed/du-lieu-mo, mount chỉ đọc) — nguồn gốc, tuổi dữ liệu ở khóa
+    # open_data của /api/status (open_data.py). Rỗng: không đọc, open_data là []
+    open_data_dir: str = "/srv/du-lieu-mo"
     # Lô nạp văn bản đến (POST /api/imports/incoming — imports/): một tệp NDJSON/CSV + zip tệp đính kèm tùy chọn,
     # xử lý nền từng mẻ. Zip giữ tạm trong thư mục spool (tmpfs /tmp của compose) tới khi lô xong
     import_interval_s: float = 2.0      # chu kỳ vòng nền khi rảnh; 0: tắt vòng nền và không nhận lô mới (503)
@@ -165,6 +177,8 @@ class Settings:
     # trần byte một lô được ghi vào kho: tổng cỡ (đã giải nén) các mục zip mà các dòng trỏ tới, mỗi lần trỏ tính một
     # lần — không có trần này thì zip 8 KB trỏ lặp lại thành hàng chục MB trong kho
     import_store_max_bytes: int = 200 * 1024 * 1024
+    # truy vết (#364): > 0 thì gửi span tới Jaeger (tracing.py). Tỉ lệ lấy mẫu do APISIX quyết; ở đây chỉ là bật/tắt
+    trace_ratio: float = 0.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -244,11 +258,18 @@ class Settings:
                 ask_min_score_semantic=float(env.get("MOC_ASK_MIN_SCORE_SEMANTIC", "0.75")),
                 ask_semantic_ratio=float(env.get("MOC_ASK_SEMANTIC_RATIO", "0.5")),
                 ask_deadline_s=float(env.get("MOC_ASK_DEADLINE_S", "50")),
-                ask_model=(env.get("MOC_ASK_MODEL") or "").strip() or env.get("MOC_AI_MODEL", "qwen3:1.7b").strip(),
+                # API ngoài (#430) không chạy mô hình Ollama tại chỗ: tên mô hình phải ghi rõ, không lấy MOC_AI_MODEL
+                ask_model=(env.get("MOC_ASK_MODEL") or "").strip() or (
+                    "" if (env.get("MOC_ASK_API") or "").strip().lower() == "openai"
+                    else env.get("MOC_AI_MODEL", "qwen3:1.7b").strip()),
                 ask_model_timeout_s=float(env.get("MOC_ASK_MODEL_TIMEOUT_S", "40")),
+                ask_api=(env.get("MOC_ASK_API") or "ollama").strip().lower(),
+                ask_api_url=(env.get("MOC_ASK_API_URL") or "").strip().rstrip("/"),
+                ask_api_key=(env.get("MOC_ASK_API_KEY") or "").strip(),
                 ask_context_chars=int(env.get("MOC_ASK_CONTEXT_CHARS", "2800")),
                 ask_concurrency=int(env.get("MOC_ASK_CONCURRENCY", "1")),
                 ask_queue_s=float(env.get("MOC_ASK_QUEUE_S", "20")),
+                ask_guide_dir=env.get("MOC_ASK_GUIDE_DIR", "/app/huong-dan").strip(),
                 # biến có mà rỗng: tắt nhúng (compose truyền ${MOC_AI_EMBED_MODEL-…}); không có biến: mặc định
                 ai_embed_model=env.get("MOC_AI_EMBED_MODEL", "qwen3-embedding:0.6b").strip(),
                 ai_embed_dims=int(env.get("MOC_AI_EMBED_DIMS", "1024")),
@@ -259,6 +280,7 @@ class Settings:
                 workflow_url=env.get("MOC_WORKFLOW_URL", "http://svc-workflow:8000").strip().rstrip("/"),
                 status_cache_s=float(env.get("MOC_STATUS_CACHE_S", "10")),
                 status_timeout_s=float(env.get("MOC_STATUS_TIMEOUT_S", "3")),
+                open_data_dir=env.get("MOC_OPEN_DATA_DIR", "/srv/du-lieu-mo").strip(),
                 import_interval_s=float(env.get("MOC_IMPORT_INTERVAL_S", "2")),
                 import_chunk=int(env.get("MOC_IMPORT_CHUNK", "20")),
                 import_max_rows=int(env.get("MOC_IMPORT_MAX_ROWS", "1000")),
@@ -269,6 +291,7 @@ class Settings:
                 import_spool_dir=env.get("MOC_IMPORT_SPOOL_DIR", "/tmp/moc-nap-lo").strip(),
                 import_spool_bytes=int(env.get("MOC_IMPORT_SPOOL_MB", "200")) * 1024 * 1024,
                 import_store_max_bytes=int(env.get("MOC_IMPORT_STORE_MAX_MB", "200")) * 1024 * 1024,
+                trace_ratio=float(env.get("MOC_TRACE_RATIO", "").strip() or 0),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -293,6 +316,8 @@ class Settings:
             raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")
         if self.restricted_max_pages < 1:
             raise ConfigError("MOC_RESTRICTED_MAX_PAGES phải ≥ 1")
+        if not 0 <= self.trace_ratio <= 1:      # NaN cũng sai
+            raise ConfigError("MOC_TRACE_RATIO phải trong khoảng [0, 1] (0: tắt truy vết)")
         self._check_reader()
         self._check_assistant()
         self._check_status()
@@ -329,6 +354,8 @@ class Settings:
         for name, url in (("MOC_GATEWAY_STATUS_URL", self.gateway_status_url), ("MOC_WORKFLOW_URL", self.workflow_url)):
             if url and not url.startswith(("http://", "https://")):
                 raise ConfigError(f"{name} phải là URL http(s)://…, hoặc rỗng để không dò thành phần đó")
+        if self.open_data_dir and not self.open_data_dir.startswith("/"):
+            raise ConfigError("MOC_OPEN_DATA_DIR phải là đường dẫn tuyệt đối, hoặc rỗng để không đọc nguồn công khai")
 
     def _check_assistant(self) -> None:
         """Biến của trợ lý hỏi đáp (F4.2)."""
@@ -353,6 +380,13 @@ class Settings:
             raise ConfigError("MOC_ASK_DEADLINE_S phải trong khoảng (0, 55] — dưới 60 giây của APISIX")
         if self.ask_model_timeout_s <= 0:
             raise ConfigError("MOC_ASK_MODEL_TIMEOUT_S phải > 0")
+        if self.ask_api not in ("ollama", "openai"):
+            raise ConfigError("MOC_ASK_API phải là ollama (mô hình tại chỗ) hoặc openai (API ngoài chuẩn OpenAI)")
+        if self.ask_api == "openai":
+            if not re.fullmatch(r"https?://[^\s/?#]+(?:/[^\s?#]*)?", self.ask_api_url):
+                raise ConfigError("MOC_ASK_API=openai cần MOC_ASK_API_URL dạng http(s)://máy-chủ/v1")
+            if not self.ask_model:
+                raise ConfigError("MOC_ASK_API=openai cần tên mô hình ở MOC_ASK_MODEL")
         if self.ask_queue_s < 0:
             raise ConfigError("MOC_ASK_QUEUE_S phải ≥ 0")
         for name, count in (("MOC_ASK_TOP_K", self.ask_top_k), ("MOC_ASK_CANDIDATES", self.ask_candidates),
@@ -367,17 +401,23 @@ class Settings:
             raise ConfigError("MOC_ASSISTANT_ID phải dài 1–64 ký tự")
 
     def warnings(self) -> list[str]:
-        """Cấu hình chạy được nhưng dễ chậm: app ghi nhật ký ``config.warning`` lúc khởi động, không chặn."""
+        """Cấu hình chạy được nhưng dễ chậm hay kém an toàn: app ghi nhật ký ``config.warning`` lúc khởi động, không
+        chặn."""
         out: list[str] = []
         if self.ai_url and self.ask_enabled:
             # Ollama của compose giữ tối đa 2 mô hình (OLLAMA_MAX_LOADED_MODELS): trích yếu F4.1 (MOC_AI_MODEL) dò và
-            # nạp trước kể cả khi chỉ hỏi đáp, thêm mô hình sinh và mô hình nhúng F4.2
-            models = {self.ai_model, self.ask_model} | ({self.ai_embed_model} if self.ai_embed_model else set())
+            # nạp trước kể cả khi chỉ hỏi đáp, thêm mô hình sinh (trừ khi viết qua API ngoài) và mô hình nhúng F4.2
+            models = ({self.ai_model} | ({self.ask_model} if self.ask_api == "ollama" else set())
+                      | ({self.ai_embed_model} if self.ai_embed_model else set()))
             if len(models) > 2:
                 out.append(f"MOC_ASK_MODEL ({self.ask_model}) khác MOC_AI_MODEL ({self.ai_model}): Ollama phải giữ "
                            f"{len(models)} mô hình nhưng compose chỉ cho 2 (OLLAMA_MAX_LOADED_MODELS) — mô hình bị nạp "
                            "đi nạp lại, câu trả lời và đọc văn bản đến dễ quá giờ. Để trống MOC_ASK_MODEL và đặt mô "
                            "hình muốn dùng vào MOC_AI_MODEL (dùng chung cho trích yếu và câu trả lời)")
+        if self.ask_api == "openai" and self.ask_api_url.startswith("http://"):
+            sent = "đoạn văn bản đã che và MOC_ASK_API_KEY" if self.ask_api_key else "đoạn văn bản đã che"
+            out.append(f"MOC_ASK_API_URL dùng http://: {sent} đi tới máy chủ mô hình không mã hóa. Dùng https://, trừ "
+                       "khi máy chủ đó nằm trong mạng nội bộ tin cậy của đơn vị")
         if self.import_data_max_bytes + self.import_zip_max_bytes > IMPORT_GATEWAY_BYTES:
             out.append("MOC_IMPORT_DATA_MAX_MB + MOC_IMPORT_ZIP_MAX_MB vượt 63 MB: APISIX nhận thân yêu cầu tối đa 64m "
                        "(client_max_body_size, platform/apisix/config.yaml) nên lô lớn bị cổng từ chối (413) trước khi "

@@ -18,8 +18,10 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from email.utils import parseaddr
@@ -27,7 +29,7 @@ from urllib.parse import urlsplit
 
 from .channels import KINDS, SMTP_PORTS, WEBHOOK_FORMATS
 from .sla import parse_duration
-from .suggest import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, parse_holidays
+from .suggest import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, holidays_from_data, parse_holidays
 
 REQUIRED = (
     "HASURA_ADMIN_SECRET",
@@ -35,6 +37,27 @@ REQUIRED = (
     "FLOWABLE_ADMIN_PASSWORD",
     "MOC_DIRECTORY_CLIENT_SECRET",
 )
+
+
+# Lịch nghỉ chính thức (nguồn công khai B): docker-compose.yml gắn seed/du-lieu-mo/ngay-nghi-le vào đây, chỉ đọc
+HOLIDAYS_FILE = "/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json"
+
+
+def read_holidays_file(path: str) -> Holidays | None:
+    """Lịch nghỉ trong ``path`` (``ngay-nghi.json``); None khi ``path`` rỗng (tắt) hay không có tệp (bản cài chưa
+    gắn thư mục): khi đó chỉ còn ``MOC_HOLIDAYS``. Tệp có mà hỏng thì ``ValueError``: dịch vụ dừng lúc khởi động như
+    khi ``MOC_HOLIDAYS`` sai, không lặng lẽ bỏ Tết."""
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{path}: {exc}") from exc
+    try:
+        return holidays_from_data(data)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from exc
 
 
 class ConfigError(RuntimeError):
@@ -89,8 +112,10 @@ class Settings:
     suggest_timeout_s: float = 10.0
     suggest_min_score: float = 0.3
     assigner_id: str = "moc-assigner"
-    # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật (MOC_HOLIDAYS, cú pháp ở suggest.parse_holidays)
+    # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật: MOC_HOLIDAYS (cú pháp ở suggest.parse_holidays) cộng lịch
+    # nghỉ chính thức của nguồn công khai B (MOC_HOLIDAYS_FILE, #427), kể cả thứ Bảy làm bù
     holidays: Holidays = NO_HOLIDAYS
+    holidays_file: str = ""     # tệp lịch nghỉ đã đọc; rỗng khi tắt hay không có tệp
     # Định tuyến thông báo đa kênh (channels.py): ngoài chuông trên web, gửi thêm qua email (SMTP) và webhook. Trống máy
     # chủ thư và URL webhook thì tắt, như trước. Cổng 0: theo kiểu TLS (587 starttls, 465 ssl, 25 none). Loại thông báo
     # trống: mọi loại. Mật khẩu SMTP và URL webhook (khóa nằm trong đường dẫn) là bí mật, lấy từ két như các bí mật
@@ -107,6 +132,22 @@ class Settings:
     notify_webhook_kinds: tuple[str, ...] = ()
     notify_interval_s: float = 5.0
     public_url: str = ""
+    # Kênh SMS, Zalo (#365): chỉ gửi tới người đã tự bật kênh (Action setMyChannel). Trống URL cổng SMS và token bot
+    # Zalo thì tắt, như trước. Cổng SMS: ứng dụng SMS Gateway for Android, chế độ Local Server, trên một điện thoại có
+    # SIM cùng mạng LAN (POST <url>/message, Basic Auth). Mật khẩu cổng SMS và token bot (nằm trong đường dẫn API của
+    # Zalo) là bí mật, lấy từ két. Địa chỉ mở bot (tùy chọn) hiện cho người dùng lúc liên kết
+    sms_gateway_url: str = ""
+    sms_gateway_user: str = ""
+    sms_gateway_password: str = field(default="", repr=False)
+    zalo_bot_token: str = field(default="", repr=False)
+    zalo_bot_url: str = ""
+    notify_sms_kinds: tuple[str, ...] = ()
+    notify_zalo_kinds: tuple[str, ...] = ()
+    # truy vết (#364): > 0 thì gửi span tới Jaeger (tracing.py). Tỉ lệ lấy mẫu do APISIX quyết; ở đây chỉ là bật/tắt
+    trace_ratio: float = 0.0
+    # cảnh báo vận hành (#284, alerts.py): Alertmanager gọi POST /ops/alerts kèm "Authorization: Bearer <token>". Bí
+    # mật lấy từ két; để trống (bản cài cũ chưa có biến) thì route trả 404 và Alertmanager không gửi
+    alert_token: str = field(default="", repr=False)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -118,6 +159,15 @@ class Settings:
             holidays = parse_holidays(env.get("MOC_HOLIDAYS", "").strip() or LEGAL_HOLIDAYS)
         except ValueError as exc:
             raise ConfigError(f"MOC_HOLIDAYS: {exc}") from exc
+        holidays_file = env.get("MOC_HOLIDAYS_FILE", HOLIDAYS_FILE).strip()
+        try:
+            official = read_holidays_file(holidays_file)
+        except ValueError as exc:
+            raise ConfigError(f"MOC_HOLIDAYS_FILE: {exc}") from exc
+        if official is None:
+            holidays_file = ""
+        else:
+            holidays |= official
         try:
             return cls(
                 hasura_url=env.get("HASURA_URL", "http://hasura:8080").rstrip("/"),
@@ -153,6 +203,7 @@ class Settings:
                 suggest_min_score=float(env.get("MOC_SUGGEST_MIN_SCORE", "0.3")),
                 assigner_id=env.get("MOC_ASSIGNER_ID", "moc-assigner").strip(),
                 holidays=holidays,
+                holidays_file=holidays_file,
                 smtp_host=env.get("MOC_SMTP_HOST", "").strip(),
                 smtp_port=int(env.get("MOC_SMTP_PORT", "").strip() or 0),
                 smtp_tls=env.get("MOC_SMTP_TLS", "").strip().lower() or "starttls",
@@ -165,6 +216,15 @@ class Settings:
                 notify_webhook_kinds=_kinds(env.get("MOC_NOTIFY_WEBHOOK_KINDS", "")),
                 notify_interval_s=float(env.get("MOC_NOTIFY_INTERVAL_S", "5")),
                 public_url=env.get("MOC_PUBLIC_URL", "").strip().rstrip("/"),
+                sms_gateway_url=env.get("MOC_SMS_GATEWAY_URL", "").strip().rstrip("/"),
+                sms_gateway_user=env.get("MOC_SMS_GATEWAY_USER", "").strip(),
+                sms_gateway_password=env.get("MOC_SMS_GATEWAY_PASSWORD", ""),
+                zalo_bot_token=env.get("MOC_ZALO_BOT_TOKEN", "").strip(),
+                zalo_bot_url=env.get("MOC_ZALO_BOT_URL", "").strip(),
+                notify_sms_kinds=_kinds(env.get("MOC_NOTIFY_SMS_KINDS", "")),
+                notify_zalo_kinds=_kinds(env.get("MOC_NOTIFY_ZALO_KINDS", "")),
+                trace_ratio=float(env.get("MOC_TRACE_RATIO", "").strip() or 0),
+                alert_token=env.get("MOC_ALERT_TOKEN", "").strip(),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -188,6 +248,11 @@ class Settings:
             raise ConfigError("MOC_SUGGEST_MIN_SCORE phải trong khoảng [0, 1] (thang _rankingScore)")
         if not 1 <= len(self.assigner_id) <= 64:
             raise ConfigError("MOC_ASSIGNER_ID phải có 1–64 ký tự")
+        if not 0 <= self.trace_ratio <= 1:      # NaN cũng sai
+            raise ConfigError("MOC_TRACE_RATIO phải trong khoảng [0, 1] (0: tắt truy vết)")
+        # token đi trong header Authorization: ký tự của token68 (RFC 7235); không in token
+        if self.alert_token and not re.fullmatch(r"[A-Za-z0-9._~+/-]{16,200}=*", self.alert_token):
+            raise ConfigError("MOC_ALERT_TOKEN phải có 16–200 ký tự chữ, số hoặc . _ ~ + / - (make env tự sinh)")
         self._check_channels()
 
     def warnings(self) -> list[str]:
@@ -216,8 +281,23 @@ class Settings:
                 raise ConfigError("MOC_NOTIFY_WEBHOOK_URL phải là địa chỉ http:// hoặc https://")
         if self.notify_webhook_format not in WEBHOOK_FORMATS:
             raise ConfigError("MOC_NOTIFY_WEBHOOK_FORMAT chỉ nhận json hoặc ntfy")
+        if self.sms_gateway_url:
+            url = urlsplit(self.sms_gateway_url)
+            if url.scheme not in ("http", "https") or not url.hostname or url.username or url.query:
+                raise ConfigError("MOC_SMS_GATEWAY_URL phải là địa chỉ http:// hoặc https:// của cổng SMS, không kèm "
+                                  "tài khoản, vd http://192.168.1.50:8080")
+            if not (self.sms_gateway_user and self.sms_gateway_password):
+                raise ConfigError("Đặt MOC_SMS_GATEWAY_URL thì phải có MOC_SMS_GATEWAY_USER và "
+                                  "MOC_SMS_GATEWAY_PASSWORD (Basic Auth hiện trong ứng dụng trên điện thoại)")
+        # token đi vào đường dẫn API: chỉ nhận ký tự an toàn trong URL; không in token
+        if self.zalo_bot_token and not re.fullmatch(r"[A-Za-z0-9:_.-]{10,200}", self.zalo_bot_token):
+            raise ConfigError("MOC_ZALO_BOT_TOKEN không đúng dạng token bot Zalo (chữ, số, dấu : _ . -)")
+        if self.zalo_bot_url and urlsplit(self.zalo_bot_url).scheme != "https":
+            raise ConfigError("MOC_ZALO_BOT_URL phải là địa chỉ https://, vd đường dẫn mở bot trong Zalo")
         for name, kinds in (("MOC_NOTIFY_EMAIL_KINDS", self.notify_email_kinds),
-                            ("MOC_NOTIFY_WEBHOOK_KINDS", self.notify_webhook_kinds)):
+                            ("MOC_NOTIFY_WEBHOOK_KINDS", self.notify_webhook_kinds),
+                            ("MOC_NOTIFY_SMS_KINDS", self.notify_sms_kinds),
+                            ("MOC_NOTIFY_ZALO_KINDS", self.notify_zalo_kinds)):
             unknown = sorted(set(kinds) - set(KINDS))
             if unknown:
                 raise ConfigError(f"{name}: không có loại thông báo {', '.join(unknown)} (có: {', '.join(KINDS)})")

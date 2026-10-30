@@ -5,8 +5,9 @@ cho từng nguyên lý. Mỗi màn dưới đây:
 
 - chạy bằng **một lệnh** trên hệ thống đang chạy (`make up`, `make seed`), xong trong **dưới một phút**;
 - in từng bước kèm dấu ✓, sai bước nào thì dừng và nói rõ bước đó (thoát 1);
-- chạy lại bao nhiêu lần cũng được, không sửa dữ liệu mẫu (mỗi lần chỉ thêm dữ liệu riêng của lần chạy, vd một
-  tệp sạch chưa gắn văn bản và vài dòng sổ kiểm toán).
+- chạy lại được nhiều lần, mỗi lần chỉ thêm dữ liệu riêng của lần chạy (vd một tệp sạch chưa gắn văn bản và vài dòng
+  sổ kiểm toán). Trừ `nong-lanh`: mỗi lần nộp lưu tối đa ba văn bản mẫu đã xong sang kho lạnh, không đảo ngược được;
+  hết văn bản thì màn báo chạy `make seed`. `pha-he` gọi `nong-lanh` khi chưa có lượt nộp lưu nào.
 
 Trên máy chủ đã `make install`, chạy `python3 scripts/demo.py <màn>` trong thư mục cài, thay cho `make demo-<màn>`.
 
@@ -37,7 +38,9 @@ văn bản vừa vào sổ, kèm căn cứ (`make demo-giao-viec`, F4.3) — xem
 bộ trong két, **chỉ minh họa** (`make demo-ky-so`, F4.5) — xem
 [mục này](#ngoài-4-nguyên-lý-ký-số-văn-bản-đi-minh-họa--make-demo-ky-so). Màn che thông tin cá nhân trong chữ
 gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng chứng cho cụm ② của đề — xem
-[mục cuối](#ngoài-4-nguyên-lý-che-thông-tin-cá-nhân--make-demo-che-pii).
+[mục này](#ngoài-4-nguyên-lý-che-thông-tin-cá-nhân--make-demo-che-pii). Màn cảnh báo vận hành ra chuông của quản trị
+đơn vị (`make demo-canh-bao`, F3.13, dưới hai phút) là bằng chứng cho cụm ⑥ — xem
+[mục cuối](#ngoài-4-nguyên-lý-cảnh-báo-vận-hành-ra-chuông--make-demo-canh-bao).
 
 ## (i) Nóng → lạnh — `make demo-nong-lanh`
 
@@ -690,8 +693,8 @@ khối này.
   không cần nút "gợi ý sai". Không đủ văn bản tương tự, hay phiếu chia đều, thì không gợi ý.
 - *"Căn cứ có làm lộ văn bản hạn chế?"* Ba lớp: không vào chỉ mục; svc-files hậu kiểm; trigger CSDL. Giao diện còn
   hậu kiểm danh sách căn cứ bằng token người xem trước khi hiện.
-- *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn tránh ngày lễ dương
-  lịch cố định, còn Tết Âm lịch và ngày nghỉ bù phải do người vận hành thêm vào `MOC_HOLIDAYS` mỗi năm; chỉ
+- *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn tránh ngày lễ, Tết và
+  ngày nghỉ bù theo lịch nghỉ chính thức đã công bố (nguồn công khai B, tới hết 2027), năm sau đó phải lấy mới; chỉ
   dựa vào trích yếu (đầu nội dung công văn toàn khuôn mẫu "Căn cứ…", "Kính gửi…"); dữ liệu mẫu nhỏ, hai đơn vị hợp lệ.
 
 ## Ngoài 4 nguyên lý: ký số văn bản đi (minh họa) — `make demo-ky-so`
@@ -848,8 +851,8 @@ Bước nào sai thì dừng, thoát 1 — kể cả khi chỉ một cách viế
 
 **Đo — `make do-che-pii`** (không cần Docker, vài giây): đọc kho mẫu như bản chạy thật (lớp chữ và bố cục PDF, TSV
 OCR, mọi trang văn bản hỏi đáp, mọi chuỗi trong nhãn, câu hỏi, lịch sử giao việc), in bảng số ký tự, số chuỗi số ứng
-viên, số chỗ bị che — phải là 0 ở mọi nguồn; rồi chạy 15 đột biến mã của bộ che (bỏ kiểm mã tỉnh, nới đầu số, bỏ vùng
-bảo vệ UUID, giữ chuỗi truy vấn…) — cả 15 phải bị test giết. Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp
+viên, số chỗ bị che — phải là 0 ở mọi nguồn; rồi chạy 18 đột biến mã của bộ che (bỏ kiểm mã tỉnh, nới đầu số, bỏ vùng
+bảo vệ UUID, giữ chuỗi truy vấn…) — cả 18 phải bị test giết. Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp
 (`test_pii.py`): kho mẫu không có, và không được có, dữ liệu thật mang thông tin cá nhân. Số đo ghi ở
 `services/svc-files/README.md`.
 
@@ -868,15 +871,55 @@ câu trích tự mở.
   người làm đơn. Che là việc của chỗ chữ ra khỏi phạm vi quyền đọc: mô hình (dù chạy tại chỗ) và nhật ký (ai vào được
   máy chủ đều đọc được). Sổ kiểm toán không che: sổ có phân quyền và chuỗi băm, che vào sổ là sửa chứng cứ.
 - *"Che nhầm số ký hiệu, ngày tháng, số tiền thì sao?"* Không che chuỗi số chỉ vì đủ dài: số ký hiệu `131/…`, ngày,
-  tiền, UUID, mã số thuế sau "MST", tổng đài 1900, dãy số nhỏ của bảng đều có test âm tính; trên kho mẫu (81 023 ký
+  tiền, UUID, mã số thuế sau "MST", tổng đài 1900, dãy số nhỏ của bảng đều có test âm tính; trên kho mẫu (81 063 ký
   tự, 747 chuỗi số ứng viên) 0 chỗ bị che — `make do-che-pii` đo lại được. Luật lỏng "0 + 9–11 chữ số" thì che cả đuôi
   UUID và mã số thuế.
 - *"Mô hình chỉ thấy `[SĐT-1]` thì trả lời được gì?"* Đúng câu "số điện thoại liên hệ là [SĐT-1]", có trích dẫn; số
   thật nằm ngay ở câu trích nguyên văn bên dưới, giao diện nói rõ. Không điền số thật trở lại vào câu của mô hình: mô
   hình có thể đặt nhãn sai chỗ, gán số người này cho người khác.
 - *"Còn gì chưa làm?"* Họ tên, địa chỉ (cần nhận dạng thực thể tiếng Việt), hộ chiếu, biển số xe; số dính chữ
-  (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi kèm; nhật ký của Hasura, PostgreSQL, Keycloak và `error_log` của
-  APISIX, nginx (định dạng cố định, vẫn có `?q=` khi phía sau lỗi); véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại.
+  (trừ di động sau `ĐT`, `SĐT`, `Tel`…), CMND và số tài khoản không có từ khóa đi kèm; nhật ký của Hasura,
+  PostgreSQL, Keycloak và `error_log` của APISIX, nginx (định dạng cố định, vẫn có `?q=` khi phía sau lỗi); véc-tơ
+  nhúng tính trước F4.4 còn tới khi nhúng lại.
+
+## Ngoài 4 nguyên lý: cảnh báo vận hành ra chuông — `make demo-canh-bao`
+
+**Điều muốn chứng minh:**
+
+- Sự cố không chỉ hiện trong Grafana: luật cảnh báo của Prometheus đi qua Alertmanager tới `svc-workflow`, thành thông
+  báo ở chuông của quản trị đơn vị — mọi đơn vị, vì thành phần dùng chung gián đoạn thì đơn vị nào cũng chịu — kèm
+  email, webhook, SMS, Zalo nếu bản cài đã bật kênh đó (#284).
+- Hết sự cố có thông báo "Hết cảnh báo"; Alertmanager gửi lại không làm chuông đổ thêm.
+- Gọi thẳng `svc-workflow` không có token thì không ghi được thông báo; API của Alertmanager (không đăng nhập) chỉ
+  Prometheus, `svc-workflow` tới được (mạng `alerts` riêng).
+
+**Lệnh in ra 5 bước:**
+
+1. Prometheus đang nối Alertmanager (`/api/v1/alertmanagers`); Alertmanager có token gọi `svc-workflow` (tệp trên
+   tmpfs, không in ra).
+2. Đẩy một cảnh báo giả (`DemoCanhBao`, thành phần `demo-<mã>`, không đụng dịch vụ thật) vào API của Alertmanager.
+   Sau khoảng 30 giây (Alertmanager gom cảnh báo bật cùng lúc) chuông của `quantri` có "Cảnh báo vận hành: Thành phần
+   demo-… gián đoạn"; trong CSDL đúng mỗi quản trị đơn vị một thông báo, văn thư, lãnh đạo, chuyên viên không nhận.
+3. Đặt `endsAt` cho cảnh báo: trong vòng một phút mỗi quản trị thêm đúng một thông báo "Hết cảnh báo: …", thông báo
+   bật không bị ghi thêm.
+4. Gọi thẳng `POST /ops/alerts` của `svc-workflow` từ trong mạng nội bộ bằng token sai → `401`.
+5. Từ `svc-files` (mạng `moc`) gọi `alertmanager:9093` không tới: không đẩy được cảnh báo giả, không tắt được cảnh báo
+   thật. Cuối màn, thông báo giả được đánh dấu đã đọc; bản cài đã bật email, SMS, Zalo thì các kênh đó đã gửi thật.
+
+Trên giao diện: đăng nhập `quantri`, chuông có thông báo màu cam (xem trước bước 5 khi chưa đánh dấu đã đọc, hoặc
+trong danh sách của chuông); bấm vào mở trang `/trang-thai`.
+
+**Nếu giám khảo hỏi:**
+
+- *"Cảnh báo thật trông thế nào?"* Như màn này, câu là `summary` của luật trong `platform/monitoring/canh-bao.yml`, vd
+  "Thành phần tim-kiem gián đoạn — Signet vẫn chạy nhưng thiếu phần việc này". Tám luật và ngưỡng: `docs/van-hanh.md`
+  mục Cảnh báo; mỗi luật có ca bật, ca không bật trong `promtool test rules` (bước CI "Giám sát").
+- *"Sao không cho Alertmanager gửi email thẳng?"* Gửi qua `svc-workflow` thì dùng lại kênh, người nhận, chống trùng,
+  hộp thư đi có thử lại của thông báo nghiệp vụ, không khai mật khẩu SMTP lần thứ hai trong cấu hình Alertmanager.
+- *"Chọn người nhận được không?"* Chưa: mọi quản trị đơn vị đều nhận. Tắt tạm một cảnh báo (silence) phải gọi API của
+  Alertmanager (`amtool` trong container), chưa có trên giao diện.
+- *"CSDL sập thì sao?"* Cảnh báo về chính sự cố đó không ghi được vào chuông cho tới khi PostgreSQL, Hasura,
+  `svc-workflow` chạy lại (`svc-workflow` trả 503, Alertmanager gửi lại); trong lúc đó chỉ Grafana, Prometheus thấy.
 
 ## Phương án dự phòng
 
@@ -885,6 +928,19 @@ qua Cloudflare Tunnel (profile `tunnel`, [`trien-khai.md`](trien-khai.md) mục 
 online → máy dự phòng chạy tại chỗ → video quay sẵn**, không gỡ lỗi trước hội đồng quá một phút. Trên bản cài, lệnh là
 `python3 scripts/…` và `docker compose …` trong `/opt/moc` (bản cài không có `Makefile`); trên máy dự phòng là `make …`
 trong thư mục mã nguồn. Kịch bản 5 phút ở [`dac-ta-san-pham.md`](dac-ta-san-pham.md) §7 có cột dự phòng cho từng màn.
+
+**Màn nào chạy trên bản online khi đang có người dùng.** Vài màn cố ý dừng hay khởi động lại dịch vụ, nên trong lúc
+chạy không tải được tệp hay cổng ngắt vài giây:
+
+- `ket-bi-mat`: khởi động lại `openbao`, `svc-files`, `svc-workflow`;
+- `tu-phuc-hoi`: xóa container `svc-files`, dừng `centrifugo`;
+- `giao-viec`: bước 10 dừng `svc-files`;
+- `cai-ung-dung`, `quy-trinh`: cài, gỡ ứng dụng làm APISIX khởi động lại khi tệp route đổi;
+- `tat-van-phong`: dựng lại `svc-files`, `svc-workflow` hai lần.
+
+`nong-lanh` và `pha-he` tiêu văn bản mẫu (xem đầu tệp). Những màn này chạy trên máy dự phòng, hoặc báo trước với hội
+đồng rằng đây là phá thật. Trên bản online đang có người dùng, chạy màn không dừng dịch vụ nào, như
+`make demo-kiem-dich` (bản cài: `python3 scripts/demo.py kiem-dich`).
 
 **Mất Internet hoặc Cloudflare** (trang online không mở được, hoặc hiện trang lỗi của Cloudflare):
 

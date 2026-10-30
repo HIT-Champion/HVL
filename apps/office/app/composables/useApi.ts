@@ -124,29 +124,34 @@ export interface ReadResult {
 // viết câu trả lời có trích dẫn [n], đã qua kiểm trích dẫn. Câu hỏi, câu trả lời không lưu ở đâu cả.
 export type AskMode = 'extract' | 'generate'
 export type AskStatus = 'answered' | 'passages_only' | 'no_evidence'
+// Đường bộ định tuyến của svc-files đã chọn cho câu hỏi (assist/route.py, tất định): van_ban là RAG như trước
+export type AskRoute = 'van_ban' | 'gioi_thieu' | 'huong_dan' | 'ngoai_pham_vi' | 'viec_cua_toi' | 'dem_van_ban'
 
 export interface AskSource {
   n: number                  // số trong dấu [n] của câu trả lời, từ 1, theo thứ tự xếp hạng
-  document_id: string
-  symbol: string | null
-  type_code: string
+  // nguồn guide (mục của "Giới thiệu trợ lý", hướng dẫn sử dụng) không phải văn bản: các trường văn bản là null
+  document_id: string | null
+  symbol: string | null      // guide: tên tài liệu
+  type_code: string | null
   type_name: string | null
-  summary: string
+  summary: string            // guide: tiêu đề mục
   issuer_name: string | null
   issued_on: string | null
-  direction: 'in' | 'out'
-  status: string
-  kind: 'page' | 'meta'      // meta: văn bản chưa có chữ (bản scan, tệp lỗi) — chỉ trích yếu, không có trang
+  direction: 'in' | 'out' | null
+  status: string | null
+  kind: 'page' | 'meta' | 'guide'   // meta: văn bản chưa có chữ (bản scan, tệp lỗi) — chỉ trích yếu, không có trang
   file_id: string | null
   file_role: 'main' | 'attachment' | 'issued' | null
   page: number | null
   excerpt: string            // ≤ 600 ký tự quanh câu khớp nhất
   cited: boolean             // câu trả lời có dấu [n] trỏ tới nguồn này
+  path?: string | null       // chỉ nguồn guide: tệp trong repo kèm neo mục, hiện như chữ
 }
 
 export interface AskAnswer {
   text: string               // mỗi ý kèm dấu [n]; hiện bằng chữ thuần (components/AnswerText.vue), không dựng HTML
-  source: 'extract' | 'model'
+  // fixed: câu cố định khi câu hỏi ngoài phạm vi; data: câu có số lấy thẳng từ dữ liệu (việc của tôi, đếm văn bản)
+  source: 'extract' | 'model' | 'fixed' | 'data'
   model: string | null
 }
 
@@ -161,6 +166,13 @@ export interface AskResult {
   // embed_unavailable, model_unavailable, model_timeout, model_rejected, model_declined
   warnings: string[]
   duration_ms: number
+  // Bộ định tuyến: máy chủ cũ không có các trường này, trang đọc kiểu tùy chọn (utils/answer.ts, tidy)
+  route?: AskRoute
+  route_reason?: string      // mã máy đọc (kw:lam-duoc-gi, mac-dinh…), không dịch
+  rewritten?: string | null  // câu nối tiếp đã ghép với câu trước; null khi không phải câu nối tiếp
+  // Đường dữ liệu (viec_cua_toi, dem_van_ban, #441): số và bộ lọc máy đọc; trang trong Signet xem danh sách đã đếm
+  data?: Record<string, unknown> | null
+  link?: string | null       // '/', '/van-ban-den', '/van-ban-di'; trang chỉ nhận đúng các trang này (utils/answer.ts)
 }
 
 export interface AskBody {
@@ -171,6 +183,7 @@ export interface AskBody {
   type_code?: string
   document_id?: string       // chỉ hỏi trong văn bản này ("Hỏi về văn bản này") — vẫn trong phạm vi được xem
   ask_id?: string            // gửi lại ở lượt generate để hai dòng sổ kiểm toán cùng một câu hỏi
+  previous?: string          // câu hỏi lượt ngay trước, cùng phạm vi; máy chủ không lưu
 }
 
 // Hồ sơ đã nộp lưu (F3.8): gói đọc lại từ bucket lạnh, manifest đã so băm với CSDL (svc-files, archive.py). Chỉ văn
@@ -334,9 +347,9 @@ export function useApi() {
     return savePdf(`/api/documents/${documentId}/preview`, `du-thao-${documentId.slice(0, 8)}.pdf`)
   }
 
-  /** Sổ đăng ký một năm để xem trên màn hình. */
-  async function register(direction: 'in' | 'out', year: number): Promise<RegisterBook> {
-    const res = await authFetch(`/api/registers/${direction}/${year}`)
+  /** Sổ đăng ký một năm để xem trên màn hình; tên cột, ghi chú theo ngôn ngữ giao diện (F2.9). */
+  async function register(direction: 'in' | 'out', year: number, lang = 'vi'): Promise<RegisterBook> {
+    const res = await authFetch(`/api/registers/${direction}/${year}?lang=${lang === 'en' ? 'en' : 'vi'}`)
     const blocked = gatewayBlock(res.status, res.headers)
     if (blocked) throw blocked
     const body = await res.json().catch(() => ({}))
@@ -345,9 +358,11 @@ export function useApi() {
   }
 
   /** In sổ đăng ký ra PDF (A4 ngang) để ký nhận, đóng sổ; mỗi lần in được ghi vào sổ kiểm toán. */
-  function printRegister(direction: 'in' | 'out', year: number): Promise<void> {
-    return savePdf(`/api/registers/${direction}/${year}/pdf`,
-      `so-dang-ky-van-ban-${direction === 'in' ? 'den' : 'di'}-${year}.pdf`)
+  function printRegister(direction: 'in' | 'out', year: number, lang = 'vi'): Promise<void> {
+    const name = lang === 'en'
+      ? `register-${direction === 'in' ? 'incoming' : 'outgoing'}-${year}.pdf`
+      : `so-dang-ky-van-ban-${direction === 'in' ? 'den' : 'di'}-${year}.pdf`
+    return savePdf(`/api/registers/${direction}/${year}/pdf?lang=${lang === 'en' ? 'en' : 'vi'}`, name)
   }
 
   async function search(params: Record<string, string | number | undefined>): Promise<{ hits: SearchHit[]; next_cursor: string | null }> {

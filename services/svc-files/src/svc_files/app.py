@@ -182,6 +182,34 @@ class StatusAi(BaseModel):
     enabled: bool = Field(description="Mô hình viết câu trả lời của trợ lý đang sẵn sàng")
     model: str | None = Field(description="Tên mô hình khi bật, vd qwen3:1.7b; null khi tắt")
     semantic: bool = Field(description="Tìm theo nghĩa được (mô hình nhúng sẵn sàng)")
+    device: Literal["gpu", "cpu", "gpu+cpu"] | None = Field(
+        default=None, description="Mô hình của Ollama đang nằm trên GPU, CPU hay chia hai (MOC_AI_DEVICE, /api/ps); "
+                                  "null khi chưa nạp mô hình nào hay trợ lý tắt")
+
+
+class StatusOpenDataFile(BaseModel):
+    file: str = Field(description="Tên tệp trong bản chụp, vd tt-26-2026-tt-bgddt.pdf")
+    url: str | None = Field(description="Nơi đã tải tệp (http/https)")
+    sha256: str = Field(description="SHA-256 của tệp; trùng `sha256` của một tệp đính kèm là văn bản từ nguồn này")
+    bytes: int
+    fetched_at: datetime | None = Field(description="Lúc tải tệp; null: như `fetched_at` của nguồn")
+    meta: dict[str, str | int | float | bool | None] = Field(
+        description="Thông tin tùy nguồn, chỉ giá trị đơn, vd symbol, issuer_name, issued_on, page_url, gazette")
+
+
+class StatusOpenData(BaseModel):
+    source: str = Field(description="Mã nguồn, tên thư mục trong seed/du-lieu-mo, vd cong-bao-gddt")
+    name: str | None
+    publisher: str | None = Field(description="Cơ quan công bố")
+    home_url: str | None
+    reuse_basis: str | None = Field(description="Căn cứ dùng lại (điều luật hay giấy phép)")
+    licence: str | None = Field(description="Giấy phép mở nếu nguồn có; null: dùng lại theo `reuse_basis`")
+    fetched_at: datetime | None = Field(description="Lúc lấy bản chụp")
+    age_days: int | None = Field(description="Tuổi bản chụp, tính bằng ngày")
+    max_age_days: int | None
+    state: Literal["ok", "stale", "broken"] = Field(
+        description="ok · stale: quá `max_age_days` · broken: manifest hỏng, thiếu tệp, sai cỡ hay sai SHA-256")
+    files: list[StatusOpenDataFile]
 
 
 class StatusOut(BaseModel):
@@ -198,6 +226,9 @@ class StatusOut(BaseModel):
     layers: list[StatusLayer] = Field(description="Các tầng theo thứ tự hiện: người dùng → lõi → quy trình → dữ liệu "
                                                   "→ trí tuệ nhân tạo")
     components: list[StatusComponent]
+    open_data: list[StatusOpenData] = Field(
+        default_factory=list, description="Nguồn dữ liệu công khai đi kèm bản cài (#424): nguồn gốc, tuổi dữ liệu; "
+                                          "bản cài không gọi nguồn lúc chạy, chỉ đọc bản chụp")
 
 
 class SearchOut(BaseModel):
@@ -428,6 +459,9 @@ def create_app(
                     "với token Bearer do Keycloak cấp (docs/api/README.md).",
         lifespan=lifespan,
     )
+    if settings.trace_ratio > 0:            # #364: chỉ nạp OpenTelemetry khi bật truy vết
+        from . import tracing
+        tracing.install(app, "svc-files")
     app.state.indexer = indexer
     app.state.extractor = extractor
     app.state.anchorer = anchorer

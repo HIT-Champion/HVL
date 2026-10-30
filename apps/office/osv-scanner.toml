@@ -17,7 +17,7 @@
 # Lỗ hổng OSV-Scanner (CI, job "Quét bí mật và lỗ hổng phụ thuộc") tạm chấp nhận cho package-lock.json này.
 # Mỗi mục phải có lý do và hạn xem lại; quá hạn CI đỏ trở lại. Có bản vá thì nâng phiên bản và xóa mục.
 #
-# Hai gói dưới chỉ chạy lúc dựng hoặc lúc chạy máy chủ phát triển; image app-office chỉ phục vụ trang tĩnh
+# Các gói dưới chỉ chạy lúc dựng hoặc lúc chạy máy chủ phát triển; image app-office chỉ phục vụ trang tĩnh
 # đã dựng sẵn qua nginx, không chứa gói npm nào.
 
 [[IgnoredVulns]]
@@ -30,3 +30,9 @@ id = "GHSA-vjh5-4x84-xrqp"
 ignoreUntil = 2026-12-31
 # Đã vá ở 4.6.2 (GitHub đóng cảnh báo), nhưng bản ghi OSV còn khoảng 3.x không có bản vá, mở tới mọi phiên bản sau
 reason = "nuxt, @nuxt/nitro-server 4.6.2 đã vá; OSV vẫn khớp do khoảng 3.x chưa vá. App-office là trang tĩnh qua nginx."
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2026-12-31
+# nuxt → @nuxt/nitro-server → nitropack → @rollup/plugin-node-resolve 16.0.3 (bản mới nhất, vẫn cần deepmerge ^4)
+reason = "deepmerge 4.3.1, chưa có bản vá (#387): rollup gộp tùy chọn cấu hình lúc dựng Nuxt; không vào image."

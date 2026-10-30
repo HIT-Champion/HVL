@@ -24,6 +24,10 @@ bản giả lập để chạy thử Mộc, không phải văn bản thật"; kh
     seed/hoi-dap/06-han-che.pdf                       văn bản hạn chế có cụm từ riêng "phương án XANH LAM"
     seed/hoi-dap/cau-hoi.json                         văn bản (số ký hiệu, trang, giao việc) + câu hỏi, đáp án đúng
 
+Mỗi câu hỏi có loại (``loai``) và đường bộ định tuyến phải chọn (``route``, #423): ``van_ban`` tra cứu văn bản,
+``noi_tiep`` câu nối tiếp (kèm ``previous``, vẫn đi ``van_ban``), ``gioi_thieu``, ``huong_dan`` (đáp án là mục của
+tệp Giới thiệu trợ lý hay docs/huong-dan: ``{"guide": "<tệp>#<neo>"}``), ``ngoai_pham_vi`` (phải từ chối).
+
 Trang 2 trở đi bắt đầu bằng ngắt trang tường minh (``break-before: page``) nên số trang và trang chứa từng câu trả
 lời là tất định; mỗi thông tin cần hỏi nằm trong đúng một câu, trên đúng một trang. Câu hỏi về văn bản mẫu của make
 seed (88/CTSV, 131/ĐT-ĐH, công văn đi cử giảng viên dự hội thảo đã phát hành) lấy nguyên câu trong
@@ -104,7 +108,8 @@ class Doc:
 class Question:
     """``expect``: "none" (không được có câu trả lời) hoặc các nguồn đúng — khớp một trong số đó trong 3 nguồn đầu là
     đúng. ``forbid``: số ký hiệu không bao giờ được xuất hiện trong nguồn. ``evidence``: câu chứa câu trả lời,
-    nguyên văn trên trang mong đợi (để kiểm mẫu và để người đọc kết quả đo đối chiếu)."""
+    nguyên văn trên trang mong đợi (để kiểm mẫu và để người đọc kết quả đo đối chiếu). ``loai``: loại câu (khóa của
+    ``ROUTES``); ``previous``: câu hỏi của lượt trước, chỉ ở câu ``noi_tiep``."""
 
     id: str
     user: str
@@ -113,6 +118,16 @@ class Question:
     keywords: tuple[str, ...] = ()
     forbid: tuple[str, ...] = ()
     evidence: str | None = None
+    loai: str = "van_ban"
+    previous: str | None = None
+
+
+# loại câu → đường bộ định tuyến của trợ lý phải chọn (services/svc-files/src/svc_files/assist/route.py)
+ROUTES = {"van_ban": "van_ban", "noi_tiep": "van_ban", "gioi_thieu": "gioi_thieu", "huong_dan": "huong_dan",
+          "ngoai_pham_vi": "ngoai_pham_vi", "viec_cua_toi": "viec_cua_toi", "dem_van_ban": "dem_van_ban",
+          # câu về văn bản thật của nguồn công khai (#446): tìm như van_ban, đếm riêng để 19 câu van_ban giữ nguyên
+          "cong_khai": "van_ban"}
+INTRO = "services/svc-files/src/svc_files/assist/gioi_thieu"
 
 
 DOCS = (
@@ -264,6 +279,19 @@ def _at(symbol: str, page: int) -> tuple[dict, ...]:
     return ({"symbol": symbol, "page": page},)
 
 
+TASKS = ({"data": "tasks"},)
+
+
+def _count(directions: tuple[str, ...], start: str | None = None, end: str | None = None,
+           type_code: str | None = None) -> tuple[dict, ...]:
+    """Đáp án câu đếm văn bản: hướng, khoảng ngày nửa mở [start, end), loại — demo.py đếm thẳng theo đúng bộ lọc này."""
+    return ({"data": "documents", "directions": list(directions), "from": start, "to": end, "type_code": type_code},)
+
+
+def _guide(path: str) -> tuple[dict, ...]:
+    return ({"guide": path},)
+
+
 QUESTIONS = (
     # Văn bản mẫu nhiều trang: mỗi câu một trang khác nhau, người hỏi ở nhiều vai trò
     Question("q01", "vanthu", "Phải đăng ký tối thiểu bao nhiêu tín chỉ để được xét học bổng?", _at("15/QĐ-ĐHM", 1),
@@ -305,12 +333,80 @@ QUESTIONS = (
     Question("q16", "vanthu", "Khoa cử giảng viên nào tham dự hội thảo chuyển đổi số?",
              ({"summary_contains": "cử giảng viên tham dự hội thảo chuyển đổi số", "page": 1},), ("Vũ Thị Mai",),
              evidence=SEED_EVIDENCE["Về việc cử giảng viên tham dự hội thảo chuyển đổi số trong giáo dục đại học"]),
+    # Nguồn công khai A (#446): thông tư thật của Bộ GD&ĐT mà make seed nạp từ seed/du-lieu-mo/cong-bao-gddt; trang là
+    # trang của tệp PDF bản Công báo (test_hoi_dap kiểm câu bằng chứng trên đúng trang đó)
+    Question("c01", "vanthu", "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?", _at("06/2026/TT-BGDĐT", 18),
+             ("15 nguyện vọng",), evidence="Thí sinh được đăng ký tối đa 15 nguyện vọng vào các chương trình đào tạo, "
+                                         "các cơ sở giáo dục đại học khác nhau", loai="cong_khai"),
+    Question("c02", "vanthu", "Còn ngành đào tạo giáo viên thì sao?", _at("06/2026/TT-BGDĐT", 18), ("01 đến 05",),
+             evidence="Các chương trình đào tạo giáo viên chỉ xét tuyển thí sinh đăng ký ở các nguyện vọng có thứ tự "
+                      "từ 01 đến 05", loai="noi_tiep",
+             previous="Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?"),
+    Question("c03", "vanthu", "Thông tư số 10/2020/TT-BGDĐT hết hiệu lực từ ngày nào?", _at("58/2026/TT-BGDĐT", 5),
+             ("01 tháng 11 năm 2026",), evidence="hết hiệu lực kể từ ngày 01 tháng 11 năm 2026", loai="cong_khai"),
     # Câu âm: không văn bản nào trả lời được; nội dung văn bản hạn chế (không bao giờ vào chỉ mục)
     Question("q17", "vanthu", "Thủ tục cấp hộ chiếu công vụ?", "none"),
     Question("q18", "vanthu", "Phương án XANH LAM là gì?", "none", forbid=("53/PA-ĐHM",)),
     # Câu quyền (cấm): công văn học bổng giao Tổ Đào tạo, giảng viên Bộ môn KTPM không được xem
     Question("q19", "giangvienktpm", "Điều kiện xét học bổng khuyến khích học tập là gì?", "none",
              forbid=("15/QĐ-ĐHM", "88/CTSV")),
+    # Câu nối tiếp (#423): ghép với câu trước rồi tìm như câu văn bản; câu trả lời khác câu trả lời của câu trước
+    Question("n01", "chuyenviendt", "Thế còn loại Giỏi?", _at("15/QĐ-ĐHM", 2), ("110%",),
+             evidence="Học bổng loại Giỏi bằng 110% mức học phí của học kỳ.", loai="noi_tiep",
+             previous="Mức học bổng loại Xuất sắc là bao nhiêu?"),
+    Question("n02", "chuyenviendt", "Còn loại Khá thì sao?", _at("15/QĐ-ĐHM", 2), ("100%",),
+             evidence="Học bổng loại Khá bằng 100% mức học phí của học kỳ.", loai="noi_tiep",
+             previous="Mức học bổng loại Xuất sắc là bao nhiêu?"),
+    Question("n03", "truongkhoa", "Còn vé máy bay thì sao?", _at("31/HD-ĐHM", 2), ("300 km",),
+             evidence="Vé máy bay hạng phổ thông chỉ thanh toán cho chuyến đi từ 300 km trở lên.", loai="noi_tiep",
+             previous="Tiền thuê phòng nghỉ được thanh toán tối đa bao nhiêu?"),
+    Question("n04", "giangvienktpm", "Còn ngày Chủ nhật thì sao?", _at("08/QC-ĐHM", 1), ("lịch học bù",),
+             evidence="Ngày Chủ nhật và ngày lễ, phòng máy chỉ mở khi có lịch thi hoặc lịch học bù.",
+             loai="noi_tiep", previous="Phòng máy mở cửa từ mấy giờ?"),
+    Question("n05", "vanthu", "Còn lịch trực từng ngày thì sao?", _at("47/TB-ĐHM", 2),
+             ("Phòng Tổ chức – Hành chính",), evidence="Lịch trực từng ngày do Phòng Tổ chức – Hành chính phân công.",
+             loai="noi_tiep", previous="Trực cơ quan dịp nghỉ Tết ở đâu?"),
+    # Câu về chính trợ lý: đáp án là mục của tệp Giới thiệu trợ lý, không tìm trong kho, không gọi mô hình
+    Question("g01", "vanthu", "Bạn làm được gì?", _guide(f"{INTRO}/vi.md#lam-duoc-gi"), loai="gioi_thieu"),
+    Question("g02", "giangvienktpm", "Xin chào", _guide(f"{INTRO}/vi.md#gioi-thieu"), loai="gioi_thieu"),
+    Question("g03", "truongkhoa", "Bạn là ai?", _guide(f"{INTRO}/vi.md#gioi-thieu"), loai="gioi_thieu"),
+    Question("g04", "chuyenviendt", "Trợ lý dùng mô hình nào?", _guide(f"{INTRO}/vi.md#mo-hinh"), loai="gioi_thieu"),
+    Question("g05", "vanthu", "Tôi nên hỏi bạn thế nào?", _guide(f"{INTRO}/vi.md#cach-hoi"), loai="gioi_thieu"),
+    Question("g06", "vanthu", "What can you do?", _guide(f"{INTRO}/en.md#lam-duoc-gi"), loai="gioi_thieu"),
+    # Cách dùng Signet: đáp án là mục của hướng dẫn sử dụng (docs/huong-dan)
+    Question("h01", "giangvienktpm", "Nộp đơn nghỉ phép ở đâu?", _guide("docs/huong-dan/viec-chung.md#đơn-nghỉ-phép"),
+             loai="huong_dan"),
+    Question("h02", "chuyenviendt", "Làm thế nào để soạn văn bản đi?",
+             _guide("docs/huong-dan/chuyen-vien.md#soạn-và-trình-văn-bản-đi"), loai="huong_dan"),
+    Question("h03", "truongkhoa", "Làm thế nào để ký số văn bản đi?",
+             _guide("docs/huong-dan/lanh-dao-don-vi.md#ký-duyệt-văn-bản-đi"), loai="huong_dan"),
+    Question("h04", "truongkhoa", "Xem sổ kiểm toán ở đâu?", _guide("docs/huong-dan/quan-tri.md#sổ-kiểm-toán"),
+             loai="huong_dan"),
+    Question("h05", "vanthu", "Đổi mật khẩu ở đâu?", _guide("docs/huong-dan/README.md#đăng-nhập"), loai="huong_dan"),
+    # Ngoài phạm vi: câu cố định nói trợ lý làm được gì, không nguồn, không tìm
+    Question("o01", "vanthu", "Thời tiết Hà Nội hôm nay thế nào?", "none", loai="ngoai_pham_vi"),
+    Question("o02", "giangvienktpm", "Giá vàng hôm nay bao nhiêu?", "none", loai="ngoai_pham_vi"),
+    Question("o03", "truongkhoa", "Tỷ giá đô la hôm nay là bao nhiêu?", "none", loai="ngoai_pham_vi"),
+    Question("o04", "chuyenviendt", "Kết quả bóng đá tối qua thế nào?", "none", loai="ngoai_pham_vi"),
+    Question("o05", "vanthu", "Viết giúp tôi một bài thơ", "none", loai="ngoai_pham_vi"),
+    Question("o06", "vanthu", "Write me a poem", "none", loai="ngoai_pham_vi"),
+    # Việc của người hỏi (#441): số việc trong Hộp việc phải bằng myTasks đếm thẳng qua GraphQL bằng token người hỏi
+    Question("v01", "vanthu", "Việc nào của tôi sắp quá hạn?", TASKS, loai="viec_cua_toi"),
+    Question("v02", "truongkhoa", "Tôi có bao nhiêu việc quá hạn?", TASKS, loai="viec_cua_toi"),
+    Question("v03", "giangvienktpm", "Tôi được giao những việc gì?", TASKS, loai="viec_cua_toi"),
+    Question("v04", "totruongdt", "Có việc nào của mình đến hạn hôm nay không?", TASKS, loai="viec_cua_toi"),
+    Question("v05", "chuyenviendt", "Which of my tasks are almost overdue?", TASKS, loai="viec_cua_toi"),
+    # Đếm văn bản (#441): số phải bằng office_documents_aggregate với đúng bộ lọc ghi ở đây, bằng token người hỏi.
+    # Mốc thời gian ghi rõ tháng, năm để đáp án không đổi theo ngày đo
+    Question("d01", "vanthu", "Có bao nhiêu văn bản đến trong tháng 10/2026?",
+             _count(("in",), "2026-10-01", "2026-11-01"), loai="dem_van_ban"),
+    Question("d02", "truongkhoa", "Thống kê số văn bản đi năm 2026",
+             _count(("out",), "2026-01-01", "2027-01-01"), loai="dem_van_ban"),
+    Question("d03", "vanthu", "Có bao nhiêu quyết định đến trong năm 2026?",
+             _count(("in",), "2026-01-01", "2027-01-01", "QĐ"), loai="dem_van_ban"),
+    Question("d04", "giangvienktpm", "Có bao nhiêu văn bản?", _count(("in", "out")), loai="dem_van_ban"),
+    Question("d05", "chuyenviendt", "How many incoming documents arrived in September 2026?",
+             _count(("in",), "2026-09-01", "2026-10-01"), loai="dem_van_ban"),
 )
 
 
@@ -324,8 +420,10 @@ def questions_json() -> dict:
                      "restricted": d.restricted, "assign": assign})
     questions = []
     for q in QUESTIONS:
-        item: dict = {"id": q.id, "user": q.user, "question": q.question,
+        item: dict = {"id": q.id, "user": q.user, "loai": q.loai, "route": ROUTES[q.loai], "question": q.question,
                       "expect": q.expect if isinstance(q.expect, str) else list(q.expect)}
+        if q.previous:
+            item["previous"] = q.previous
         if q.keywords:
             item["keywords"] = list(q.keywords)
         if q.forbid:

@@ -52,7 +52,7 @@ ENV = {
     "MOC_AI_EMBED_DIMS": str(DIMS),
 }
 DIFF_KEYS = {"user_id", "ask_id", "mode", "status", "answer_source", "hits", "cited", "documents", "semantic",
-             "model", "embed_model", "duration_ms", "warnings"}
+             "model", "embed_model", "duration_ms", "warnings", "route", "route_reason", "followup", "model_where"}
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 D88 = "8c1d2e3f-0000-4000-8000-000000000088"
 D_MAT = "8c1d2e3f-0000-4000-8000-0000000000ff"
@@ -277,6 +277,7 @@ def test_generate_without_a_model_returns_the_quote(asking):
     body = ask(env, env.token(), mode="generate").json()
     assert body["answer"]["source"] == "extract" and body["warnings"] == ["model_unavailable"]
     assert env.hasura.agent_events[0]["diff"]["model"] is None
+    assert env.hasura.agent_events[0]["diff"]["model_where"] is None
 
 
 async def _slow(request):
@@ -299,6 +300,7 @@ def test_model_failures_keep_the_quote(asking, reply, warning):
     assert body["answer"] == {"text": f"“{QUOTE}” [1]", "source": "extract", "model": None}
     diff = env.hasura.agent_events[0]["diff"]
     assert diff["answer_source"] == "extract" and diff["model"] == CHAT_MODEL and diff["warnings"] == warning
+    assert diff["model_where"] == "local"           # đã gọi mô hình (không đạt): vẫn ghi mô hình nào, chạy ở đâu
 
 
 def test_model_is_skipped_when_the_deadline_is_near(asking):
@@ -503,6 +505,7 @@ def test_one_agent_audit_row_without_question_or_answer(asking):
         "user_id": "u-van-thu", "ask_id": body["ask_id"], "mode": "generate", "status": "answered",
         "answer_source": "model", "hits": 1, "cited": 1, "documents": D88, "semantic": True, "model": CHAT_MODEL,
         "embed_model": EMBED_MODEL, "duration_ms": body["duration_ms"], "warnings": "",
+        "route": "van_ban", "route_reason": "mac-dinh", "followup": False, "model_where": "local",
     }
     assert not any(isinstance(v, list | dict) for v in event["diff"].values())    # giao diện hiểu mảng là [cũ, mới]
     dumped = json.dumps(event, ensure_ascii=False)

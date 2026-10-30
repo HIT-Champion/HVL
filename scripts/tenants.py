@@ -462,15 +462,55 @@ class Keycloak:
     def update_client(self, client_id: str, rep: dict[str, Any]) -> None:
         self._req("PUT", f"/clients/{client_id}", rep)
 
+    # mapper của client (PUT client bỏ qua protocolMappers): moc wiki sync thêm mapper `groups` còn thiếu
+    def protocol_mappers(self, client_id: str) -> list[dict[str, Any]]:
+        return self._req("GET", f"/clients/{client_id}/protocol-mappers/models")[0] or []
+
+    def add_protocol_mapper(self, client_id: str, rep: dict[str, Any]) -> None:
+        self._req("POST", f"/clients/{client_id}/protocol-mappers/models", rep)
+
     # theme đăng nhập: realm_clients.py áp loginTheme của tệp realm cho realm đã nạp từ trước
     def update_realm(self, rep: dict[str, Any]) -> None:
         """PUT realm. Gửi nguyên bản vừa đọc đã sửa, như enable_organizations."""
         self._req("PUT", "", rep)
 
+    # user profile: realm_clients.py thêm thuộc tính của tệp realm còn thiếu (vd phone_number, #365)
+    def user_profile(self) -> dict[str, Any]:
+        return self._req("GET", "/users/profile")[0]
+
+    def update_user_profile(self, rep: dict[str, Any]) -> None:
+        """PUT cấu hình user profile. Gửi nguyên bản vừa đọc đã thêm thuộc tính: thiếu thuộc tính nào là Keycloak xóa
+        thuộc tính đó."""
+        self._req("PUT", "/users/profile", rep)
+
     def login_themes(self) -> set[str]:
         """Tên các theme đăng nhập máy chủ Keycloak đang có: dựng sẵn trong image và thư mục /opt/keycloak/themes."""
         info, _ = self._req("GET", "/serverinfo", server=True)
         return {t.get("name") for t in ((info or {}).get("themes") or {}).get("login") or []}
+
+    # vai trò của client (moc tu-dong, scripts/tu_dong.py): client_id là id nội bộ, không phải clientId
+    def client_roles(self, client_id: str) -> list[dict[str, Any]]:
+        return self._req("GET", f"/clients/{client_id}/roles")[0] or []
+
+    def create_client_role(self, client_id: str, rep: dict[str, Any]) -> None:
+        self._req("POST", f"/clients/{client_id}/roles", rep)
+
+    def client_role_users(self, client_id: str, role: str) -> list[dict[str, Any]]:
+        return self._all(f"/clients/{client_id}/roles/{urllib.parse.quote(role, safe='')}/users")
+
+    def grant_client_roles(self, user_id: str, client_id: str, roles: list[dict[str, Any]], *,
+                           revoke: bool = False) -> None:
+        """Gán (POST) hoặc gỡ (DELETE) vai trò client cho tài khoản; thân là danh sách vai trò như client_roles trả."""
+        self._req("DELETE" if revoke else "POST", f"/users/{user_id}/role-mappings/clients/{client_id}", roles)
+
+    # robot của flow Node-RED (moc tu-dong robot, #366): client confidential, mapper claim cố định
+    def update_protocol_mapper(self, client_id: str, mapper_id: str, rep: dict[str, Any]) -> None:
+        self._req("PUT", f"/clients/{client_id}/protocol-mappers/models/{mapper_id}", rep)
+
+    def client_secret(self, client_id: str, *, regenerate: bool = False) -> str:
+        """Bí mật của client confidential; regenerate: Keycloak sinh bí mật mới, bí mật cũ hết dùng được ngay."""
+        rep, _ = self._req("POST" if regenerate else "GET", f"/clients/{client_id}/client-secret")
+        return (rep or {}).get("value") or ""
 
 
 def admin_token() -> str:

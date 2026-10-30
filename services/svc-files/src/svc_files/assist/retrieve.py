@@ -126,7 +126,7 @@ class Filters:
 class Passage:
     chunk_id: str
     document_id: str
-    kind: Literal["page", "meta"]
+    kind: Literal["page", "meta", "guide"]     # guide: mục hướng dẫn, giới thiệu trợ lý (guide.py), không phải văn bản
     file_id: str | None
     file_role: Literal["main", "attachment", "issued"] | None
     page: int | None

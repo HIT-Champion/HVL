@@ -11,8 +11,8 @@
 >
 > 1. **Gồm gì.** Lõi Tầng 1 không giao diện: phần mềm nguồn mở dùng nguyên bản (Keycloak, APISIX, Hasura, PostgreSQL,
 >    Flowable, SeaweedFS, Meilisearch, ClamAV, OpenBao, Centrifugo) cộng hai dịch vụ Python của đội, `svc-files` và
->    `svc-workflow`. Tầng 2 là ba ứng dụng: Văn phòng điện tử, Không gian cá nhân P.A.R.A (hai trang tĩnh) và Bảng tin
->    đơn vị (cắm bằng `moc app install`).
+>    `svc-workflow`. Tầng 2 là các ứng dụng: Văn phòng điện tử, Không gian cá nhân P.A.R.A (hai trang tĩnh), trang tài
+>    liệu API, và Bảng tin đơn vị, Nghỉ phép (cắm bằng `moc app install`).
 > 2. **Chạy thế nào.** Mọi yêu cầu vào qua một cổng APISIX có kiểm token. Dữ liệu có cấu trúc đi qua Hasura, quyền tới
 >    từng dòng; tệp đi qua `svc-files`, quét ClamAV trước khi lưu; bước quy trình do Flowable giữ.
 > 3. **Vì sao chọn vậy.** Không viết lại phần mềm đã có, chạy trên một máy 8 GB, không dịch vụ trả phí (§1); từng lựa
@@ -70,12 +70,12 @@ văn bản, giao việc và sự kiện đó qua Hasura, đúng quyền người
 `agent`), việc của nó vào sổ kiểm toán, và nó chỉ gợi ý — người quyết.
 
 Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (15 dịch vụ, trong đó
-`keycloak-fonts` chạy một lần rồi thoát), `app` là Tầng 2 (`app-office`, `app-ca-nhan`); `make up` bật cả hai. Phần
-tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio, PostGIS), `logs` (Vector, Parseable), `mail` (Mailpit),
-`tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng khi gọi `make ai-model`, `make demo-it-ot`, `make
-backup` hay `make restore`. Kế hoạch dời việc đổi profile sang Phase 1, dự kiến `core / app / ops / ai`
-([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0); hiện là `core`,
-`app` cộng các phần tùy chọn ở trên, không có profile `ops`.
+`keycloak-fonts` chạy một lần rồi thoát), `app` là Tầng 2 (`app-office`, `app-ca-nhan`, `app-tai-lieu-api`); `make up`
+bật cả hai. Phần tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio, PostGIS), `logs` (Vector, Parseable), `trace`
+(Jaeger), `mail` (Mailpit), `tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng khi gọi `make ai-model`,
+`make demo-it-ot`, `make backup` hay `make restore`. Kế hoạch dời việc đổi profile sang Phase 1, dự kiến
+`core / app / ops / ai` ([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0); hiện là `core`, `app`
+cộng các phần tùy chọn ở trên, không có profile `ops`.
 
 ### 1.3. Ràng buộc tài nguyên
 
@@ -98,9 +98,9 @@ của ba câu, đúng mức đã kiểm:
 | 2. Cài dưới một giờ | **Chưa đo** với người ngoài đội trên máy sạch | `ROADMAP.md`, giai đoạn 5 |
 | 3. Không dịch vụ trả phí bắt buộc | Đạt | [`trien-khai.md`](trien-khai.md) §5, §5b |
 
-- **Câu 1.** `make up` bật profile `core` và `app` (17 dịch vụ, 16 chạy liên tục). README ghi khoảng 3,2 GB (đo
-  từ trước khi thêm `app-ca-nhan`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa.
-  Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
+- **Câu 1.** `make up` bật profile `core` và `app` (19 dịch vụ, 18 chạy liên tục). README ghi khoảng 3,2 GB (đo từ trước
+  khi thêm `app-ca-nhan`, `app-tai-lieu-api`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB
+  đĩa. Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
   cần máy 16 GB.
 - **Câu 2.** Cài từ mã nguồn bằng `make env`, `make up`, `make seed`; `make install PREFIX=…` cài ra ngoài thư mục mã
   nguồn (F1.8).
@@ -112,8 +112,9 @@ của ba câu, đúng mức đã kiểm:
 Vẽ theo `docker-compose.yml` và [`platform/apisix/apisix.yaml`](../platform/apisix/apisix.yaml); nhãn mũi tên ra từ cổng
 là đường dẫn thật (realm mặc định `moc`). Ảnh động ở README ([`anh/kien-truc-tong-the.gif`](anh/kien-truc-tong-the.gif))
 vẽ cùng hệ thống cho người mới đọc. Các nhóm [H] [P] [D] [I] theo bảng §3; `svc-files` đứng ở nhóm Tin cậy như trong
-ảnh. Hai dịch vụ của đội (`svc-files`, `svc-workflow`) còn chứa phần máy chủ của Văn phòng điện tử — §4 tách riêng phần
-đó.
+ảnh. Nét đứt là phần tùy chọn, bật theo profile hay chạy khi gọi lệnh. Kênh thông báo bên ngoài nằm ngoài mạng Docker
+(cột phải của ảnh): `svc-workflow` gọi ra khi bản cài đặt cấu hình, không có gì từ đó gọi vào. Hai dịch vụ của đội
+(`svc-files`, `svc-workflow`) còn chứa phần máy chủ của Văn phòng điện tử — §4 tách riêng phần đó.
 
 ```mermaid
 flowchart LR
@@ -125,6 +126,10 @@ flowchart LR
   subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app; mạng apps: chỉ tới APISIX)"]
     OFF["app-office<br/>Văn phòng điện tử · Nuxt 4"]
     CN["app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
+    TL["app-tai-lieu-api<br/>Tài liệu API · Swagger UI"]
+    APP["ứng dụng cắm bằng manifest<br/>Bảng tin, Nghỉ phép (moc app install)"]
+    NR["Node-RED · profile tu-dong<br/>flow tự động, chỉ người vận hành soạn"]
+    WK["DokuWiki · profile wiki<br/>wiki nội bộ từng đơn vị"]
   end
   subgraph TANG1["Tầng 1 — lõi không giao diện (profile core)"]
     subgraph KGH["[H] Nhân sự"]
@@ -140,6 +145,7 @@ flowchart LR
       PG[("PostgreSQL 16<br/>core · office · personal")]
       MS["Meilisearch 1.54<br/>tìm toàn văn"]
       SW[("SeaweedFS 4.48<br/>kho tệp S3")]
+      SC["Scorpio 6.0 NGSI-LD<br/>cảm biến IoT · profile iot"]
     end
     subgraph TINCAY["Tin cậy"]
       SF["svc-files<br/>tệp, tìm kiếm, PDF, AI"]
@@ -150,19 +156,35 @@ flowchart LR
       OL["Ollama 0.35<br/>profile ai"]
     end
     subgraph VANHANH["Vận hành"]
-      PM["Prometheus + Grafana"]
+      PM["Prometheus + Grafana<br/>Alertmanager"]
+      JG["Jaeger 2.22<br/>truy vết · profile trace"]
+      LG["Vector 0.59 + Parseable 3.2<br/>log tập trung · profile logs"]
+      BK["restic 0.19<br/>sao lưu · moc backup"]
     end
+  end
+  subgraph NGOAI["Ngoài hệ thống — kênh thông báo, tắt mặc định"]
+    EM["Máy chủ thư SMTP<br/>webhook Mattermost, Slack, ntfy"]
+    SMS["SMS Gateway for Android<br/>điện thoại có SIM cùng LAN"]
+    ZL["Zalo Bot Platform<br/>bot của đơn vị"]
   end
   U1 --> GW
   U2 --> GW
   GW -->|"/*"| OFF
   GW -->|"/ca-nhan, /ca-nhan/*"| CN
+  GW -->|"/tai-lieu-api, /tai-lieu-api/*"| TL
+  GW -->|"/bang-tin/*, /nghi-phep/* — route thêm lúc cài"| APP
+  APP -->|"token, GraphQL: chỉ qua cổng"| GW
+  GW -.->|"/tu-dong, /tu-dong/* · WebSocket"| NR
+  NR -.->|"OIDC, token robot, GraphQL<br/>(Action notifyFromFlow): chỉ qua cổng"| GW
+  GW -.->|"/wiki, /wiki/*"| WK
+  WK -.->|"OIDC: chỉ qua cổng"| GW
   GW -->|"/realms/moc, /realms/moc/*, /resources/*"| KC
   GW -->|"/v1/graphql"| HA
   GW -->|"/api/files, /api/files/*, /api/search,<br/>/api/documents/*, /api/registers/*"| SF
   GW -->|"/api/case-files/*, /api/imports, /api/imports/*"| SF
   GW -->|"/api/verify, /api/verify/*, /api/status<br/>không cần token"| SF
   GW -->|"/realtime · WebSocket"| CE
+  GW -->|"/api/workflow/* — quy trình của ứng dụng cắm thêm"| WF
   HA -->|"6 Actions"| WF
   HA -->|"SQL"| PG
   WF -->|"REST, external worker"| FL
@@ -180,6 +202,17 @@ flowchart LR
   FL -->|"CSDL flowable"| PG
   KC -->|"CSDL keycloak"| PG
   PM -->|"chỉ số mỗi 15 giây"| GW
+  PM -->|"cảnh báo: /ops/alerts"| WF
+  WF -.->|"NGSI-LD"| SC
+  WF -.->|"email, webhook: hộp thư đi"| EM
+  WF -.->|"POST /message: người dùng tự bật"| SMS
+  WF -.->|"getUpdates, sendMessage:<br/>người dùng tự bật, liên kết bằng mã"| ZL
+  GW -.->|"span, tỉ lệ MOC_TRACE_RATIO"| JG
+  SF -.->|"span"| JG
+  WF -.->|"span"| JG
+  GW -.->|"log 9 dịch vụ, driver fluentd"| LG
+  BK -.->|"sao lưu"| PG
+  BK -.->|"sao lưu"| SW
 ```
 
 - **Một cửa.** Chỉ APISIX mở cổng ra mạng (`MOC_HTTP_PORT`, mặc định 8080). Yêu cầu GET, HEAD tới đường không có trong
@@ -191,16 +224,16 @@ flowchart LR
   gọi `svc-workflow` kèm `X-Moc-Action-Secret`; `svc-workflow` gọi `svc-files` bằng token tài khoản dịch vụ (client
   credentials). Cổng gỡ khóa quản trị Hasura khỏi mọi yêu cầu từ ngoài.
 - **Hai đường ghi.** Dữ liệu có cấu trúc đi qua Hasura: quyền theo vai trò và đơn vị tới từng dòng; thao tác làm đổi
-  trạng thái quy trình đi qua Hasura Actions do `svc-workflow` xử lý; dịch vụ này không có route ở cổng và chính nó cũng
-  ghi qua Hasura, bằng vai trò `service`, `agent`. Tệp đi qua `svc-files`: quét ClamAV trước khi ghi SeaweedFS, tải về
-  sau khi Hasura xác nhận người hỏi được xem.
+  trạng thái quy trình đi qua Hasura Actions do `svc-workflow` xử lý; ở cổng, dịch vụ này chỉ có route `/api/workflow/*`
+  cho quy trình của ứng dụng cắm bằng manifest (#301), và chính nó cũng ghi qua Hasura, bằng vai trò `service`, `agent`.
+  Tệp đi qua `svc-files`: quét ClamAV trước khi ghi SeaweedFS, tải về sau khi Hasura xác nhận người hỏi được xem.
 - **Mạng con khép kín.** SeaweedFS chỉ ở mạng `storage`, OpenBao ở `secrets`, Ollama ở `ai` — mạng `internal` của
   Docker, chỉ `svc-files` (và `svc-workflow` với `secrets`) nối vào, nên không thành phần nào khác chạm được tệp, két
-  hay mô hình qua mạng. Container ứng dụng (`app-office`, `app-ca-nhan`, ứng dụng cài bằng `moc app install`) chỉ ở
-  mạng `apps` (`internal`), nơi chỉ có APISIX: ứng dụng tới lõi duy nhất qua cổng, kể cả phần máy chủ của ứng dụng
-  (token client credentials, GraphQL đi qua đúng các route của trình duyệt, cùng kiểm token, giới hạn tốc độ, WAF).
-  Hasura giao sự kiện tới ứng dụng qua cổng hook 9081 của APISIX — không publish, route hook chỉ khớp ở cổng đó
-  ([`them-ung-dung.md`](them-ung-dung.md) 1.3). Ngoại lệ có chủ ý: container `restic` (profile `backup`, không
+  hay mô hình qua mạng. Container ứng dụng (`app-office`, `app-ca-nhan`, `app-tai-lieu-api`, ứng dụng cài bằng
+  `moc app install`) chỉ ở mạng `apps` (`internal`), nơi chỉ có APISIX: ứng dụng tới lõi duy nhất qua cổng, kể cả phần
+  máy chủ của ứng dụng (token client credentials, GraphQL đi qua đúng các route của trình duyệt, cùng kiểm token, giới
+  hạn tốc độ, WAF). Hasura giao sự kiện tới ứng dụng qua cổng hook 9081 của APISIX — không publish, route hook chỉ khớp
+  ở cổng đó ([`them-ung-dung.md`](them-ung-dung.md) 1.3). Ngoại lệ có chủ ý: container `restic` (profile `backup`, không
   mạng) gắn thẳng volume của SeaweedFS và OpenBao để sao lưu (`docker-compose.yml`, `scripts/backup.py`). Flowable không
   gọi ra ngoài: việc tự động là việc giao ra ngoài (external worker) do `svc-workflow` kéo về (QĐ-009).
 
@@ -218,11 +251,11 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Không gian | Thành phần đang chạy (phiên bản ghim) |
 |---|---|
 | Nền chung | APISIX 3.18.0 · `svc-files`, `svc-workflow` (Python 3.13, FastAPI 0.143) · ClamAV 1.5.4 · OpenBao 2.7.1 · sổ kiểm toán chuỗi băm · pyHanko 0.37.0 · bộ che thông tin cá nhân |
-| [H] Nhân sự | Keycloak 26.7.5 · Không gian cá nhân P.A.R.A (ứng dụng thứ hai) |
-| [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) |
+| [H] Nhân sự | Keycloak 26.7.5 · Không gian cá nhân P.A.R.A (ứng dụng thứ hai) · DokuWiki 2026-07-14c (profile `wiki`) |
+| [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) · Node-RED 5.0.8 (profile `tu-dong`) |
 | [D] Dữ liệu | PostgreSQL 16 · Hasura CE v2.51.0 · SeaweedFS 4.48 · Meilisearch CE v1.54.3 · DuckDB 1.5.6 · phả hệ OpenLineage · dashboard ECharts 6.1.0 · Scorpio 6.0.2 và PostGIS 16-3.5 (profile `iot`) |
 | [I] Trí tuệ | Ollama 0.35.1 (profile `ai`) · Qwen3-1.7B, Qwen3-Embedding-0.6B · Tesseract 5.5.0 · truy xuất có nguồn tự viết · ba tác tử |
-| Vận hành | Prometheus 3.15.0, Grafana OSS 13.2.3 · Vector 0.59.0, Parseable 3.2.4 (profile `logs`) · restic 0.19.1 · reconciler GitOps · cloudflared 2026.10.0 (profile `tunnel`) |
+| Vận hành | Prometheus 3.15.0, Alertmanager 0.34.1, Grafana OSS 13.2.3 · Vector 0.59.0, Parseable 3.2.4 (profile `logs`) · restic 0.19.1 · reconciler GitOps · cloudflared 2026.10.0 (profile `tunnel`) |
 
 <details>
 <summary><b>Bảng chi tiết từng không gian</b>: vai trò, cụm Tầng 1, vị trí trong repo, mức</summary>
@@ -247,6 +280,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 |---|---|---|---|---|---|
 | Keycloak | 26.7.5 | Đăng nhập một lần cho mọi ứng dụng, TOTP bắt buộc với vai trò quan trọng; vai trò, đơn vị, phòng đưa vào token (claim của Hasura); mỗi đơn vị một Organization | ① ② | `platform/keycloak/realm/moc-realm.json`, `scripts/tenants.py` | F1.1 Hoàn thiện; F3.12 Hoàn thiện |
 | Không gian cá nhân P.A.R.A *(mã của đội)* | JavaScript thuần, nginx-unprivileged 1.30.6 | Ứng dụng thứ hai: mỗi người xếp tệp của mình vào Dự án, Lĩnh vực, Tài nguyên, Lưu trữ; dùng đăng nhập, tệp, sổ kiểm toán của lõi | Tầng 2 | `apps/ca-nhan/`, schema `personal` | Không có mã F; bước CI `make demo-ca-nhan` ([`them-ung-dung.md`](them-ung-dung.md) §4) |
+| DokuWiki | 2026-07-14c, plugin oauth, oauthgeneric | Wiki nội bộ (profile `wiki`, tắt mặc định): mỗi đơn vị một không gian chỉ người của đơn vị đọc, sửa; đăng nhập Keycloak (client `wiki`), không tài khoản quản trị; mạng `apps`, sau APISIX ở `/wiki/` | — | `platform/wiki/`, `scripts/wiki.py` | — (#367) |
 
 **[P] Không gian Quy trình**
 
@@ -256,9 +290,10 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Hasura Actions | Hasura 2.51.0 | Cửa ghi nghiệp vụ: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `completeTask` (cùng truy vấn hộp việc `myTasks` và sơ đồ cảm biến `otSensorMap` của F3.10) → `svc-workflow`, kèm biến phiên lấy từ JWT | ⑤ | `db/metadata/actions.yaml` | F1.4 Hoàn thiện |
 | JSON Schema dùng chung | Ajv 8.20.0 (giao diện), jsonschema 4.26 (`svc-workflow`) | Poka-yoke ba lớp: form, máy chủ, ràng buộc CSDL theo cùng một tệp schema | — | `schemas/` | F2.2 Hoàn thiện |
 | Centrifugo | 6.9.7 | Đẩy thông báo từng người qua WebSocket `/realtime`, tự kiểm token Keycloak | ⑦ | `platform/centrifugo/config.yaml`, `svc_workflow/notify.py` | F2.5 Hoàn thiện |
-| Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP và webhook Mattermost, Slack, ntfy (`core.notification_deliveries`, tắt mặc định) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
+| Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP, webhook Mattermost, Slack, ntfy, SMS, Zalo (`core.notification_deliveries`, tắt mặc định; SMS, Zalo do từng người tự bật) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
 | Nạp lô *(mã của đội)* | — | `POST /api/imports/incoming`: tệp NDJSON hoặc CSV, mỗi dòng qua ClamAV và Action `receiveIncoming` thay mặt văn thư | ⑤ | `svc_files/imports/` | Dùng được (mục 3, cụm ⑤) |
 | Mailpit | v1.31.4 | Hộp thư thử cho email thông báo (profile `mail`, chỉ để demo) | ⑦ | `docker-compose.yml` | — |
+| Node-RED | 5.0.8, openid-client 6.8.8 | Tự động hóa không sửa mã (profile `tu-dong`, tắt mặc định): người vận hành nền tảng soạn flow ở `/tu-dong/`; đăng nhập Keycloak, chỉ vai trò `operator` của client `tu-dong`; không node `exec`, không cài node từ trình soạn; flow tới lõi qua APISIX bằng robot của đơn vị (vai trò Hasura `tu_dong`) | ⑤ | `platform/tu-dong/`, `scripts/tu_dong.py` | — (#366) |
 
 **[D] Không gian Dữ liệu**
 
@@ -287,8 +322,8 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
-| Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
-| Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 8 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
+| Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Alertmanager gọi svc-workflow để cảnh báo thành thông báo cho quản trị đơn vị (#284); Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
+| Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 9 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
 | restic | 0.19.1 | Sao lưu mã hóa CSDL, tệp, két (`make backup`, `make restore`) | ⑥ | `scripts/backup.py` | F3.4 Hoàn thiện |
 | Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, kiểm chữ ký commit nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
 | cloudflared | 2026.10.0 | Cloudflare Tunnel cho máy không có IP công khai (profile `tunnel`, tùy chọn) | — | dịch vụ `cloudflared` trong `docker-compose.yml` | F1.9 Hoàn thiện (tunnel chưa kiểm trong CI) |
@@ -302,20 +337,20 @@ F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đ�
 
 | Khe cắm trong kế hoạch | Hiện trạng | Đang lấp bằng | Nguồn |
 |---|---|---|---|
-| [H] Quản trị tri thức (wiki) | **Chưa có** | Trợ lý hỏi đáp trên kho văn bản của Văn phòng điện tử (F4.2); chưa có kho tri thức nào khác | `ROADMAP.md` giai đoạn 1, 4 |
-| [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email và webhook tới Mattermost, Slack, ntfy — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
+| [H] Quản trị tri thức (wiki) | Tùy chọn (profile `wiki`, tắt mặc định) | DokuWiki ở `/wiki/`: mỗi đơn vị một không gian riêng, đăng nhập Keycloak (#367); trợ lý hỏi đáp trên kho văn bản của Văn phòng điện tử (F4.2). Chưa có không gian chung cả trường, trang wiki không vào tìm kiếm của Văn phòng | `docs/van-hanh.md` mục Wiki nội bộ; `ROADMAP.md` giai đoạn 1, 4 |
+| [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email, webhook tới Mattermost, Slack, ntfy, SMS, Zalo — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
 | [H] Cổng nội bộ | Một phần | Các ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; trang Ứng dụng (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng riêng | `ROADMAP.md` giai đoạn 1 |
-| [P] Biểu mẫu low-code | **Chưa có** | Form viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py` | `ROADMAP.md` giai đoạn 2 |
-| [P] Tự động hóa, kịch bản serverless (⑤) | **Chưa có** | Vòng nền viết cứng trong `svc-files`, `svc-workflow`; Kestra đã cân nhắc, chưa đưa vào | `muc-hoan-thien.md` §3; `DEPENDENCIES.md` |
+| [P] Biểu mẫu low-code | Một phần | Form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py`; chưa có trình dựng form (#303) | `ROADMAP.md` giai đoạn 2 |
+| [P] Tự động hóa, kịch bản serverless (⑤) | Một phần (profile `tu-dong`, tắt mặc định) | Node-RED ở `/tu-dong/` cho người vận hành nền tảng: đăng nhập Keycloak, chỉ vai trò `operator`, flow tới lõi qua APISIX bằng robot của đơn vị, hai flow mẫu (#366); chưa có webhook, bước BPMN gọi flow; vòng nền của lõi vẫn viết cứng trong `svc-files`, `svc-workflow` | `muc-hoan-thien.md` §3; `van-hanh.md` mục Tự động hóa bằng Node-RED |
 | [P] Trục streaming sự kiện (⑥) | Một phần | Luồng `core.app_events` (đến, vào sổ, phát hành; không văn bản hạn chế) qua Hasura Event Triggers tới ứng dụng cài bằng `moc app install`; chưa phải broker: không phát lại, không bảo đảm thứ tự. Bảng sự kiện, hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3, [`them-ung-dung.md`](them-ung-dung.md) mục 1 |
 | [D] Thu thập, làm sạch, đồng bộ sang kho phân tích | **Chưa có** | Chặn dữ liệu bẩn ngay ở điểm nhập (Poka-yoke ba lớp); dashboard đọc thẳng view trên CSDL nghiệp vụ | `ROADMAP.md` giai đoạn 3 |
 | [D] BI riêng | **Chưa có** (chủ ý) | Trang `/dieu-hanh` (ECharts) đọc view `office.v_*` qua Hasura. Metabase bị loại: bản nguồn mở không đăng nhập bằng Keycloak được, đọc thẳng CSDL bỏ qua quyền đơn vị | `DEPENDENCIES.md` |
 | [D] Lớp ngữ nghĩa báo cáo, số liệu chuỗi thời gian (③) | Một phần | Mỗi báo cáo một view viết tay; `office.archived_document_facts` giữ số liệu của văn bản đã nộp lưu | `muc-hoan-thien.md` §3 |
 | [I] Kho véc-tơ riêng | Không dùng (chủ ý) | Chỉ mục đoạn `chunks` trên Meilisearch sẵn có (QĐ-004) | `DEPENDENCIES.md` |
 | [I] Cổng giám sát tác tử | **Chưa có** màn riêng | Dòng của tác tử trong sổ kiểm toán; số đo từng tác tử ở [`danh-gia-ai.md`](danh-gia-ai.md) | `ROADMAP.md` giai đoạn 4 |
-| Tracing phân tán (⑥) | **Chưa có** | `X-Request-Id` từ APISIX đi qua hai dịch vụ tới `core.audit_log.request_id` | `muc-hoan-thien.md` §3 |
+| Tracing phân tán (⑥) | Một phần | Jaeger (profile `trace`, tắt mặc định, #364): span của APISIX, `svc-files`, `svc-workflow`, lưu trong RAM; chưa có span của Hasura, Flowable, Keycloak, PostgreSQL. `X-Request-Id` từ APISIX đi qua hai dịch vụ tới `core.audit_log.request_id` | `muc-hoan-thien.md` §3 |
 | Dịch thuật trong lõi (②) | Một phần | Chỉ bản địa hóa giao diện tiếng Việt, tiếng Anh | `muc-hoan-thien.md` §3 |
-| SMS, Zalo (⑦) | **Chưa có** | Email, webhook | `muc-hoan-thien.md` §3 |
+| SMS, Zalo (⑦) | Một phần | SMS qua SMS Gateway for Android trên điện thoại cùng LAN, Zalo qua bot của đơn vị; tắt mặc định, từng người tự bật (#365). Mới thử với cổng, bot giả trong test, chưa với tài khoản thật | `muc-hoan-thien.md` §3 |
 
 Ứng viên đã cân nhắc nhưng không dùng — vì giấy phép không thuộc danh sách OSI, của chính nó hay của phụ thuộc bắt
 buộc (Vault, n8n, Redpanda, MongoDB, immudb, Directus, bpmn-js; Orion vì bắt buộc MongoDB), vì đã ngừng phát triển
@@ -340,7 +375,7 @@ tệp metadata của `core` trỏ sang `office`, năm vai trò cố định củ
 §4.7 đã làm ở #302: phần Văn phòng của hai dịch vụ nằm trong gói `office/`, chỉ gắn route và chạy vòng nền khi
 `MOC_OFFICE_ENABLED` bật; tắt thì hai dịch vụ vẫn lên và phần lõi vẫn chạy (`make demo-tat-van-phong`, có trong CI). Vẫn
 chung tiến trình, chung image. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`,
-nhưng nó mang theo các chỗ dính ở CSDL, metadata và vai trò (§4.6). Các bước còn lại là việc sau `v1.3.0` (§4.7).
+nhưng nó mang theo các chỗ dính ở CSDL, metadata và vai trò (§4.6). Các bước còn lại là việc sau `v1.4.0` (§4.7).
 
 ### 4.2. Sơ đồ
 
@@ -472,7 +507,7 @@ hiện tại.
 | `directory.py` | Dáng nghiệp vụ | Đồng bộ người dùng Keycloak → `core.users` là cơ chế chung; viết cứng `ROLES = {"clerk", "staff", "manager", "director", "tenant_admin"}` |
 | `notify.py` | Dáng nghiệp vụ | Ghi `core.notifications`, đẩy qua Centrifugo; nhận `document_id`, người nhận và người được báo tiếp chọn theo vai trò văn thư (`staff` → `manager` → `director`) |
 | `hasura.py` | Dáng nghiệp vụ | Máy khách vai trò `service`, `Actor` (biến phiên, cả nhóm ứng viên của BPMN văn bản), hai câu của danh bạ. 23 câu của Văn phòng (`office_register_incoming`, `office_number_outgoing`, `office_dispatches`…) đã sang `office/queries.py` (#302) |
-| `channels.py` | Dáng nghiệp vụ | Kênh email, webhook dùng chung; loại thông báo và câu chữ là của Văn phòng (`document.issued`, `task.overdue`…) |
+| `channels.py` | Dáng nghiệp vụ | Kênh email, webhook, SMS, Zalo dùng chung; loại thông báo và câu chữ là của Văn phòng (`document.issued`, `task.overdue`…) |
 | `schemas.py` | Dáng nghiệp vụ | Bộ kiểm JSON Schema chung; schema hiện có là form văn bản đến `schemas/van-ban-den.json` |
 | `workflow.py`, route `POST /actions/{name}` | Văn phòng | Nghiệp vụ của 5 Actions: tiếp nhận, vào sổ, trình văn bản đi, hộp việc, hoàn thành việc; đối soát với Flowable |
 | `forms.py` | Văn phòng | Dữ liệu của từng `formKey` trong BPMN văn bản |
@@ -484,6 +519,8 @@ hiện tại.
 | `processes/*.bpmn20.xml` | Văn phòng | Hai quy trình `van-ban-den`, `van-ban-di` |
 | `office/api.py` | Văn phòng | Lớp `Office` theo khuôn `Part`: gắn `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN văn bản, sáu vòng định kỳ của Văn phòng (#302) |
 | `apps/` (`bpmn.py`, `forms.py`, `bundle.py`, `deploy.py`, `auth.py`, `api.py`) | Lõi | Quy trình của ứng dụng cắm bằng manifest (#301): kiểm BPMN theo danh sách trắng và form JSON Schema, triển khai lên Flowable với tiền tố `<tên>.`, API chung `/api/workflow/<tên>/…` chỉ nhận token của client `app-<tên>`. Không biết ứng dụng cụ thể nào, luôn bật, không theo `MOC_OFFICE_ENABLED` |
+| `alerts.py`, route `POST /ops/alerts` | Lõi | Cảnh báo vận hành Alertmanager gửi sang (#284) → thông báo `ops.alert` cho vai trò `tenant_admin` của mọi đơn vị, không gắn văn bản; phần chung, gắn cả khi tắt Văn phòng |
+| `tu_dong.py`, route `POST /actions/tu-dong/{name}` | Lõi | Action `notifyFromFlow` của robot flow Node-RED (vai trò Hasura `tu_dong`, #366) → thông báo `flow.message` cho người của đơn vị robot theo vai trò; kèm văn bản thì chỉ `director`, `clerk`; cùng khóa không báo lại |
 | `parts.py` | Lõi | Khuôn `Part` (`install`, `jobs`, `aclose`) để gắn một phần nghiệp vụ; vòng định kỳ, triển khai BPMN có thử lại, định dạng lỗi Hasura Action; không biết phần cụ thể nào |
 | `app.py`, `config.py` | Trộn | `create_app` dựng phần chung (danh bạ, thông báo: hai vòng định kỳ) và quy trình của ứng dụng (`apps/`, #301); chỉ dựng và gắn phần Văn phòng khi `MOC_OFFICE_ENABLED` bật (#302). Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
 
@@ -589,7 +626,7 @@ thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](the
 
 ### 4.7. Hướng tách
 
-Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.3.0`, chưa xếp ngày (#324).
+Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.4.0`, chưa xếp ngày (#324).
 
 **Tiêu chí xong** — kiểm được, không cần tin lời:
 
@@ -645,7 +682,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 | QĐ-001 | "mọi tệp mã phải mang header Apache-2.0 (CI cưỡng chế)" | Vẫn đúng với tệp mã; tệp không chèn được header (JSON, ảnh, Markdown…) khai giấy phép trong `REUSE.toml` |
 | QĐ-002 | "dùng chung cho mọi thành phần, tách bằng schema hoặc database riêng" | Đúng, trừ Scorpio: broker bắt buộc phần mở rộng `postgis` nên có CSDL PostGIS riêng (profile `iot`) |
 | QĐ-002 | "tài liệu vận hành ở giai đoạn 5 phải có quy trình sao lưu và phục hồi rõ ràng" | Đã có: `make backup`, `make restore` (restic, F3.4), [`van-hanh.md`](van-hanh.md) mục "Sao lưu và khôi phục" |
-| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 17 dịch vụ (15 của `core`, 2 của `app`), 16 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
+| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 19 dịch vụ (16 của `core`, 3 của `app`), 18 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
 
 ### QĐ-001: Chọn Apache-2.0 làm giấy phép dự án
 
@@ -746,8 +783,9 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 - **Hệ quả:** tắt `svc-files` thì văn bản vẫn tới lãnh đạo ngay, chỉ có dòng `failed`; CI chạy đủ bằng tìm theo từ khóa
   và bỏ phiếu. Gợi ý giải thích được ("vì 3 văn bản tương tự đã giao Tổ Đào tạo") và tốt dần khi có thêm văn bản đã
   giao; ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác đo được dễ cao ảo — số đo luôn báo kèm số văn bản, số đơn vị.
-  Hạn tránh thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS`; ngày lễ âm lịch, ngày nghỉ bù do người vận hành thêm mỗi
-  năm. Chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
+  Hạn tránh thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` cộng lịch nghỉ chính thức (Tết, nghỉ bù, làm bù) của
+  nguồn công khai B `seed/du-lieu-mo/ngay-nghi-le` (#427); năm chưa công bố thì người vận hành thêm vào
+  `MOC_HOLIDAYS`. Chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
   thêm một dòng tác tử ở Sổ kiểm toán và tab Lịch sử — dòng sổ không mang trích yếu, không mang căn cứ. Chi tiết:
   `docs/mo-hinh-du-lieu.md` §1, §3, §4.2, README của `svc-workflow`.
 
@@ -763,7 +801,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   cần thêm mô hình ngôn ngữ (spaCy không có pipeline tiếng Việt chính thức) mà bộ nhận dạng dựng sẵn không có định
   dạng Việt Nam, nên vẫn phải tự viết regex. phonenumbers — metadata lớn phải ghim và cập nhật, không biết CCCD hay số
   tài khoản. Luật lỏng "0 + 9–11 chữ số" — che cả đuôi UUID, mã số thuế, số hiệu dài (các chuỗi âm tính trong
-  `test_pii.py`); luật theo cấu trúc che nhầm 0 chỗ trên kho mẫu: 81 023 ký tự, 747 chuỗi số ứng viên, đo lại bằng
+  `test_pii.py`); luật theo cấu trúc che nhầm 0 chỗ trên kho mẫu: 81 063 ký tự, 747 chuỗi số ứng viên, đo lại bằng
   `make do-che-pii`.
 - **Phương án chỗ che cho mô hình:** che trong chỉ mục — mất tìm theo số, phải nhúng lại toàn bộ, câu trích không còn
   khớp văn bản gốc. Che sau khi cắt cửa sổ ngữ cảnh — lọt mẩu số bị cắt đôi ("…liên hệ 0912 345"). Điền số thật trở
@@ -929,8 +967,9 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 - **Quyết định:** trang tĩnh. `apps/office`: Nuxt 4 với `ssr: false`, dựng ra tệp tĩnh, `nginx-unprivileged` 1.30.6 phục
   vụ. `apps/ca-nhan`: JavaScript thuần, không bước biên dịch, cùng image nginx. Đăng nhập OIDC Authorization Code với
   PKCE (`oidc-client-ts`); dữ liệu qua `/v1/graphql`, tệp qua `/api/*`, thông báo qua `/realtime` — cùng gốc với cổng
-  nên không cần CORS. `svc-workflow` không có route ở cổng: chỉ Hasura gọi nó. Giao diện chỉ đọc vai trò trong token để
-  vẽ menu; quyền do Hasura và dịch vụ kiểm.
+  nên không cần CORS. Văn phòng không gọi thẳng `svc-workflow`: Hasura Actions gọi nó (route `/api/workflow/*` ở cổng,
+  thêm sau ở #301, dành cho ứng dụng cắm bằng manifest). Giao diện chỉ đọc vai trò trong token để vẽ menu; quyền do
+  Hasura và dịch vụ kiểm.
 - **Lý do (căn cứ duy nhất trong repo):** chú thích ở `apps/office/nuxt.config.ts` — "Giao diện chạy hoàn toàn trên
   trình duyệt (SPA): dựng thành trang tĩnh, nginx phục vụ, mọi dữ liệu lấy qua APISIX cùng tên miền — không có máy chủ
   Node nào phải chạy ở bản triển khai." Không tài liệu nào ghi SSR từng được cân nhắc hay ràng buộc 8 GB là lý do.
@@ -958,7 +997,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   giữa hai phần là gọi hàm. Đổi lại: chưa tắt hay thay được Văn phòng mà không sửa mã lõi; tìm kiếm, chữ PDF, trợ lý chỉ
   phủ văn bản của Văn phòng; triển khai lại phần Văn phòng là khởi động lại cả dịch vụ lõi; còn những chỗ dính ở §4.4.
   Ứng dụng thứ hai vẫn cắm được mà không sửa `services/` (§4.6). Hướng tách, tiêu chí, cái giá: §4.7 — việc sau
-  `v1.3.0`.
+  `v1.4.0`.
 
 ### QĐ-013: WAF Coraza dạng proxy-wasm trong APISIX
 
@@ -990,8 +1029,10 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
 
 - **Lõi còn ôm phần máy chủ của Văn phòng điện tử**: tách cứng ở cổng và khóa ngoại CSDL; hàm, cột, metadata, vai trò
   của `core` còn dính `office`; chưa tách ở mã (§4, QĐ-012).
-- **Thiếu một năng lực Tầng 1**: nơi chạy kịch bản serverless (⑤); việc nền là vòng lặp viết cứng trong hai dịch vụ.
-  Trục sự kiện (⑥) mới một phần: Event Triggers giao `core.app_events` tới ứng dụng, chưa phải broker
+- **Kịch bản serverless (⑤) mới một phần**: Node-RED (profile `tu-dong`, #366) cho người vận hành soạn flow, gọi lõi
+  bằng robot của đơn vị; chưa có webhook, bước BPMN gọi flow, việc nền của lõi vẫn là vòng lặp viết cứng trong hai
+  dịch vụ. Trục sự kiện (⑥)
+  mới một phần: Event Triggers giao `core.app_events` tới ứng dụng, chưa phải broker
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, QĐ-008).
 - **Một máy, một PostgreSQL**: điểm lỗi đơn (QĐ-002), không tự mở rộng, không chịu lỗi nhiều nút (QĐ-003); sổ kiểm toán
   là một chuỗi băm, mọi giao dịch ghi sổ xếp hàng ở dòng `core.audit_head`; chưa đo tải
@@ -1000,13 +1041,15 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   vai trò CSDL quyền hẹp ([`trien-khai.md`](trien-khai.md) §8). Mốc neo sổ kiểm toán ra bucket khóa ghi là để chặn đúng
   đường siêu người dùng viết lại sổ (`svc_files/anchors.py`).
 - **Mạng**: TLS chỉ ở đoạn trình duyệt ↔ proxy, trong mạng Docker các dịch vụ gọi nhau bằng HTTP;
-  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy, kể cả container ứng dụng ở mạng `apps`
-  ([`trien-khai.md`](trien-khai.md) §8). Ứng dụng chỉ tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
+  `MOC_TRUSTED_PROXY=auto` tin mọi container ở mạng `moc` (dịch vụ lõi, `cloudflared`), không tin mạng `apps`; bản
+  cài cũ còn `172.16.0.0/12` thì tin mọi container trên máy ([`trien-khai.md`](trien-khai.md) §8, #211). Ứng dụng chỉ
+  tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
   tới được nhau và tới cổng trạng thái 7085, cổng chỉ số 9091 của APISIX (chỉ số, không dữ liệu nghiệp vụ). WAF (F3.15,
   QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
-- **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ, chưa có
-  tracing phân tán; cảnh báo chỉ hiện trong Grafana, Prometheus, chưa gửi ra ngoài; log tập trung tắt mặc định (F3.13,
-  F3.14).
+- **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ; tracing
+  phân tán mới ở mức Một phần (Jaeger tắt mặc định, chưa có span của Hasura, Flowable, Keycloak, PostgreSQL); cảnh
+  báo tới mọi quản trị đơn vị (chuông, kênh ngoài nếu bật), chưa chọn được người nhận; log tập trung tắt mặc định
+  (F3.13, F3.14).
 - **Két bí mật**: `.env` vẫn là nguồn bí mật; chưa có quy trình xoay khóa transit, xoay bí mật
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, cụm ①).
 - **Số đo còn thiếu**: chạy trên máy 8 GB và "cài dưới một giờ" chưa đo (§1.3); cột "trước" của số đo thành công chưa

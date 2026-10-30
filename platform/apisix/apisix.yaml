@@ -27,6 +27,9 @@
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
 #   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
 #   /tai-lieu-api, /tai-lieu-api/*   → app-tai-lieu-api (Swagger UI) — không cần token; gọi thử đi qua các route trên
+#   /wiki, /wiki/*                   → wiki (DokuWiki, profile wiki)  — wiki tự đăng nhập bằng Keycloak, tự kiểm quyền
+#   /tu-dong, /tu-dong/*             → tu-dong (Node-RED, profile tu-dong; có WebSocket) — Node-RED tự đăng nhập bằng
+#                                      Keycloak, chỉ vai trò operator, tự kiểm token trình soạn
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Container ứng dụng chỉ ở mạng `apps` cùng APISIX (docker-compose.yml): phần máy chủ của ứng dụng cũng gọi lõi qua
@@ -93,6 +96,16 @@ upstreams:
     type: roundrobin
     nodes:
       "app-tai-lieu-api:8080": 1
+  # Wiki nội bộ (#367, profile wiki — tắt mặc định): chưa bật thì không có container, route /wiki trả 503
+  - id: wiki
+    type: roundrobin
+    nodes:
+      "wiki:8080": 1
+  # Tự động hóa Node-RED (#366, profile tu-dong — tắt mặc định): chưa bật thì không có container, route /tu-dong trả 503
+  - id: tu-dong
+    type: roundrobin
+    nodes:
+      "tu-dong:1880": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -130,6 +143,19 @@ plugin_configs:
           set:
             X-Forwarded-Port: $moc_cong_chuyen_tiep
 
+# #364 — truy vết phân tán: span gửi Jaeger của profile trace (OTLP/HTTP, chỉ trong mạng moc). trace_id ngẫu nhiên,
+# không lấy từ X-Request-Id (mã đó là UUID có gạch, không làm trace_id được); mã yêu cầu nằm ở thuộc tính
+# x-request-id của span, tìm trong Jaeger bằng thẻ x-request-id=<mã>. Không bật profile trace thì để
+# MOC_TRACE_RATIO=0: APISIX không gửi gì
+plugin_metadata:
+  - id: opentelemetry
+    trace_id_source: random
+    resource:
+      service.name: apisix
+    collector:
+      address: jaeger:4318
+      request_timeout: 3
+
 global_rules:
   - id: 1
     plugins:
@@ -137,6 +163,16 @@ global_rules:
         header_name: X-Request-Id
         include_in_response: true
         algorithm: uuid
+      # #364: chọn MOC_TRACE_RATIO yêu cầu (0–1) theo trace_id, gửi traceparent cho dịch vụ phía sau. trace_id_ratio
+      # chứ không parent_base: cờ lấy mẫu trong traceparent client tự gửi không bắt APISIX ghi. Chạy sau request-id
+      # (priority 12009 < 12015) nên span mang mã yêu cầu. http.target của span có chuỗi truy vấn: Jaeger bỏ
+      # (platform/trace/jaeger.yaml)
+      opentelemetry:
+        sampler:
+          name: trace_id_ratio
+          options:
+            fraction: ${{MOC_TRACE_RATIO:=0}}
+        additional_header_prefix_attributes: [x-request-id]
       # F3.13: đếm yêu cầu, mã trạng thái, độ trễ của mọi route; nhãn route là id trong tệp này (graphql, svc-files, …)
       prometheus: {}
       # F3.15: Coraza 3.3.3 trong coraza-proxy-wasm đọc JSON bằng đệ quy không giới hạn (GHSA-6gcq-wc29-5xf2): thân
@@ -368,6 +404,66 @@ global_rules:
                 SecRule &ARGS_POST "@ge 1000" "id:10061,phase:2,deny,status:403,log,
                 msg:'Quá nhiều tham số form (GHSA-6r3q-mjv7-xr8m)',chain"
               - SecRule REQBODY_PROCESSOR "@streq URLENCODED"
+              # Loại trừ 10 — wiki nội bộ (#367, mọi đường dưới /wiki/). Keycloak trả về /wiki/doku.php sau đăng nhập
+              # như loại trừ 2: iss là URL của realm, code, session_state là token ngẫu nhiên — gỡ đúng ba luật bắt nhầm
+              # token (#140). Nội dung trang khi lưu, xem trước, lưu nháp (POST /wiki/<trang>, /wiki/lib/exe/ajax.php:
+              # wikitext, phần trước, sau của đoạn đang sửa) và tóm tắt thay đổi là chữ tự do như loại trừ 5: DokuWiki
+              # chỉ lưu thành tệp chữ rồi dựng HTML có escape (không bật htmlok, phpok), không chạy, không tải URL.
+              # SQLi, XSS, duyệt thư mục, Log4Shell, Node.js vẫn soi
+              - >-
+                SecRule REQUEST_FILENAME "@beginsWith /wiki/" "id:10070,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=931100;ARGS:iss,
+                ctl:ruleRemoveTargetById=934110;ARGS:iss,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_state,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_state,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_state,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:prefix,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:suffix,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:summary,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:prefix,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:suffix,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:summary,
+                ctl:ruleRemoveTargetById=931100;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=931100;ARGS:prefix,
+                ctl:ruleRemoveTargetById=931100;ARGS:suffix,
+                ctl:ruleRemoveTargetById=931100;ARGS:summary,
+                ctl:ruleRemoveTargetById=931120;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=931120;ARGS:prefix,
+                ctl:ruleRemoveTargetById=931120;ARGS:suffix,
+                ctl:ruleRemoveTargetById=931120;ARGS:summary"
+              # Loại trừ 11 — tự động hóa Node-RED (#366, mọi đường dưới /tu-dong). Keycloak trả về
+              # /tu-dong/auth/strategy/callback kèm iss, code, session_state như loại trừ 2; Node-RED trả mã đổi một lần
+              # (base64 ngẫu nhiên, có + / =) về trình soạn ở /tu-dong/?code=, trình soạn gửi lại mã đó ở POST
+              # /tu-dong/auth/token; cookie phiên connect.sid chỉ dùng trong lúc bắt tay với Keycloak. Gỡ đúng ba luật
+              # bắt nhầm token (#140) trên đúng các khóa đó
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/tu-dong(?:/|$)" "id:10080,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=931100;ARGS:iss,
+                ctl:ruleRemoveTargetById=934110;ARGS:iss,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_state,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_state,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_state,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:connect.sid,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:connect.sid,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:connect.sid"
+              # Loại trừ 12 — thân của API lưu flow, thư viện của Node-RED (POST /tu-dong/flows, /tu-dong/flow[/<id>],
+              # POST /tu-dong/library/…): mã JavaScript của node Function, HTML của node Template, câu truy vấn — đúng
+              # thứ CRS chặn, mỗi loại node một tên trường nên không loại trừ theo khóa được; lại mang thông tin đăng
+              # nhập của node, không để WAF ghi ra log. Chỉ token trình soạn (vai trò operator) mới được Node-RED nhận
+              # flow. Không soi thân ở đúng các đường này; tham số truy vấn, header vẫn soi. WAF so đường thô còn APISIX
+              # chuyển đường đã chuẩn hóa: đường có ".." (kể cả %2e%2e) không được gỡ, vd /tu-dong/library/../auth/token
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/tu-dong/(?:flows|flow(?:/[^/]+)?|library/.+)$"
+                "id:10081,phase:1,pass,nolog,chain"
+              - SecRule REQUEST_FILENAME "!@contains .." "t:none,t:urlDecodeUni,ctl:requestBodyAccess=Off"
               - Include @owasp_crs/*.conf
               # Loại trừ 4 — Host là địa chỉ IP: Signet được mở bằng IP trong mạng nội bộ; dưới APISIX coraza-proxy-wasm
               # thêm Host lần nữa nên luật cộng điểm hai lần (6 ≥ 5) và chặn mọi yêu cầu vào bằng IP
@@ -526,6 +622,27 @@ routes:
     uris: ["/tai-lieu-api", "/tai-lieu-api/*"]
     methods: [GET, HEAD]
     upstream_id: app-tai-lieu-api
+
+  # Wiki nội bộ (#367): DokuWiki tự đăng nhập bằng Keycloak (client bí mật `wiki`) và tự kiểm quyền theo đơn vị nên
+  # không qua can-token; POST để lưu trang, tải tệp. DokuWiki chạy ở gốc container (basedir /wiki/): bỏ tiền tố trước
+  # khi chuyển vào
+  - id: wiki
+    uris: ["/wiki", "/wiki/*"]
+    methods: [GET, HEAD, POST]
+    upstream_id: wiki
+    plugins:
+      proxy-rewrite:
+        regex_uri: ["^/wiki/?(.*)$", "/$1"]
+
+  # Tự động hóa bằng Node-RED (#366): Node-RED tự đăng nhập bằng Keycloak (client công khai `tu-dong`, chỉ vai trò
+  # operator) và tự kiểm token của trình soạn ở mỗi lời gọi nên không qua can-token. Trình soạn gọi API bằng GET, POST,
+  # PUT, DELETE và nhận sự kiện qua WebSocket /tu-dong/comms. httpAdminRoot của Node-RED là /tu-dong: không bỏ tiền tố.
+  # Không có endpoint HTTP của flow (httpNodeRoot tắt, platform/tu-dong/settings.js)
+  - id: tu-dong
+    uris: ["/tu-dong", "/tu-dong/*"]
+    methods: [GET, HEAD, POST, PUT, DELETE]
+    upstream_id: tu-dong
+    enable_websocket: true
 
   - id: app-office
     uri: /*

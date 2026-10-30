@@ -22,13 +22,17 @@ cộng một từ khóa riêng chỉ form của ứng dụng dùng: ``"x-moc-ran
 ``x-moc-range`` gắn vào trường sau. Kiểm sau mọi từ khóa khác; trường nào đã có lỗi hoặc không phải chuỗi thì không so.
 Không thêm vào ``schemas.py`` để form của Văn phòng điện tử (Ajv biên dịch sẵn) không lệch với máy chủ.
 
-Lúc triển khai, form phải: là JSON Schema 2020-12 hợp lệ; ``type: object``, ``additionalProperties: false`` (mọi biến
-ghi vào quy trình đều được khai); tên trường dạng camelCase, không trùng biến hệ thống; giá trị là một giá trị đơn
-(biến Flowable); ``$ref`` chỉ trỏ trong chính tệp (không tải gì từ ngoài); ``format`` chỉ ``date``, ``uuid`` — hai
-định dạng cả trình duyệt lẫn máy chủ cùng kiểm; không có ``patternProperties``, ``propertyNames``; ``pattern`` không
-dễ quay lui bùng nổ, có ``maxLength`` cạnh nó khi thời gian kiểm tăng theo độ dài chuỗi (``pattern_problem``), cả form
-cộng lại không quá ``MAX_FORM_STEPS``. Lúc kiểm dữ liệu, chuỗi dài quá ``maxLength`` không chạy ``pattern``
-(``AppValidator``).
+Lúc triển khai, form phải: là JSON Schema 2020-12 hợp lệ, lồng không quá ``MAX_DEPTH`` tầng; ``type: object``,
+``additionalProperties: false`` (mọi biến ghi vào quy trình đều được khai); tên trường dạng camelCase, không trùng biến
+hệ thống; giá trị là một giá trị đơn (biến Flowable); ``$ref`` chỉ trỏ trong chính tệp (không tải gì từ ngoài);
+``format`` chỉ ``date``, ``uuid`` — hai định dạng cả trình duyệt lẫn máy chủ cùng kiểm; không có ``patternProperties``,
+``propertyNames``; ``pattern`` không dễ quay lui bùng nổ, có ``maxLength`` cạnh nó khi thời gian kiểm tăng theo độ dài
+chuỗi (``pattern_problem``), cả form cộng lại không quá ``MAX_FORM_STEPS``. Lúc kiểm dữ liệu, chuỗi dài quá
+``maxLength`` không chạy ``pattern`` (``AppValidator``). Tệp sai kiểu ở đâu cũng thành câu lỗi, không ném ngoại lệ.
+
+Trình dựng form của Văn phòng điện tử (#303) chép các luật lúc cài sang trình duyệt (``apps/office/app/utils/
+formRules.ts``, trừ ``pattern`` và meta-schema); hai bên chạy chung ``tests/app_form_rules.cases.json``, kể cả các
+hằng số dưới đây. Sửa luật thì sửa cả hai nơi.
 """
 
 from __future__ import annotations
@@ -53,11 +57,18 @@ RESERVED = ("tenantId", "departmentId", "initiator")
 # Flowable 8 giải các tên này trong biểu thức của BPMN (điều kiện rẽ nhánh) thành giá trị của động cơ trước khi tìm biến
 # (VariableContainerELResolver, ProcessVariableScopeELResolver; task: khi biểu thức chạy trên một việc)
 ENGINE_NAMES = ("execution", "task", "authenticatedUserId", "currentTenantId")
+# từ khóa của ngôn ngữ biểu thức (JUEL): biến trùng tên không viết được trong ``${…}``, ``${le == 'x'}`` lỗi cú pháp
+EL_KEYWORDS = ("and", "div", "empty", "eq", "false", "ge", "gt", "instanceof", "le", "lt", "mod", "ne", "not",
+               "null", "or", "true")
 VARIABLE = re.compile(r"[a-z][A-Za-z0-9]{0,63}", re.ASCII)
 SCALAR_TYPES = {"string", "integer", "number", "boolean", "null"}
 FORMATS = {"date", "uuid"}
 DATE_RULES = {"not-after-today", "not-before-today"}
 MAX_FORM_BYTES = 256 * 1024
+# Tầng đối tượng, mảng lồng nhau trong tệp form: form thật chỉ vài tầng. Trần thấp để json.loads, _walk không chạm giới
+# hạn đệ quy của Python. Cũng là trần số tầng schema tính cả qua $ref (_cost): kiểm dữ liệu gửi lên, jsonschema đi đệ
+# quy khoảng 12 khung mỗi tầng allOf — 16 $ref nối nhau, mỗi đích lồng 20 tầng đã quá giới hạn
+MAX_DEPTH = 32
 LONG = (-(2**63), 2**63 - 1)    # biến kiểu long của Flowable
 
 # ``pattern`` chạy bằng ``re`` (quay lui) ngay trong vòng sự kiện của svc-workflow lúc kiểm dữ liệu gửi lên, và ``re``
@@ -80,6 +91,9 @@ SUBSCHEMA = ("not", "if", "then", "else", "items", "contains", "additionalProper
 SUBSCHEMA_LISTS = ("allOf", "anyOf", "oneOf", "prefixItems")
 SUBSCHEMA_MAPS = ("properties", "patternProperties", "dependentSchemas")
 MAX_REF_DEPTH = 16
+# Chỉ số mảng trong JSON Pointer của $ref: số ASCII không có số 0 đầu (RFC 6901), tối đa 9 chữ số. int() của Python
+# còn nhận "١", "01", "-1", " 1" và ném lỗi với "²" hay quá 4300 chữ số
+ARRAY_INDEX = re.compile(r"0|[1-9][0-9]{0,8}")
 # jsonschema đi qua một schema con mất khoảng 7 µs, cỡ 2300 bước của re: tính mỗi nút 3000 bước, để $ref lồng nhau
 # (allOf mười $ref tới tầng sau, tầng sau lại thế) không qua được trần dù không có pattern nào
 NODE_STEPS = 3000
@@ -89,6 +103,28 @@ ROOT_ONLY = ("$id", "$anchor", "$dynamicAnchor", "$recursiveAnchor")
 
 def _scalar(value: Any) -> bool:
     return value is None or isinstance(value, (str, bool, int, float))
+
+
+def _no_constant(name: str) -> Any:
+    """json.loads nhận NaN, Infinity, -Infinity; JSON (và JSON.parse của trình duyệt) thì không."""
+    raise ValueError(f"{name} không phải giá trị JSON")
+
+
+def _one_of(value: Any, allowed: set[str]) -> bool:
+    """``value`` là một chuỗi trong ``allowed``. Đối tượng, mảng thì sai, không để ``in`` của set ném TypeError."""
+    return isinstance(value, str) and value in allowed
+
+
+def _depth(value: Any) -> int:
+    """Số tầng đối tượng, mảng lồng nhau của một giá trị JSON; đi bằng vòng lặp, không đệ quy."""
+    deepest, stack = 0, [(value, 1)]
+    while stack:
+        node, level = stack.pop()
+        children = node.values() if isinstance(node, dict) else node if isinstance(node, list) else None
+        if children is not None:
+            deepest = max(deepest, level)
+            stack.extend((child, level + 1) for child in children)
+    return deepest
 
 
 def bad_value(value: Any) -> bool:
@@ -275,15 +311,16 @@ class RefProblem(Exception):
 
 
 def _resolve(root: dict[str, Any], ref: str) -> Any:
-    """``#/…`` (JSON Pointer) trong chính form → schema đích; trỏ không tới đâu thì RefProblem."""
+    """``#/…`` (JSON Pointer) trong chính form → schema đích; trỏ không tới đâu thì RefProblem. Giải %XX cả chuỗi rồi
+    mới tách theo ``/`` như thư viện referencing mà jsonschema dùng, nên ``%2F`` cũng là dấu tách."""
     if ref != "#" and not ref.startswith("#/"):
         raise RefProblem(f"$ref {ref!r}: chỉ nhận JSON Pointer trong chính form (#/…)")
     node: Any = root
-    for part in ref[2:].split("/") if ref != "#" else ():
-        part = unquote(part).replace("~1", "/").replace("~0", "~")
+    for part in unquote(ref[2:]).split("/") if ref != "#" else ():
+        part = part.replace("~1", "/").replace("~0", "~")
         if isinstance(node, dict) and part in node:
             node = node[part]
-        elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+        elif isinstance(node, list) and ARRAY_INDEX.fullmatch(part) and int(part) < len(node):
             node = node[int(part)]
         else:
             raise RefProblem(f"$ref {ref!r} không trỏ tới schema nào trong form")
@@ -293,8 +330,9 @@ def _resolve(root: dict[str, Any], ref: str) -> Any:
 def form_steps(schema: dict[str, Any]) -> int:
     """Số bước ước lượng khi kiểm một lần gửi (giá trị đơn): ``NODE_STEPS`` cho mỗi schema jsonschema đi qua, cộng số
     bước quay lui của pattern ở đó. Đích một ``$ref`` trỏ bao nhiêu chỗ tính bấy nhiêu lần, như jsonschema chạy; lúc cài
-    mỗi đích chỉ đi qua một lần. $ref vòng hay lồng quá ``MAX_REF_DEPTH`` tầng → RefProblem."""
-    return _cost(schema, schema, (), {})[0]
+    mỗi đích chỉ đi qua một lần. $ref vòng hay lồng quá ``MAX_REF_DEPTH`` tầng, schema lồng quá ``MAX_DEPTH`` tầng tính
+    cả qua $ref → RefProblem."""
+    return _cost(schema, schema, (), {}, 1)[0]
 
 
 def _subschemas(node: dict[str, Any]) -> Iterator[Any]:
@@ -306,12 +344,21 @@ def _subschemas(node: dict[str, Any]) -> Iterator[Any]:
         yield from node[key].values() if isinstance(node.get(key), dict) else ()
 
 
-def _cost(node: Any, root: dict[str, Any], refs: tuple[int, ...], memo: dict[int, tuple[int, int]]) -> tuple[int, int]:
-    """(số bước, số tầng $ref sâu nhất bên dưới) của ``node``. ``refs``: các đích $ref đang đi qua, ``memo``: kết quả
-    theo đích — khóa là chính đích (id), nên hai cách viết cùng một JSON Pointer không bị tính hai lần."""
+def _too_deep() -> RefProblem:
+    return RefProblem(f"schema lồng quá {MAX_DEPTH} tầng tính cả qua $ref — jsonschema đi đệ quy từng tầng khi kiểm "
+                      "dữ liệu gửi lên")
+
+
+def _cost(node: Any, root: dict[str, Any], refs: tuple[int, ...], memo: dict[int, tuple[int, int, int]],
+          level: int) -> tuple[int, int, int]:
+    """(số bước, số tầng $ref sâu nhất bên dưới, số tầng schema từ ``node`` trở xuống kể cả qua $ref) của ``node``, ở
+    tầng ``level`` tính từ gốc. ``refs``: các đích $ref đang đi qua, ``memo``: kết quả theo đích — khóa là chính đích
+    (id), nên hai cách viết cùng một JSON Pointer không bị tính hai lần."""
     if not isinstance(node, dict):
-        return 0, 0
-    steps, depth = NODE_STEPS, 0
+        return 0, 0, 0
+    if level > MAX_DEPTH:
+        raise _too_deep()
+    steps, depth, levels = NODE_STEPS, 0, 1
     if isinstance(node.get("pattern"), str):
         steps += pattern_cost(node["pattern"], _bound(node.get("maxLength")))[1]
     ref = node.get("$ref")
@@ -320,15 +367,18 @@ def _cost(node: Any, root: dict[str, Any], refs: tuple[int, ...], memo: dict[int
         if id(target) in refs or len(refs) >= MAX_REF_DEPTH:
             raise RefProblem(f"$ref {ref!r} trỏ vòng hoặc lồng quá {MAX_REF_DEPTH} tầng")
         if id(target) not in memo:
-            memo[id(target)] = _cost(target, root, (*refs, id(target)), memo)
-        sub_steps, sub_depth = memo[id(target)]
-        if len(refs) + 1 + sub_depth > MAX_REF_DEPTH:      # đích đã tính từ chỗ nông hơn, chỗ này lồng sâu hơn
+            memo[id(target)] = _cost(target, root, (*refs, id(target)), memo, level + 1)
+        sub_steps, sub_depth, sub_levels = memo[id(target)]
+        # đích đã tính từ chỗ nông hơn, chỗ này lồng sâu hơn
+        if len(refs) + 1 + sub_depth > MAX_REF_DEPTH:
             raise RefProblem(f"$ref {ref!r} trỏ vòng hoặc lồng quá {MAX_REF_DEPTH} tầng")
-        steps, depth = steps + sub_steps, sub_depth + 1
+        if level + sub_levels > MAX_DEPTH:
+            raise _too_deep()
+        steps, depth, levels = steps + sub_steps, sub_depth + 1, sub_levels + 1
     for sub in _subschemas(node):
-        sub_steps, sub_depth = _cost(sub, root, refs, memo)
-        steps, depth = steps + sub_steps, max(depth, sub_depth)
-    return steps, depth
+        sub_steps, sub_depth, sub_levels = _cost(sub, root, refs, memo, level + 1)
+        steps, depth, levels = steps + sub_steps, max(depth, sub_depth), max(levels, sub_levels + 1)
+    return steps, depth, levels
 
 
 def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
@@ -336,9 +386,13 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
     if len(raw) > MAX_FORM_BYTES:
         return None, [f"{where}: tệp lớn quá {MAX_FORM_BYTES // 1024} KB"]
     try:
-        schema = json.loads(raw.decode("utf-8"))
+        schema = json.loads(raw.decode("utf-8"), parse_constant=_no_constant)
+    except RecursionError:
+        return None, [f"{where}: JSON lồng quá {MAX_DEPTH} tầng"]
     except (UnicodeDecodeError, ValueError) as exc:
         return None, [f"{where}: không phải JSON UTF-8 ({exc})"]
+    if _depth(schema) > MAX_DEPTH:
+        return None, [f"{where}: JSON lồng quá {MAX_DEPTH} tầng"]
     if not isinstance(schema, dict):
         return None, [f"{where}: cần một đối tượng JSON Schema ở gốc"]
     errors: list[str] = []
@@ -357,6 +411,9 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
         elif name in ENGINE_NAMES:
             errors.append(f"{where}: trường {name} trùng tên Flowable dành sẵn trong biểu thức "
                           f"({', '.join(ENGINE_NAMES)}) — điều kiện của BPMN không đọc được giá trị gửi lên")
+        elif name in EL_KEYWORDS:
+            errors.append(f"{where}: trường {name} trùng từ khóa của biểu thức ({', '.join(EL_KEYWORDS)}) — điều kiện "
+                          "của BPMN không viết được biến này")
         elif not VARIABLE.fullmatch(name):
             errors.append(f"{where}: tên trường {name!r} phải dạng camelCase (chữ thường đầu, chỉ chữ và số, "
                           "≤ 64 ký tự) — là tên biến Flowable")
@@ -364,20 +421,22 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
             errors.append(f"{where}: trường {name} phải là một schema (đối tượng)")
             continue
         types = prop.get("type", [])
-        if not set(types if isinstance(types, list) else [types]) <= SCALAR_TYPES:
+        if not all(_one_of(t, SCALAR_TYPES) for t in (types if isinstance(types, list) else [types])):
             errors.append(f"{where}: trường {name}: chỉ nhận giá trị đơn (string, integer, number, boolean) — biến "
                           "Flowable không chứa đối tượng, mảng")
         if isinstance(prop.get("enum"), list) and not all(_scalar(v) for v in prop["enum"]):
             errors.append(f"{where}: trường {name}: enum chỉ gồm giá trị đơn")
-        if "x-moc-date" in prop and prop["x-moc-date"] not in DATE_RULES:
+        if "x-moc-date" in prop and not _one_of(prop["x-moc-date"], DATE_RULES):
             errors.append(f"{where}: trường {name}: x-moc-date chỉ nhận {', '.join(sorted(DATE_RULES))}")
-    missing = [r for r in schema.get("required") or [] if r not in props]
-    if missing:
+    required = schema.get("required", [])
+    if not isinstance(required, list):
+        errors.append(f"{where}: required phải là danh sách tên trường")
+    elif missing := [r for r in required if not (isinstance(r, str) and r in props)]:
         errors.append(f"{where}: required có trường không khai trong properties: {', '.join(map(str, missing))}")
     ranges = schema.get("x-moc-range", [])
+    dates = {name for name, prop in props.items() if isinstance(prop, dict) and prop.get("format") == "date"}
     if not isinstance(ranges, list) or not all(
-            isinstance(p, list) and len(p) == 2 and p[0] != p[1]
-            and all(isinstance(props.get(f), dict) and props[f].get("format") == "date" for f in p) for p in ranges):
+            isinstance(p, list) and len(p) == 2 and p[0] != p[1] and all(_one_of(f, dates) for f in p) for p in ranges):
         errors.append(f"{where}: x-moc-range phải là danh sách cặp [trường trước, trường sau], hai trường đã khai "
                       "trong properties với format: date (như bộ kiểm form trên trình duyệt)")
     _walk(schema, where, errors)

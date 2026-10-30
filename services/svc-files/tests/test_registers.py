@@ -27,7 +27,9 @@ import pytest
 from conftest import TENANT_A
 from svc_files.hasura import HasuraAuthError, HasuraError
 from svc_files.anchors import Mark
-from svc_files.registers import COLUMNS, HIDDEN, WIDTHS, Register, build_register, register_html, render_register_pdf
+from svc_files.registers import (COLUMNS, HIDDEN, TEXT, WIDTHS, Register, build_register, register_html,
+                                 render_register_pdf)
+from svc_files.render import TYPE_NAMES_EN
 
 OTHER_TENANT = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000b")
 PRINTED = datetime(2026, 10, 20, 2, 30, tzinfo=UTC)
@@ -56,12 +58,12 @@ def outgoing(number: int, **over) -> dict:
 
 
 def book(docs: list[dict], *, direction: str = "in", visible: set[str] | None = None, last: int | None = None,
-         users: list[dict] | None = None, anchor: Mark | None = None) -> Register:
+         users: list[dict] | None = None, anchor: Mark | None = None, lang: str = "vi") -> Register:
     data = {"core_tenants_by_pk": TENANT,
             "office_registers": [{"last_number": last if last is not None else len(docs)}] if docs or last else [],
             "office_documents": docs, "core_users": users or []}
     seen = {d["id"] for d in docs} if visible is None else visible
-    return build_register(data, seen, direction=direction, year=2026, printed_at=PRINTED, anchor=anchor)
+    return build_register(data, seen, direction=direction, year=2026, printed_at=PRINTED, anchor=anchor, lang=lang)
 
 
 ANCHOR = Mark(1234, "0123456789abcdef" + "f" * 48, datetime(2026, 10, 20, 1, 15, 3, tzinfo=UTC))
@@ -224,6 +226,67 @@ def test_footer_text_lands_in_the_pdf():
         assert FOOTER in " ".join(page.extract_text().split())
 
 
+# --- tiếng Anh (F2.9, #398): chỉ chữ cố định đổi, chữ người dùng nhập giữ nguyên ----------------------------------
+
+
+def test_both_languages_have_the_same_texts_and_columns():
+    assert set(TEXT["vi"]) == set(TEXT["en"]) and set(TEXT["vi"]["urgency"]) == set(TEXT["en"]["urgency"])
+    for direction in ("in", "out"):
+        assert len(TEXT["en"]["columns"][direction]) == len(COLUMNS[direction]) == len(WIDTHS[direction])
+    for key, value in TEXT["vi"].items():   # cùng số chỗ điền {} ở mỗi câu
+        if isinstance(value, str):
+            assert value.count("{") == TEXT["en"][key].count("{"), key
+
+
+def test_english_incoming_row_translates_fixed_words_only():
+    doc = incoming(1, urgency="khan", due_on="2026-10-30", status="registered", assignments=[],
+                   document_type={"code": "CV", "name": "Công văn"})
+    assert book([doc], lang="en").entries[0].cells == (
+        "06/10/2026", "1", "UBND tỉnh", "1/UBND-VP", "01/10/2026", "Official letter: Về việc báo cáo quý III",
+        "Trưởng khoa", "", "Urgent; Due 30/10/2026",
+    )
+    assert book([incoming(1, status="done", assignments=[])], lang="en").entries[0].cells[6] == "Filed (not assigned)"
+
+
+def test_english_outgoing_rows_and_restricted_rows():
+    sent = outgoing(5, urgency="hoa_toc", document_type={"code": "TB", "name": "Thông báo"})
+    own = outgoing(6, status="approved", events=[], document_type={"code": "XYZ", "name": "Loại riêng"})
+    secret = outgoing(7, restricted=True)
+    reg = book([sent, own, secret], direction="out", visible={"o-5", "o-6"}, lang="en")
+    assert reg.entries[0].cells == (
+        "05/TB-CNTT", "19/10/2026", "Notice: Về việc họp giao ban", "Phạm Minh Đức", "Các bộ môn; Lưu",
+        "Records office; Phòng Đào tạo", "", "20/10/2026", "", "Immediate; Verification code ABCDE-23456",
+    )
+    assert reg.entries[1].cells[2] == "Loại riêng: Về việc họp giao ban"        # loại đơn vị tự thêm: giữ tên
+    assert reg.entries[1].cells[9] == "Numbered, not yet issued"
+    assert reg.entries[2].cells == ("07/TB-CNTT", "19/10/2026", TEXT["en"]["hidden"], "", "", "Records office", "",
+                                    "20/10/2026", "", "Restricted")
+
+
+def test_every_seeded_document_type_has_an_english_name():
+    import pathlib
+    import re
+
+    # danh mục NĐ 30 và loại "Thông tư" của nguồn công khai (#424)
+    migrations = pathlib.Path(__file__).resolve().parents[3] / "db/migrations/default"
+    codes = {code for name in ("1792281600300_document_types", "1792281604000_document_type_tt")
+             for code in re.findall(r"\('([^']+)',\s*'", (migrations / name / "up.sql").read_text(encoding="utf-8"))}
+    assert codes and codes == set(TYPE_NAMES_EN)
+
+
+def test_english_cover_footer_and_closing():
+    reg = book([incoming(1), incoming(2, restricted=True)], visible={"d-1"}, last=3, anchor=ANCHOR, lang="en")
+    page = register_html(reg)
+    for text in ('<html lang="en">', "Register of incoming documents", "Year: 2026", "Numbers 01 to 03",
+                 "Rows missing for numbers: 3.", "Restricted rows the printer may not read: 1 (only",
+                 "09:30 on 20/10/2026", "Decree 30/2020/ND-CP", '"Page " counter(page)', "Audit anchor #1234 · 0123456789abcdef · 08:15",
+                 "Records officer", "(Signature and full name)", "<th>Receipt signature</th>"):
+        assert text in page, text
+    for vietnamese in ("Sổ đăng ký", "Trang ", "Mốc neo", "Văn thư", "Ký nhận", "Hạn chế"):
+        assert vietnamese not in page, vietnamese
+    assert "No documents in the 2026 register yet." in register_html(book([], direction="out", lang="en"))
+
+
 # --- API ----------------------------------------------------------------------------------------------------
 
 
@@ -345,7 +408,7 @@ def test_pdf_download_is_audited(client, hasura, make_token, printed):
     [event] = hasura.events
     assert event["action"] == "register.printed" and event["entity"] == "office.registers"
     assert event["entity_id"] == "in/2026" and event["actor_id"] == "u-van-thu" and event["tenant_id"] == TENANT_A
-    assert event["details"] == {"direction": "in", "year": 2026, "entries": 2, "masked": 1}
+    assert event["details"] == {"direction": "in", "year": 2026, "entries": 2, "masked": 1, "lang": "vi"}
 
 
 def test_outgoing_pdf_name(client, make_token, printed):
@@ -360,6 +423,16 @@ def test_no_pdf_without_an_audit_record(client, hasura, make_token, printed, mon
     monkeypatch.setattr(hasura, "log_event", broken)
     r = get(client, make_token(), "/api/registers/in/2026/pdf")
     assert r.status_code == 503 and not r.content.startswith(b"%PDF")
+
+
+def test_english_register_over_the_api(client, hasura, make_token, printed):
+    hasura.add_registered(TENANT_A, "out", 1)
+    body = get(client, make_token(), "/api/registers/out/2026?lang=en").json()
+    assert body["title"] == "Register of outgoing documents" and body["columns"] == list(TEXT["en"]["columns"]["out"])
+    r = get(client, make_token(), "/api/registers/out/2026/pdf?lang=en")
+    assert r.status_code == 200 and 'filename="register-outgoing-2026.pdf"' in r.headers["content-disposition"]
+    assert printed[0].lang == "en" and hasura.events[0]["details"]["lang"] == "en"
+    assert get(client, make_token(), "/api/registers/out/2026?lang=fr").status_code == 422
 
 
 def test_registers_are_in_the_public_api(client):

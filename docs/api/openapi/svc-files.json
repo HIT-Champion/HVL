@@ -892,6 +892,22 @@
               "minimum": 2000,
               "title": "Year"
             }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "vi",
+                "en"
+              ],
+              "type": "string",
+              "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi",
+              "default": "vi",
+              "title": "Lang"
+            },
+            "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi"
           }
         ],
         "responses": {
@@ -962,6 +978,22 @@
               "minimum": 2000,
               "title": "Year"
             }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "vi",
+                "en"
+              ],
+              "type": "string",
+              "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi",
+              "default": "vi",
+              "title": "Lang"
+            },
+            "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi"
           }
         ],
         "responses": {
@@ -1840,10 +1872,12 @@
             "type": "string",
             "enum": [
               "extract",
-              "model"
+              "model",
+              "fixed",
+              "data"
             ],
             "title": "Source",
-            "description": "extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng"
+            "description": "extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng · fixed: câu cố định cho câu hỏi ngoài phạm vi · data: câu có số từ dữ liệu của người hỏi"
           },
           "model": {
             "anyOf": [
@@ -1955,6 +1989,22 @@
             ],
             "title": "Ask Id",
             "description": "Gửi lại `ask_id` của lượt extract ở lượt generate: hai dòng sổ kiểm toán cùng một câu hỏi"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous",
+            "description": "Câu hỏi của lượt ngay trước trong cùng phạm vi (`rewritten` của lượt đó nếu có), để hiểu câu nối tiếp như \"Còn khoa Kinh tế thì sao?\". Máy chủ không lưu; sai dạng thì bị bỏ qua",
+            "examples": [
+              "Điều kiện xét học bổng khoa CNTT là gì?"
+            ]
           }
         },
         "additionalProperties": false,
@@ -2038,6 +2088,77 @@
           "duration_ms": {
             "type": "integer",
             "title": "Duration Ms"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "van_ban",
+              "gioi_thieu",
+              "huong_dan",
+              "ngoai_pham_vi",
+              "viec_cua_toi",
+              "dem_van_ban"
+            ],
+            "title": "Route",
+            "description": "Đường bộ định tuyến đã chọn: van_ban: tìm trong kho văn bản · gioi_thieu: câu về chính trợ lý, câu chào · huong_dan: cách dùng Signet, trả lời từ hướng dẫn sử dụng · ngoai_pham_vi: câu cố định, không tìm · viec_cua_toi: đếm việc trong Hộp việc của người hỏi · dem_van_ban: đếm văn bản người hỏi được xem. Trừ van_ban, huong_dan, các đường không gọi mô hình, cả khi mode=generate"
+          },
+          "route_reason": {
+            "type": "string",
+            "title": "Route Reason",
+            "description": "Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp) hoặc `mac-dinh`",
+            "examples": [
+              "kw:lam-duoc-gi"
+            ]
+          },
+          "rewritten": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rewritten",
+            "description": "Câu nối tiếp đã ghép với `previous` thành câu độc lập — câu đem đi tìm. null khi không phải câu nối tiếp"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data",
+            "description": "Đường viec_cua_toi, dem_van_ban: các số và bộ lọc của câu trả lời `source: data`, máy đọc. viec_cua_toi: `{kind: tasks, on, tasks, overdue, today, soon, no_due}` · dem_van_ban: `{kind: documents, counts: {in?, out?}, type_code, from, to}` (`to` là ngày sau ngày cuối; null: không lọc theo ngày). null với đường khác",
+            "examples": [
+              {
+                "counts": {
+                  "in": 12
+                },
+                "from": "2026-10-01",
+                "kind": "documents",
+                "to": "2026-11-01"
+              }
+            ]
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link",
+            "description": "Trang trong Signet xem danh sách đã đếm: `/` (Hộp việc, Lịch hạn), `/van-ban-den`, `/van-ban-di`; null khi không có trang nào hợp",
+            "examples": [
+              "/van-ban-den"
+            ]
           }
         },
         "type": "object",
@@ -2050,7 +2171,10 @@
           "semantic",
           "ai_available",
           "warnings",
-          "duration_ms"
+          "duration_ms",
+          "route",
+          "route_reason",
+          "rewritten"
         ],
         "title": "AskOut"
       },
@@ -2062,9 +2186,17 @@
             "description": "Số trong dấu [n], từ 1"
           },
           "document_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Document Id"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "null với nguồn `guide`"
           },
           "symbol": {
             "anyOf": [
@@ -2156,10 +2288,11 @@
             "type": "string",
             "enum": [
               "page",
-              "meta"
+              "meta",
+              "guide"
             ],
             "title": "Kind",
-            "description": "page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ)"
+            "description": "page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ) · guide: mục của hướng dẫn sử dụng hay của Giới thiệu trợ lý; `symbol` là tên tài liệu, `summary` là tiêu đề mục"
           },
           "file_id": {
             "anyOf": [
@@ -2211,6 +2344,18 @@
             "type": "boolean",
             "title": "Cited",
             "description": "Câu trả lời có trích nguồn này"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path",
+            "description": "Chỉ nguồn `guide`: tệp trong repo kèm neo mục, vd `docs/huong-dan/viec-chung.md#đơn-nghỉ-phép`"
           }
         },
         "type": "object",
@@ -3004,6 +3149,23 @@
             "type": "boolean",
             "title": "Semantic",
             "description": "Tìm theo nghĩa được (mô hình nhúng sẵn sàng)"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "gpu",
+                  "cpu",
+                  "gpu+cpu"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device",
+            "description": "Mô hình của Ollama đang nằm trên GPU, CPU hay chia hai (MOC_AI_DEVICE, /api/ps); null khi chưa nạp mô hình nào hay trợ lý tắt"
           }
         },
         "type": "object",
@@ -3076,6 +3238,218 @@
         ],
         "title": "StatusLayer"
       },
+      "StatusOpenData": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Mã nguồn, tên thư mục trong seed/du-lieu-mo, vd cong-bao-gddt"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher",
+            "description": "Cơ quan công bố"
+          },
+          "home_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Url"
+          },
+          "reuse_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reuse Basis",
+            "description": "Căn cứ dùng lại (điều luật hay giấy phép)"
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence",
+            "description": "Giấy phép mở nếu nguồn có; null: dùng lại theo `reuse_basis`"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At",
+            "description": "Lúc lấy bản chụp"
+          },
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days",
+            "description": "Tuổi bản chụp, tính bằng ngày"
+          },
+          "max_age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age Days"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "broken"
+            ],
+            "title": "State",
+            "description": "ok · stale: quá `max_age_days` · broken: manifest hỏng, thiếu tệp, sai cỡ hay sai SHA-256"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/StatusOpenDataFile"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "name",
+          "publisher",
+          "home_url",
+          "reuse_basis",
+          "licence",
+          "fetched_at",
+          "age_days",
+          "max_age_days",
+          "state",
+          "files"
+        ],
+        "title": "StatusOpenData"
+      },
+      "StatusOpenDataFile": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File",
+            "description": "Tên tệp trong bản chụp, vd tt-26-2026-tt-bgddt.pdf"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Nơi đã tải tệp (http/https)"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "SHA-256 của tệp; trùng `sha256` của một tệp đính kèm là văn bản từ nguồn này"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At",
+            "description": "Lúc tải tệp; null: như `fetched_at` của nguồn"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Meta",
+            "description": "Thông tin tùy nguồn, chỉ giá trị đơn, vd symbol, issuer_name, issued_on, page_url, gazette"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "url",
+          "sha256",
+          "bytes",
+          "fetched_at",
+          "meta"
+        ],
+        "title": "StatusOpenDataFile"
+      },
       "StatusOut": {
         "properties": {
           "status": {
@@ -3134,6 +3508,14 @@
             },
             "type": "array",
             "title": "Components"
+          },
+          "open_data": {
+            "items": {
+              "$ref": "#/components/schemas/StatusOpenData"
+            },
+            "type": "array",
+            "title": "Open Data",
+            "description": "Nguồn dữ liệu công khai đi kèm bản cài (#424): nguồn gốc, tuổi dữ liệu; bản cài không gọi nguồn lúc chạy, chỉ đọc bản chụp"
           }
         },
         "type": "object",

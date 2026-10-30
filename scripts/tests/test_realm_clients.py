@@ -26,6 +26,7 @@ import importlib
 import io
 import json
 import pathlib
+import re
 import sys
 import types
 import unittest
@@ -87,10 +88,11 @@ def tearDownModule() -> None:
 class FakeKeycloak:
     """GET, POST /clients của Keycloak 26 (phân trang first/max, 409 khi trùng clientId); ghi lại mọi lần gọi."""
 
-    def __init__(self, *client_ids: str, status: int | None = None):
+    def __init__(self, *client_ids: str, status: int | None = None, profile: dict[str, Any] | None = None):
         self.clients = [{"id": str(uuid.uuid4()), "clientId": c} for c in client_ids]
         self.calls: list[tuple[str, str, Any]] = []
         self.status = status
+        self.profile = profile or {}
 
     def writes(self) -> list[tuple[str, str]]:
         return [(m, p) for m, p, _ in self.calls if m != "GET"]
@@ -113,6 +115,12 @@ class FakeKeycloak:
             cid = str(uuid.uuid4())
             self.clients.append({**copy.deepcopy(body), "id": cid})
             return None, {"Location": f"{BASE}/clients/{cid}"}
+        if path == "/users/profile" and method == "GET":
+            return copy.deepcopy(self.profile), {}
+        if path == "/users/profile" and method == "PUT":
+            # Keycloak 26 thay cả cấu hình bằng thân gửi lên (thiếu thuộc tính nào là xóa thuộc tính đó)
+            self.profile = copy.deepcopy(body)
+            return None, {}
         raise AssertionError(f"chưa giả lập: {method} {url}")
 
 
@@ -202,6 +210,66 @@ class SyncTest(unittest.TestCase):
         kc = FakeKeycloak(*(f"c{i}" for i in range(tenants.PAGE * 2 + 3)), "app-office", "app-ca-nhan",
                           "app-tai-lieu-api")
         self.assertEqual(realm_clients.sync(client(kc), realm_file())["created"], [])
+
+
+def old_profile() -> dict[str, Any]:
+    """User profile của realm nạp trước #365 (chưa có phone_number), cộng một thuộc tính quản trị tự thêm."""
+    want = realm_clients.file_profile(realm_file())
+    attrs = [a for a in want["attributes"] if a["name"] != "phone_number"]
+    attrs[1] = {**attrs[1], "permissions": {"view": ["admin"], "edit": ["admin"]}}      # quản trị đã đổi quyền email
+    return {**want, "attributes": [*attrs, {"name": "ma_nhan_vien", "permissions": {"view": ["admin"]}}],
+            "unmanagedAttributePolicy": "ADMIN_VIEW"}
+
+
+class ProfileTest(unittest.TestCase):
+    def test_file_declares_phone_number_only_admins_edit(self) -> None:
+        attrs = {a["name"]: a for a in realm_clients.file_profile(realm_file())["attributes"]}
+        phone = attrs["phone_number"]
+        # như email: quản trị nhập; trang tài khoản của Keycloak bị WAF chặn lệnh ghi, Signet không dẫn tới đó
+        self.assertEqual(phone["permissions"], {"view": ["admin", "user"], "edit": ["admin"]})
+        self.assertNotIn("group", phone)
+        pattern = re.compile(phone["validations"]["pattern"]["pattern"])
+        for ok in ("0912 345 678", "+84912345678", "(0912) 345-678", "0912.345.678"):
+            self.assertRegex(ok, pattern)
+        for bad in ("abc", "12", "0912;rm", "+84 912 345 678 999 999 999"):
+            self.assertNotRegex(bad, pattern)
+
+    def test_adds_only_missing_attributes_keeps_admin_changes(self) -> None:
+        kc = FakeKeycloak(profile=old_profile())
+        result = realm_clients.sync_profile(client(kc), realm_file())
+        self.assertEqual(result["added"], ["phone_number"])
+        self.assertIn("moc_role", result["present"])
+        self.assertEqual(kc.writes(), [("PUT", "/users/profile")])
+        names = [a["name"] for a in kc.profile["attributes"]]
+        self.assertEqual(names[-2:], ["ma_nhan_vien", "phone_number"])
+        self.assertEqual(kc.profile["attributes"][1]["permissions"], {"view": ["admin"], "edit": ["admin"]})
+        self.assertEqual(kc.profile["unmanagedAttributePolicy"], "ADMIN_VIEW")
+        self.assertEqual(kc.profile["groups"], old_profile()["groups"])     # phone_number không thuộc nhóm nào
+        again = realm_clients.sync_profile(client(kc), realm_file())
+        self.assertEqual(again["added"], [])
+        self.assertEqual(kc.writes(), [("PUT", "/users/profile")])
+
+    def test_group_of_a_new_attribute_is_added_too(self) -> None:
+        profile = old_profile()
+        profile["attributes"] = [a for a in profile["attributes"] if a.get("group") != "moc"]
+        profile["groups"] = [g for g in profile["groups"] if g["name"] != "moc"]
+        kc = FakeKeycloak(profile=profile)
+        realm_clients.sync_profile(client(kc), realm_file())
+        self.assertEqual([g["name"] for g in kc.profile["groups"]], ["user-metadata", "moc"])
+
+    def test_dry_run_and_command(self) -> None:
+        kc = FakeKeycloak(profile=old_profile())
+        code, out, _ = run_moc(kc, "realm", "profile", "--dry-run", "--json")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["added"], ["phone_number"])
+        self.assertEqual(kc.writes(), [])
+        code, out, _ = run_moc(kc, "realm", "profile")
+        self.assertEqual((code, out.strip()), (0, "user profile: vừa thêm thuộc tính phone_number"))
+        code, out, _ = run_moc(kc, "realm", "profile")
+        self.assertIn("đã có đủ", out)
+        code, _, err = run_moc(FakeKeycloak(status=403), "realm", "profile")
+        self.assertEqual(code, 1)
+        self.assertIn("403", err)
 
 
 class CommandTest(unittest.TestCase):

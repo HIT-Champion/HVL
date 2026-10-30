@@ -8,6 +8,66 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+## [1.3.0] - 2026-10-30
+
+Bản cho vòng trường 01/11. Hai nguồn dữ liệu công khai có bản chụp trong repo, trang Trạng thái báo tuổi dữ liệu:
+thông tư của Bộ GD&ĐT về giáo dục đại học từ Công báo (nạp thành văn bản đến) và lịch nghỉ lễ, Tết chính thức cho hạn
+gợi ý giao việc. Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn sử dụng, từ chối câu ngoài phạm vi, hiểu câu
+nối tiếp, đếm việc và văn bản của chính người hỏi; tùy chọn viết câu trả lời qua API ngoài chuẩn OpenAI và chạy mô hình
+trên GPU NVIDIA. Thêm cảnh báo vận hành qua Alertmanager vào chuông của quản trị đơn vị, tự động hóa Node-RED và wiki
+nội bộ DokuWiki (đăng nhập Keycloak, tắt mặc định), truy vết phân tán Jaeger (profile `trace`), kênh SMS, Zalo; tiếng
+Anh cho sổ đăng ký, văn bản đi và Đơn nghỉ phép; trang Dựng form cho quản trị; hướng dẫn vận hành tiếng Anh. Log tập
+trung thu cả Meilisearch; bộ che thông tin cá nhân bắt cả số di động viết liền sau `ĐT`, `SĐT`.
+Nâng tại chỗ từ `v1.2.1`, rồi nạp nguồn công khai bằng `python3 scripts/moc.py du-lieu-mo nap`; bản cài cũ còn đặt
+`MOC_TRUSTED_PROXY` là một dải cố định thì đổi tay sang `auto` (#211).
+
+### Đã thêm
+- Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
+- Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).
+- Cảnh báo của Prometheus qua Alertmanager thành thông báo ở chuông (và kênh ngoài) của quản trị đơn vị (#284).
+- Wiki nội bộ DokuWiki ở `/wiki/` (profile `wiki`, tắt mặc định): đăng nhập Keycloak, mỗi đơn vị một không gian (#367).
+- Sổ đăng ký văn bản đến, đi xem và in bằng tiếng Anh khi người in chọn giao diện tiếng Anh (#398).
+- Dữ liệu công khai: 4 thông tư Bộ GD&ĐT từ Công báo, nạp khi `make seed`; trang trạng thái báo tuổi dữ liệu (#424).
+- Trang Dựng form cho quản trị đơn vị: khai trường, xem trước, tải tệp JSON Schema cho form của ứng dụng (#303).
+- Văn bản đi bằng tiếng Anh: người soạn chọn ngôn ngữ, PDF giữ thể thức NĐ 30 với phần cố định tiếng Anh (#398).
+- Giao diện tiếng Anh cho Đơn nghỉ phép, cả form dựng từ JSON Schema, chung ngôn ngữ với Văn phòng điện tử (#398).
+- Tự động hóa Node-RED ở `/tu-dong/` (profile `tu-dong`, tắt mặc định): đăng nhập Keycloak, chỉ người vận hành (#366).
+- Robot của đơn vị cho flow Node-RED gọi API, hai flow mẫu: văn bản sắp hạn lúc 07:00, văn bản Hỏa tốc (#366).
+- Hướng dẫn vận hành bằng tiếng Anh `docs/van-hanh.en.md`; README.en.md trỏ sang bản này (#59).
+- Nhãn "Nguồn công khai" trên trang văn bản nạp từ nguồn mở; trang Trạng thái liệt kê nguồn và tuổi dữ liệu (#426).
+- Trang Hỏi đáp: gợi ý theo loại câu, câu nối tiếp, dòng "Đã hiểu là…", nói rõ trợ lý trả lời được gì (#422).
+- Trợ lý hỏi đáp viết câu trả lời qua API ngoài chuẩn OpenAI (`MOC_ASK_API=openai`, tắt mặc định), khóa qua két (#430).
+- Tùy chọn chạy mô hình bằng GPU NVIDIA (`MOC_AI_DEVICE=gpu`); `/api/status` báo mô hình nằm ở GPU hay CPU (#442).
+- Nguồn công khai B: lịch nghỉ lễ, Tết, nghỉ bù chính thức 2026–2027 cho hạn gợi ý giao việc, có bản chụp (#427).
+- Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn, từ chối câu ngoài phạm vi, ghép câu nối tiếp (#423).
+- Trợ lý hỏi đáp đếm việc trong Hộp việc và số văn bản bằng quyền người hỏi, không qua mô hình (#441).
+- Bộ câu đánh giá trợ lý thêm 3 câu trên thông tư thật của nguồn công khai A, đo riêng (loại `cong_khai`) (#446).
+
+### Đã sửa đổi
+- Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).
+- Sơ đồ kiến trúc ở README, `docs/architecture.md` vẽ lại theo lõi hiện tại, thêm kênh ngoài, Node-RED, DokuWiki (#374).
+- Job "Bản online" chạy ngay sau Release đợi tối đa 60 phút cho bản online nâng xong rồi mới kiểm (#344).
+
+### Đã sửa lỗi
+- Tài liệu lệch mã: số dịch vụ, số test, màn demo không chạy trên bản online, ROADMAP sau `v1.2.1` (#379).
+- Sự kiện `office.document.received` nay được ghi khi văn thư thêm văn bản đến, ứng dụng nghe nó mới nhận được (#381).
+- Bản cài có `scripts/demo_tat_van_phong.py`; màn cắm ứng dụng trong bản cài dừng trước khi gỡ ứng dụng (#376).
+- Tệp OpenLineage tải từ trang Phả hệ số liệu ghi `producer` là repo Signet, không còn tên repo cũ (#376).
+- `moc app install` báo lỗi rõ với tệp form sai kiểu hay lồng quá 32 tầng (cả qua `$ref`), không còn lỗi 500 (#386).
+- Smoke không còn trượt bước hỏi đáp ngay sau khi nâng cấp hay trên bản cài tìm theo nghĩa (#360).
+- Bật giảm chuyển động thì thông báo, dòng hộp việc, popover hiện ngay, không qua khung trong suốt (#391).
+- `make demo-it-ot` không còn đỏ khi lịch sử đo của broker mới có một lần đo (#432).
+- `moc app install` từ chối form có trường trùng từ khóa của biểu thức BPMN (`le`, `not`, `or`…) (#405).
+- Tin realtime có đường dẫn là liên kết có tên với trình đọc màn hình, không còn bị axe báo `link-name` (#407).
+- `release.sh` chạy được trên macOS: không có `sha256sum` thì dùng `shasum -a 256`, thiếu cả hai thì dừng sớm (#57).
+- Grafana lên trong vài giây trên đĩa ghi chậm (WSL2), không còn quá hạn healthcheck: CSDL SQLite để trong RAM (#417).
+
+### Bảo mật
+- `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
+- Cảnh báo `deepmerge` chưa có bản vá (GHSA-gcqx-w48m-w2h4) ghi bỏ qua có hạn: gói chỉ chạy lúc dựng (#387).
+- Bộ che thông tin cá nhân che cả số di động viết liền sau `ĐT`, `SĐT`, `DĐ`, `Tel`, `Phone` (`ĐT0912…`) (#58).
+- `vue-i18n` 11.4.14 vá GHSA-83rm-6c8r-g728 và GHSA-8rc2-428q-7ww3 của bản 11.4.13 trong Văn phòng điện tử (#421).
+
 ## [1.2.1] - 2026-10-28
 
 Bản vá đúng bản đang chạy online: giao diện Lịch hạn (hộp việc xếp theo ngày hạn) cho Văn phòng điện tử, trang đăng

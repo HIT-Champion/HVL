@@ -133,6 +133,12 @@
       "ly_do": "pytest kéo theo, chỉ cài trên Windows (sys_platform == 'win32'), chỉ dùng khi chạy test. PyPI chỉ khai classifier 'BSD License'; tệp LICENSE.txt trong wheel là BSD ba điều khoản"
     },
     {
+      "goi": "pkg:pypi/protobuf",
+      "phien_ban": "7.36.2",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "OpenTelemetry kéo theo (bộ xuất OTLP của truy vết, svc-files, svc-workflow, #364). METADATA ghi chữ tự do '3-Clause BSD License'; tệp LICENSE trong wheel là BSD ba điều khoản của Google"
+    },
+    {
       "goi": "pkg:github/actions/checkout",
       "phien_ban": "v7.0.1",
       "giay_phep": "MIT",

@@ -799,6 +799,686 @@
           }
         }
       }
+    },
+    "/actions/channels/{name}": {
+      "post": {
+        "summary": "Kênh thông báo của chính người gọi (SMS, Zalo): myChannels, setMyChannel",
+        "operationId": "channels_action_actions_channels__name__post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "X-Moc-Action-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách MyChannel: mỗi kênh cá nhân bản cài đã cấu hình một dòng (db/metadata/actions.graphql)",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Sai định dạng Action, hoặc kênh chưa được cấu hình trên bản cài",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vai trò không được dùng Action này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Tài khoản chưa có trong danh bạ của đơn vị, hoặc chưa có số điện thoại để bật SMS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Chưa gọi được CSDL, thử lại sau",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action",
+                  "input",
+                  "session_variables"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "object",
+                    "required": [
+                      "name"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Trùng {name} trên đường dẫn"
+                      }
+                    }
+                  },
+                  "input": {
+                    "type": "object",
+                    "description": "Đối số của Action, khai trong db/metadata/actions.graphql"
+                  },
+                  "session_variables": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, x-hasura-tenant-id, x-hasura-department-id"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ops/alerts": {
+      "post": {
+        "summary": "Nhận cảnh báo của Alertmanager → thông báo ops.alert cho quản trị đơn vị (F3.13)",
+        "description": "Chỉ Alertmanager gọi (receiver webhook trong platform/monitoring/alertmanager.yml), kèm Authorization: Bearer MOC_ALERT_TOKEN. Thân là webhook phiên bản 4 của Alertmanager; mỗi cảnh báo firing/resolved thành một thông báo cho mọi người dùng vai trò tenant_admin, gửi lại không sinh thông báo thứ hai.",
+        "operationId": "ops_alerts_ops_alerts_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Thân không phải webhook của Alertmanager"
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "Chưa đặt MOC_ALERT_TOKEN"
+          },
+          "503": {
+            "description": "Chưa ghi được CSDL, Alertmanager sẽ gửi lại"
+          }
+        }
+      }
+    },
+    "/actions/tu-dong/{name}": {
+      "post": {
+        "summary": "Robot của flow tự động hóa báo người trong đơn vị theo vai trò: notifyFromFlow (#366)",
+        "operationId": "tu_dong_action_actions_tu_dong__name__post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "X-Moc-Action-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NotifyFromFlowOutput {sent}: số người vừa nhận thông báo; người đã có thông báo cùng khóa không tính (db/metadata/actions.graphql)",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Gửi kèm văn bản cho vai trò có thể không xem được nó: chỉ director, clerk (extensions.fields.roles = document_readers_only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Sai định dạng Action, hoặc đối số sai: extensions.fields chỉ trường sai và mã lỗi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không phải robot (vai trò tu_dong), hoặc văn bản hạn chế",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có văn bản này trong đơn vị của robot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Chưa gọi được CSDL, thử lại sau",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "extensions"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"
+                    },
+                    "extensions": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action",
+                  "input",
+                  "session_variables"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "object",
+                    "required": [
+                      "name"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Trùng {name} trên đường dẫn"
+                      }
+                    }
+                  },
+                  "input": {
+                    "type": "object",
+                    "description": "Đối số của Action, khai trong db/metadata/actions.graphql"
+                  },
+                  "session_variables": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, x-hasura-tenant-id, x-hasura-department-id"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

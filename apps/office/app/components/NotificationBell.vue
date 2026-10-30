@@ -20,7 +20,8 @@
 import { useI18n } from 'vue-i18n'
 import type { AppNotification } from '~/composables/useNotifications'
 
-// Chuông thông báo trên thanh trên: số chưa đọc, 20 tin mới nhất, chấm xanh khi đang nhận tin trực tiếp
+// Chuông thông báo trên thanh trên: số chưa đọc, 20 tin mới nhất, chấm xanh khi đang nhận tin trực tiếp; cuối khung
+// là kênh SMS, Zalo người dùng tự bật (NotificationChannels, chỉ hiện khi bản cài có cấu hình kênh)
 const { t } = useI18n()
 const { items, unread, markRead, markAllRead } = useNotifications()
 const { state } = useRealtime()
@@ -35,12 +36,14 @@ onMounted(() => document.addEventListener('click', outside))
 onBeforeUnmount(() => document.removeEventListener('click', outside))
 
 const URGENT = new Set(['task.overdue', 'task.escalated', 'document.overdue', 'ot.alarm'])
-const rows = computed(() => items.value.map((n) => ({ n, ...describeNotification(t, n), urgent: URGENT.has(n.kind) })))
+const urgent = (n: AppNotification) => URGENT.has(n.kind) || (n.kind === 'ops.alert' && n.data.status === 'firing')
+const rows = computed(() => items.value.map((n) => ({ n, ...describeNotification(t, n), urgent: urgent(n) })))
 
 async function go(n: AppNotification) {
   open.value = false
   markRead(n).catch(() => { /* lần sau tải lại vẫn thấy chưa đọc */ })
-  if (n.document_id) await navigateTo(`/van-ban/${n.document_id}`)
+  const to = notificationLink(n)
+  if (to) await navigateTo(to)
 }
 
 async function readAll() {
@@ -102,6 +105,7 @@ async function readAll() {
         </li>
       </ul>
       <p v-else class="px-4 py-10 text-center text-sm text-stone-500">{{ t('notify.empty') }}</p>
+      <NotificationChannels />
     </div>
     </Transition>
   </div>

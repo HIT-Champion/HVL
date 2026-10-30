@@ -48,7 +48,7 @@ query ArchivedCaseFiles {
 LETTER = """
 query Letter($id: uuid!, $tenant: uuid!) {
   office_documents_by_pk(id: $id) {
-    id direction status type_code summary body recipients symbol issued_on verify_code restricted
+    id direction status type_code summary body recipients symbol issued_on verify_code restricted language
     document_type { name in_symbol }
     department { code }
     signer { full_name }
@@ -77,7 +77,7 @@ query Register($tenant: uuid!, $direction: String!, $year: Int!) {
                    order_by: {register_number: asc}) {
     id status symbol issuer_name issued_on summary urgency restricted register_number registered_at due_on
     recipients verify_code
-    document_type { name }
+    document_type { code name }
     department { name }
     signer { full_name }
     assignments(where: {role: {_eq: "lead"}, parent_id: {_is_null: true}, status: {_neq: "cancelled"}},

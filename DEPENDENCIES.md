@@ -36,7 +36,10 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
   GHSA-jr96-gvgh-j3r4, HIGH: PDF dị dạng làm chạy rất lâu); serialize-javascript 7.1.3 (22/10, GHSA-m5mm-p8h7-m29v)
   và fast-uri 3.1.9 (19/10, bốn GHSA mức LOW/MODERATE) — gói kéo theo khi dựng `apps/office`, chọn đúng bản vá chứ
   không lấy bản mới hơn (serialize-javascript 7.1.4 ra 23/10). 27/10/2026: cùng serialize-javascript 7.1.3 cho trang
-  tài liệu (`website/`, #349).
+  tài liệu (`website/`, #349). 28/10/2026: plugin oauth của DokuWiki, commit b709c33 (21/10) cho wiki nội bộ (#367):
+  bản trước commit 3a1666c (18/10, "fix(security): sign the login cookie") không ký cookie đăng nhập, ai biết email
+  của một người làm được cookie đăng nhập thay người đó; b709c33 thêm bản sửa kèm theo (bỏ cookie bị từ chối trước khi
+  DokuWiki đọc). Tác giả không công bố mã GHSA, OSV-Scanner không đọc plugin tải trong Dockerfile.
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -142,7 +145,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | [Vue](https://vuejs.org) | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
 | [oidc-client-ts](https://github.com/authts/oidc-client-ts) | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep`, `app-tai-lieu-api` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | [Swagger UI](https://github.com/swagger-api/swagger-ui) (`swagger-ui-dist`) | 5.33.2 | Apache-2.0 | Trang Tài liệu API `/tai-lieu-api/` (`app-tai-lieu-api`, #357): đọc và gọi thử API lõi, API Văn phòng điện tử từ OpenAPI. Dùng nguyên `swagger-ui-bundle.js`, `swagger-ui.css` của gói, kèm `LICENSE`, `NOTICE`; bản dựng sẵn đã gồm các thư viện swagger-ui dùng: React, Redux, Immutable và đa số còn lại MIT, swagger-client Apache-2.0, DOMPurify MPL-2.0 hoặc Apache-2.0, sha.js, ieee754 BSD-3-Clause, zenscroll Unlicense (đều được OSI phê duyệt). Gói kéo theo `@scarf/scarf` 1.4.0 (Apache-2.0), chỉ có bước postinstall gửi số liệu sử dụng: cài bằng `npm ci --ignore-scripts` nên không chạy, không vào image. Trang không gọi CDN | npm, ghim trong `package-lock.json` của `apps/tai-lieu-api` | 3 |
-| [vue-i18n](https://vue-i18n.intlify.dev) | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
+| [vue-i18n](https://vue-i18n.intlify.dev) | 11.4.14 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | [Tailwind CSS](https://tailwindcss.com) (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | [Ajv](https://ajv.js.org) | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
 | [Apache ECharts](https://echarts.apache.org) | 6.1.0 | Apache-2.0 | Biểu đồ dashboard điều hành (F3.11), chỉ nạp biểu đồ cột, vẽ SVG. Kéo theo zrender 6.1.0 (BSD-3-Clause) và tslib 2.3.0 (0BSD), cùng nằm trong bundle | npm | 3 |
@@ -193,6 +196,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | [jsonschema](https://github.com/python-jsonschema/jsonschema) (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
 | [DuckDB](https://duckdb.org) | 1.5.6 | MIT | Nộp lưu hồ sơ (F3.8, `svc-files`): ghi bảng văn bản, giao việc, dòng thời gian thành Parquet (nén zstd) và đọc lại cho phòng đọc. Một wheel nhúng, không kéo thêm gói Python, không chạy máy chủ riêng | pip | 3 |
 | [pyHanko](https://github.com/MatthiasValvekens/pyHanko) (+ pyhanko-certvalidator, asn1crypto, tzlocal, lxml, aiohttp và 7 gói con, oscrypto, uritools, certifi; tzdata chỉ trên Windows) | 0.37.0 · 0.32.1 | MIT (lxml BSD-3, aiohttp Apache-2.0/MIT, certifi MPL-2.0, aiohappyeyeballs PSF-2.0) | Ký số PAdES bản phát hành bằng khóa trong Transit, kiểm chữ ký (svc-files, F4.5, chỉ minh họa) | pip | 4 |
+| [OpenTelemetry Python](https://opentelemetry.io/docs/languages/python/) (SDK, exporter OTLP/HTTP, instrumentation FastAPI và httpx2, kéo theo protobuf, requests, wrapt…) | 1.45.1 · 0.66b1 | Apache-2.0 (protobuf BSD-3, wrapt BSD-2, asgiref BSD-3, urllib3 MIT) | Truy vết phân tán (#364): `svc-files`, `svc-workflow` ghi span của yêu cầu APISIX đã chọn, che theo danh sách trắng rồi gửi Jaeger (`tracing.py`). Chỉ nạp khi `MOC_TRACE_RATIO` > 0 | pip | 4 |
 
 **Ký số văn bản đi (F4.5, chỉ minh họa)** thêm một gói khai trực tiếp, pyHanko, cùng các gói nó kéo theo. Ghim bản mới
 nhất phát hành trước 06/10/2026 (quy tắc hai tuần); ngày lấy từ PyPI (lần tải lên đầu tiên của bản đó), giấy phép từ
@@ -222,6 +226,31 @@ Gói đã có trong khóa, giữ nguyên bản: `cryptography` 50.0.2 (pyHanko �
 4.16.0. Image `svc-files` nặng thêm khoảng 15 MB (lxml, aiohttp; có wheel manylinux cho CPython 3.13). Khóa ký và CA
 không phải gói: chúng nằm trong két OpenBao sẵn có (mount `transit`, `pki`).
 
+**Truy vết phân tán (#364)** thêm bốn gói khai trực tiếp vào cả `svc-files` và `svc-workflow`, ghim đúng bản
+(`==`). Gói nó kéo theo ghim bản mới nhất phát hành trước 13/10/2026 (`--exclude-newer-package`, quy tắc hai tuần);
+ngày lấy từ PyPI, giấy phép từ METADATA. Tắt (mặc định) thì không gói nào được nạp lúc chạy.
+
+| Gói | Bản | Phát hành | Giấy phép | Vì sao có |
+|---|---|---|---|---|
+| opentelemetry-sdk | 1.45.1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: TracerProvider, lấy mẫu theo cha, xử lý lô |
+| opentelemetry-exporter-otlp-proto-http | 1.45.1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: gửi span tới Jaeger qua OTLP/HTTP |
+| opentelemetry-instrumentation-fastapi | 0.66b1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: span cho mỗi route |
+| opentelemetry-instrumentation-httpx | 0.66b1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: span cho lời gọi httpx2 (`HTTPX2ClientInstrumentor`) |
+| opentelemetry-exporter-otlp-proto-common, opentelemetry-proto | 1.45.1 | 06/10/2026 | Apache-2.0 | Exporter: mã hóa span sang protobuf |
+| opentelemetry-exporter-http-transport, opentelemetry-exporter-otlp-common | 0.66b1 | 06/10/2026 | Apache-2.0 | Exporter |
+| opentelemetry-instrumentation, -instrumentation-asgi, -semantic-conventions, -util-http | 0.66b1 | 06/10/2026 | Apache-2.0 | Instrumentation FastAPI, httpx |
+| asgiref | 3.12.1 | 14/07/2026 | BSD-3-Clause | Instrumentation ASGI; 3.13.0 (23/10) quá mới |
+| protobuf | 7.36.2 | 17/09/2026 | BSD-3-Clause | opentelemetry-proto |
+| googleapis-common-protos | 1.75.5 | 29/09/2026 | Apache-2.0 | Exporter; 1.76.0 (22/10) quá mới |
+| requests | 2.34.2 | 14/05/2026 | Apache-2.0 | Exporter gửi HTTP bằng requests |
+| charset-normalizer | 3.5.2 | 30/09/2026 | MIT | requests |
+| urllib3 | 2.8.0 | 15/09/2026 | MIT | requests (`svc-files` đã có qua botocore) |
+| certifi | 2026.10.19 | 20/10/2026 | MPL-2.0 | requests, chỉ mới ở `svc-workflow`; cùng bản và cùng ngoại lệ vá bảo mật như `svc-files` ở bảng trên. Span đi `http://jaeger:4318`, không dùng TLS |
+| wrapt | 2.5.0 | 27/09/2026 | BSD-2-Clause | Instrumentation; 2.5.1 (14/10) quá mới |
+| packaging | 26.3 | 04/08/2026 | Apache-2.0 OR BSD-2-Clause | Instrumentation |
+
+`opentelemetry-api` 1.45.1 đã có trong khóa từ trước (FastAPI kéo theo), giữ nguyên.
+
 Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dịch vụ; image dịch vụ dựng từ
 `python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
 chạy, không sửa), HarfBuzz (MIT) và phông Liberation 2.1 (SIL OFL 1.1) — cùng số đo với Times New Roman mà
@@ -243,12 +272,19 @@ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục
 | [Scorpio Broker](https://github.com/ScorpioBroker/ScorpioBroker) | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (F3.10, profile `iot`): bản sao số, lịch sử đo, subscription báo `svc-workflow` khi vượt ngưỡng. Bản java mặc định (không Kafka), không mở cổng ra ngoài | `scorpiobroker/all-in-one-runner:java-6.0.2` (image 03/07/2026) | 3 |
 | [PostGIS](https://postgis.net) | 16-3.5 | GPL-2.0 | CSDL riêng của Scorpio (broker bắt buộc phần mở rộng `postgis`); dịch vụ độc lập, mạng riêng chỉ broker nối được, Signet không liên kết mã | `postgis/postgis:16-3.5-alpine`, ghim digest (image 31/08/2026) | 3 |
 | [Prometheus](https://prometheus.io) | v3.15.0 | Apache-2.0 | Thu chỉ số của cổng API (plugin `prometheus` của APISIX) và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo (`promtool` cùng image kiểm luật trong CI); không mở cổng ra ngoài (F3.13) | `prom/prometheus:v3.15.0` | 3 |
+| [Alertmanager](https://github.com/prometheus/alertmanager) | v0.34.1 | Apache-2.0 | Nhận cảnh báo đang bật của Prometheus, gom theo luật, chống gửi dồn rồi gọi `svc-workflow` (`POST /ops/alerts`, token riêng) để thành thông báo ở chuông của quản trị đơn vị, kèm email, webhook nếu đã bật kênh (#284, F3.13; `amtool` cùng image kiểm cấu hình trong CI); không mở cổng ra ngoài, không giữ trạng thái (tmpfs) | `prom/alertmanager:v0.34.1`, ghim digest (image 17/09/2026) | 3 |
 | [Grafana (OSS)](https://github.com/grafana/grafana) | 13.2.3 | AGPL-3.0 | Hiển thị giám sát: bảng điều khiển nạp từ `platform/monitoring/` (dịch vụ độc lập, chỉ nghe 127.0.0.1, chỉ xem, không tài khoản) (F3.13) | `grafana/grafana:13.2.3` | 3 |
 | [cloudflared](https://github.com/cloudflare/cloudflared) | 2026.10.0 | Apache-2.0 | Cloudflare Tunnel (F1.9, profile `tunnel`, tùy chọn): máy không có IP công khai ra Internet có HTTPS mà không mở cổng — gọi ra Cloudflare, chuyển yêu cầu vào APISIX qua mạng Docker; token để ngoài repo | `cloudflare/cloudflared:2026.10.0` (image 05/10/2026) | 1 |
 | [Mailpit](https://mailpit.axllent.org) | v1.31.4 | MIT | Hộp thư thử cho thông báo email của `svc-workflow` (profile `mail`, chỉ để demo, kiểm thử): nhận mọi thư qua SMTP trong mạng Docker, không chuyển tiếp ra ngoài, giao diện web chỉ nghe 127.0.0.1; không hỏi bản mới. Cài thật thì gửi qua máy chủ thư của đơn vị | `axllent/mailpit:v1.31.4`, ghim digest (image 03/10/2026) | 4 |
 | [restic](https://restic.net) | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
-| [Vector](https://vector.dev) | 0.59.0 | MPL-2.0 | Thu log của 8 dịch vụ qua driver fluentd của Docker, che lần hai, gửi Parseable (F3.14, profile `logs`, tắt mặc định): chạy uid 65534, không gắn `docker.sock`, cổng nhận chỉ nghe 127.0.0.1; mật khẩu Parseable qua compose secret | `timberio/vector:0.59.0-distroless-static`, ghim digest (image 06/10/2026) | 3 |
+| [Vector](https://vector.dev) | 0.59.0 | MPL-2.0 | Thu log của 9 dịch vụ qua driver fluentd của Docker, che lần hai, gửi Parseable (F3.14, profile `logs`, tắt mặc định): chạy uid 65534, không gắn `docker.sock`, cổng nhận chỉ nghe 127.0.0.1; mật khẩu Parseable qua compose secret | `timberio/vector:0.59.0-distroless-static`, ghim digest (image 06/10/2026) | 3 |
 | [Parseable](https://github.com/parseablehq/parseable) | 3.2.4 | AGPL-3.0 | Lưu và tra log tập trung (F3.14, profile `logs`): dịch vụ độc lập, chỉ nghe 127.0.0.1, chạy root nhưng bỏ mọi capability, basic auth (mật khẩu rỗng thì không mở cổng), giữ `MOC_LOGS_RETENTION_DAYS` ngày, tắt kiểm bản mới và gửi số liệu sử dụng | `quay.io/parseablehq/parseable:v3.2.4`, ghim digest (image 02/10/2026) | 3 |
+| [Jaeger](https://www.jaegertracing.io) | 2.22.0 | Apache-2.0 | Nhận và hiện trace (#364, profile `trace`, tắt mặc định): span OTLP/HTTP của APISIX (plugin `opentelemetry`), `svc-files`, `svc-workflow`; giữ 10 000 trace trong RAM, giao diện chỉ nghe 127.0.0.1, không tài khoản; bỏ chuỗi truy vấn trước khi lưu (`platform/trace/jaeger.yaml`) | `jaegertracing/jaeger:2.22.0`, ghim digest (image 06/10/2026) | 4 |
+| [DokuWiki](https://www.dokuwiki.org) | 2026-07-14c | GPL-2.0 | Wiki nội bộ ([H] Quản trị tri thức, #367, profile `wiki`, tắt mặc định): mỗi đơn vị một không gian `don-vi:<mã>` chỉ người của đơn vị đọc và sửa (`scripts/wiki.py` ghi danh sách quyền), đăng nhập chỉ qua Keycloak, không tài khoản quản trị; dịch vụ độc lập trong mạng `apps`, chạy uid 33, bỏ mọi capability, 256 MiB | `dokuwiki/dokuwiki:2026-07-14c`, ghim digest (DokuWiki phát hành 02/09/2026), bỏ `install.php`; volume `wiki_data` nằm trong `moc backup` | 4 |
+| [Plugin oauth](https://github.com/cosmocode/dokuwiki-plugin-oauth) của DokuWiki | 2026-10-20 (commit b709c33) | GPL-2.0 (kèm lusitanian/oauth 0.8.11, MIT) | Đăng nhập DokuWiki bằng OAuth: tạo tài khoản ở lần đăng nhập đầu, lấy lại nhóm (đơn vị) mỗi lần đăng nhập. Ngoại lệ vá bảo mật, xem mục Cách đọc | Tải trong `platform/wiki/Dockerfile` theo commit, kiểm sha256, nguyên bản | 4 |
+| [Plugin oauthgeneric](https://github.com/cosmocode/dokuwiki-plugin-oauthgeneric) của DokuWiki | 2025-10-02 (commit b5a5653) | GPL-2.0 | Dịch vụ OAuth chung cho plugin oauth: nối client `wiki` của Keycloak, đọc tên, email, nhóm từ userinfo | Như plugin oauth | 4 |
+| [Node-RED](https://nodered.org) | 5.0.8 | Apache-2.0 | Tự động hóa không sửa mã (#366, profile `tu-dong`, tắt mặc định): trình soạn flow ở `/tu-dong/`, đăng nhập chỉ qua Keycloak, chỉ vai trò `operator` của client `tu-dong` (`scripts/tu_dong.py`); không node `exec`, không cài node từ trình soạn; dịch vụ độc lập trong mạng `apps`, rootfs chỉ đọc, bỏ mọi capability, 256 MiB | `nodered/node-red:5.0.8-minimal`, ghim digest (phát hành 08/10/2026), cộng `platform/tu-dong/settings.js`; volume `tu_dong_data` nằm trong `moc backup` | 4 |
+| [openid-client](https://github.com/panva/openid-client) (kèm [jose](https://github.com/panva/jose) 6.2.12, [oauth4webapi](https://github.com/panva/oauth4webapi) 3.8.8) | 6.8.8 | MIT | Passport strategy cho đăng nhập Keycloak của Node-RED: luồng code + PKCE, kiểm chữ ký, `iss`, `aud` của ID token | `npm ci --omit=dev --ignore-scripts` theo `platform/tu-dong/package-lock.json` (sha512), cả ba phát hành 05/09/2026 | 4 |
 | [Coraza](https://coraza.io) + [OWASP CRS](https://coreruleset.org) | Coraza v3.3.3, CRS v4.14.0 (trong coraza-proxy-wasm 0.6.0) | Apache-2.0 | Tường lửa ứng dụng web ở cổng API (F3.15): mọi yêu cầu qua CRS paranoia 1 trước khi kiểm token, tải tấn công → 403; nội dung tệp vẫn do ClamAV soi | `ghcr.io/corazawaf/coraza-proxy-wasm:0.6.0` (phát hành 06/07/2025), ghim digest, kiểm sha256 tệp `.wasm`; APISIX nạp bằng `wasm.plugins` | 3 |
 
 **Ghi chú:**
@@ -267,6 +303,12 @@ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục
   OSV-Scanner không đọc tệp `.wasm`: lỗ hổng mới của Coraza phải theo dõi tay (GitHub Security Advisories của
   `corazawaf/coraza`). Khi có bản phát hành mang Coraza ≥ 3.8.1 thì đổi digest và băm trong Dockerfile; hướng thay
   nếu cần bản vá sớm hơn: coraza-caddy (Coraza 3.8.1) thành một container đứng trước APISIX — so sánh ở README đó.
+- DokuWiki: thẻ `2026-07-14c` của image được đẩy lại khi dựng lại; digest đang ghim là bản đẩy 24/10/2026, mã DokuWiki
+  vẫn của bản phát hành 02/09/2026. Hai plugin của CosmoCode (nhóm làm DokuWiki) không có bản phát hành, chỉ có commit
+  và ngày trong `plugin.info.txt`: ghim commit và sha256 của tệp nén. Plugin oauth mang sẵn thư viện lusitanian/oauth
+  0.8.11 (MIT, 14/02/2018, không còn bản mới) trong `vendor/`. Tệp duy nhất của Signet mà DokuWiki đọc là
+  `platform/wiki/signet.protected.php` (chỉ gán cấu hình); wiki nói chuyện với Signet qua HTTP (OpenID Connect
+  qua APISIX), không liên kết mã.
 
 ## Trí tuệ nhân tạo
 
@@ -327,6 +369,7 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 | Presidio (MIT) | `presidio-analyzer` 2.2 bắt buộc kéo spaCy, numpy, phonenumbers, tldextract, regex, pydantic, PyYAML, click; bộ máy NLP spaCy cần tải thêm mô hình ngôn ngữ (không có pipeline tiếng Việt chính thức); bộ nhận dạng dựng sẵn không có định dạng Việt Nam (CCCD, đầu số di động, số tài khoản) nên vẫn phải tự viết regex | `pii.py` tự viết, chỉ thư viện chuẩn, nhận theo cấu trúc (mã tỉnh, đầu số đã cấp), chạy được trong bộ lọc nhật ký (F4.4) |
 | phonenumbers (Apache-2.0) | Metadata lớn phải ghim và cập nhật theo bản phát hành; không biết CCCD, CMND hay số tài khoản; luật số di động Việt Nam chỉ là "10 số, đầu số đã cấp" | Danh sách `MOBILE_PREFIXES` có ngày và nguồn trong `pii.py` (F4.4) |
 | Kestra (Apache-2.0) | Nộp lưu nóng → lạnh (F3.8) là một job mỗi giờ: không đáng thêm một máy chủ Java ~1 GB RAM | Vòng nền trong `svc-files` |
+| n8n, Windmill, Activepieces, Kestra cho tự động hóa (#366) | n8n theo Sustainable Use License (không phải OSI); đăng nhập SSO của Kestra, Activepieces chỉ ở bản trả phí, Windmill bản Community tối đa 10 người dùng SSO; Kestra đòi tối thiểu 4 GiB RAM | Node-RED (Apache-2.0), profile `tu-dong` |
 | Marquez (Apache-2.0) | Thêm một máy chủ chỉ để lưu và xem phả hệ, trong khi Signet tự lưu và hiển thị phả hệ | Bảng `core.lineage_events` và trang phả hệ (F3.9); đặt `MOC_OPENLINEAGE_URL` thì `svc-files` gửi sự kiện sang Marquez có sẵn |
 | openlineage-python (Apache-2.0) | Chỉ cần dựng sự kiện OpenLineage 2-0-2, thư viện chuẩn đủ | `svc_files.lineage` (thư viện chuẩn) |
 | Typer (MIT) | Lệnh `moc` đủ dùng với thư viện chuẩn, không cần thêm gói | `argparse` |
@@ -351,12 +394,13 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   `mdn-data`, `@speed-highlight/core` (mục Tầng 2). Gói cho chọn giấy phép thì chọn giấy phép OSI: `node-forge`
   theo BSD-3-Clause, `type-fest` theo MIT.
 - ⚠️ GPL-2.0/3.0, AGPL-3.0 — chấp nhận được khi chạy như **dịch vụ độc lập** giao tiếp qua mạng,
-  không liên kết mã. Hiện gồm: ClamAV và PostGIS (GPL-2.0), Grafana và Parseable (AGPL-3.0).
+  không liên kết mã. Hiện gồm: ClamAV, PostGIS, DokuWiki cùng hai plugin oauth, oauthgeneric (GPL-2.0), Grafana và
+  Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic
   License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào.
-- Logo các dự án trong sơ đồ kiến trúc (`docs/anh/logo/`, ảnh `docs/anh/kien-truc-tong-the*.gif`) không phải thành
-  phần phần mềm: là nhãn hiệu của chủ sở hữu, chỉ dùng để nhận diện phần mềm nguồn mở mà Signet sử dụng, không thuộc
-  giấy phép Apache-2.0 của Signet; khai riêng trong `REUSE.toml` (`LicenseRef-Logos`), nguồn ghi ở
+- Logo các dự án trong sơ đồ kiến trúc (`docs/anh/logo/`, ảnh `docs/anh/kien-truc-tong-the*.gif`) không phải thành phần
+  phần mềm: là nhãn hiệu của chủ sở hữu, chỉ dùng để nhận diện phần mềm nguồn mở mà Signet sử dụng hoặc gửi thông báo
+  tới, không thuộc giấy phép Apache-2.0 của Signet; khai riêng trong `REUSE.toml` (`LicenseRef-Logos`), nguồn ghi ở
   `docs/anh/logo/NGUON.md`.
 
 **Kiểm tự động, cả gói gián tiếp.** `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft (tệp khóa npm kể cả gói

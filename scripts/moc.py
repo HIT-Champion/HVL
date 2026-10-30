@@ -62,11 +62,34 @@
         realm còn dùng theme mặc định; không đổi theme quản trị đã chọn. Thoát 0: xong hoặc không cần đặt; 1: Keycloak
         chưa có thư mục theme (docker compose up -d keycloak) hoặc từ chối; 2: không gọi được Keycloak.
 
+    python3 scripts/moc.py realm profile [--dry-run] [--json]
+        Thêm vào user profile của realm đang chạy thuộc tính có trong moc-realm.json mà realm chưa có (vd phone_number
+        cho kênh SMS, #365). Không sửa, không xóa thuộc tính đã có. Thoát 0: xong; 1: bị từ chối; 2: không gọi được
+        Keycloak.
+
     python3 scripts/moc.py app install apps/<thư mục>/app.yaml [--dry-run] | list [--json] | remove TÊN [--dry-run]
                            | sync [--files] [--json]
         Cắm ứng dụng vào lõi bằng manifest, không sửa tệp lõi nào: client Keycloak, route APISIX, container, schema và
         migration riêng, bảng và quyền Hasura, event trigger nghe sự kiện của lõi. Chạy lại được; lỗi giữa chừng thì
         báo bước nào. Gỡ giữ nguyên dữ liệu. (make app-install APP=…; chi tiết trong scripts/ung_dung.py)
+
+    python3 scripts/moc.py wiki sync [--dry-run] [--json]
+        Wiki nội bộ (#367, profile wiki): thêm hoặc cập nhật client Keycloak `wiki`, ghi danh sách quyền của DokuWiki
+        để mỗi đơn vị chỉ đọc, sửa không gian don-vi:<mã> của mình, và trang đầu liệt kê các không gian. Chạy lại sau
+        khi thêm đơn vị. Thoát 0: xong; 1: bị từ chối hoặc wiki không chạy; 2: không gọi được CSDL, Keycloak.
+        (make wiki-up cũng gọi; chi tiết trong scripts/wiki.py)
+
+    python3 scripts/moc.py tu-dong sync [--dry-run] [--json]
+    python3 scripts/moc.py tu-dong operator add|remove TÊN | list [--json]
+        Tự động hóa bằng Node-RED (#366, profile tu-dong): thêm client Keycloak `tu-dong`, vai trò `operator` và mapper
+        đưa vai trò vào ID token, hoặc đặt lại đường chuyển hướng; cấp, gỡ, liệt kê người vào được trình soạn
+        /tu-dong/ (không ai có sẵn). Thoát 0: xong; 1: bị từ chối hoặc thiếu MOC_TU_DONG_SECRET; 2: không gọi được
+        Keycloak. (make tu-dong-up gọi sync; chi tiết trong scripts/tu_dong.py)
+
+    python3 scripts/moc.py du-lieu-mo lay [MÃ ...] | kiem [MÃ ...] [--json] | nap [MÃ ...] [--clerk TÊN]
+        Dữ liệu công khai (#424): lấy mới bản chụp seed/du-lieu-mo/<mã> từ nguồn (máy của đội, chỉ thay khi băm
+        khớp), so SHA-256 và tuổi dữ liệu, nạp bản chụp thành văn bản đến qua API nạp lô (make seed gọi). Thoát 1: lấy
+        lỗi (giữ bản cũ), bản chụp hỏng, có dòng nạp lỗi. (make du-lieu-mo; chi tiết trong scripts/du_lieu_mo.py)
 
 Đọc CSDL qua `docker compose exec postgres psql`, đọc bucket qua `docker compose exec svc-files`, gọi Keycloak qua cổng
 quản trị nội bộ (127.0.0.1): không mở thêm cổng nào, không cần mật khẩu ngoài .env.
@@ -87,9 +110,12 @@ from typing import Any
 
 import anchor_sig
 import backup
+import du_lieu_mo
 import realm_clients
 import tenants
+import tu_dong
 import ung_dung
+import wiki
 from audit_chain import (ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Problem, Report, check, local_time,
                          to_datetime)
 from moc_env import ENV, ROOT
@@ -595,8 +621,8 @@ def main(argv: list[str] | None = None) -> int:
     tk.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     tk.set_defaults(run=tenants.cmd_check)
 
-    rm = groups.add_parser("realm", help="realm Keycloak: client của ứng dụng (docs/them-ung-dung.md), theme đăng nhập"
-                           ).add_subparsers(dest="cmd", required=True)
+    rm = groups.add_parser("realm", help="realm Keycloak: client của ứng dụng (docs/them-ung-dung.md), theme đăng "
+                           "nhập, user profile").add_subparsers(dest="cmd", required=True)
     rc = rm.add_parser("clients", help="thêm client ứng dụng trên trình duyệt còn thiếu so với moc-realm.json")
     rc.add_argument("--dry-run", action="store_true", help="chỉ in client sẽ thêm, không thay đổi gì")
     rc.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
@@ -605,8 +631,15 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--dry-run", action="store_true", help="chỉ in việc sẽ làm, không thay đổi gì")
     rt.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     rt.set_defaults(run=realm_clients.cmd_theme)
+    rp = rm.add_parser("profile", help="thêm thuộc tính user profile còn thiếu so với moc-realm.json (vd phone_number)")
+    rp.add_argument("--dry-run", action="store_true", help="chỉ in thuộc tính sẽ thêm, không thay đổi gì")
+    rp.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
+    rp.set_defaults(run=realm_clients.cmd_profile)
 
     ung_dung.add_parser(groups)
+    wiki.add_parser(groups)
+    tu_dong.add_parser(groups)
+    du_lieu_mo.add_parser(groups)
     args = parser.parse_args(argv)
     return args.run(args)
 

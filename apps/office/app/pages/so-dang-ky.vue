@@ -29,7 +29,7 @@ const books = { den: 'in', di: 'out' } as const
 type Book = keyof typeof books
 const FIRST_YEAR = 2020
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { register, printRegister } = useApi()
 const notice = useNotice()
 const route = useRoute()
@@ -54,7 +54,7 @@ async function load() {
   loading.value = true
   failure.value = ''
   try {
-    const result = await register(books[book.value], year.value)
+    const result = await register(books[book.value], year.value, locale.value)
     if (mine === latest) data.value = result
   } catch (e) {
     if (mine === latest) failure.value = errorText(t, e)
@@ -63,7 +63,8 @@ async function load() {
   }
 }
 
-watch([book, year], load)
+// đổi ngôn ngữ thì tải lại: tên cột, ghi chú của sổ do svc-files dựng theo ngôn ngữ (F2.9)
+watch([book, year, locale], load)
 onMounted(load)
 
 // Cột luôn trống trên hệ thống (Ký nhận, Số lượng bản) chỉ để ghi tay trên bản in: màn hình bỏ đi cho gọn
@@ -83,7 +84,7 @@ function pick(query: Record<string, string>) {
 async function print() {
   printing.value = true
   try {
-    await printRegister(books[book.value], year.value)
+    await printRegister(books[book.value], year.value, locale.value)
   } catch (e) {
     notice.error(errorText(t, e))
   } finally {

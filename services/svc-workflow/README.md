@@ -14,6 +14,7 @@ Chủ: issue #15.
 | `myTasks` | người dùng nghiệp vụ | Việc của người gọi và của nhóm vai trò của họ, khẩn trước |
 | `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` → liên thông tới đơn vị nhận trong hệ thống |
 | `otSensorMap` | `clerk`, `staff`, `manager`, `director` | Chỉ đọc: số đo mới nhất và cờ chất lượng của các cảm biến NGSI-LD trong đơn vị người gọi (mục IT/OT bên dưới) |
+| `notifyFromFlow(roles, title, text, document_id, key)` | `tu_dong` (robot của flow Node-RED) | Báo người đang hoạt động của đơn vị robot theo vai trò, thông báo `flow.message` (mục Tự động hóa bên dưới) |
 
 Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §4.
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
@@ -24,6 +25,23 @@ xuất bằng `make api-docs`.
 `python -m svc_workflow.apps.deploy check|install|remove <tên>` mà `moc app install | remove` gọi trong container:
 kiểm BPMN theo danh sách trắng, form, rồi triển khai thành một deployment trên cùng Flowable. Chi tiết:
 [`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) mục 1.10, [`docs/api/README.md`](../../docs/api/README.md) §8.
+
+**Cảnh báo vận hành (#284, F3.13)**: `alerts.py` (luôn bật) mở `POST /ops/alerts` trong mạng nội bộ cho Alertmanager
+(`platform/monitoring/alertmanager.yml`), kèm `Authorization: Bearer <MOC_ALERT_TOKEN>`. Mỗi cảnh báo `firing` hay
+`resolved` của webhook thành một thông báo `ops.alert` cho mọi người dùng vai trò `tenant_admin` của mọi đơn vị, đi
+chuông và kênh ngoài như thông báo khác; khóa chống trùng `ops.alert:<fingerprint>:<startsAt>:<status>` nên
+Alertmanager gửi lại không thêm dòng. Thông báo chỉ có câu `summary`, mức, nhãn `component`, `route` của luật. Thiếu
+token → 404, sai token → 401, thân sai dạng → 400, chưa ghi được CSDL → 503 (Alertmanager gửi lại).
+
+**Tự động hóa bằng Node-RED (#366)**: `tu_dong.py` (luôn bật) nhận Action `notifyFromFlow` ở
+`POST /actions/tu-dong/{name}`. Chỉ vai trò `tu_dong` gọi được: token client credentials của robot đơn vị, người làm
+(`x-hasura-user-id`) là tên client của robot, không phải người trong danh bạ. Robot báo mọi người đang hoạt động có vai
+trò trong `roles` của chính đơn vị mình (đọc, ghi bằng vai trò service theo đơn vị của phiên); thông báo
+`flow.message` mang `title` (một dòng, ≤ 120 ký tự), `text` (≤ 1000 ký tự, giữ xuống dòng), `robot` và phần văn bản như
+thông báo khác, đi chuông và kênh ngoài (webhook, SMS, Zalo không mang `text`). Khóa chống trùng `flow:<robot>:<key>`:
+gửi lại cùng `key` không thêm dòng, `sent` là số người vừa nhận. Kèm `document_id` thì chỉ được `director`, `clerk`
+(hai vai trò thấy mọi văn bản không hạn chế của đơn vị; vai trò khác → 422 `fields.roles = document_readers_only`);
+văn bản của đơn vị khác → 404, văn bản hạn chế → 403. Nhật ký `tu_dong.notify` không có tiêu đề, lời nhắn.
 
 **Không ghi hai lần**: các lần gọi cùng một việc (`completeTask`) hay cùng một văn bản (vào sổ, trình, job đối soát)
 chạy lần lượt trong tiến trình, lần sau thấy việc lần trước đã làm. CSDL chặn thêm khi có nhiều bản sao dịch vụ:
@@ -68,6 +86,27 @@ như các vòng nền khác. Hộp thư đi không lưu địa chỉ, URL hay n�
 lỗi kèm mã SMTP/HTTP — không chép thông điệp lỗi của smtplib, httpx2 vì chúng mang địa chỉ người nhận, URL webhook.
 Mỗi lần xếp hàng và mỗi kết quả vào sổ kiểm toán chuỗi băm (đã gửi cho ai, qua kênh nào, lúc nào, thử mấy lần). Thử
 trên máy không cần máy chủ thư: profile `mail` (Mailpit) — xem [docs/trien-khai.md](../../docs/trien-khai.md) mục 7.
+
+**Thông báo qua SMS, Zalo** (`channels.py`, `subscriptions.py`, #365; chỉ khi đặt `MOC_SMS_GATEWAY_URL` hoặc
+`MOC_ZALO_BOT_TOKEN`, mặc định tắt): khác email, hai kênh này chỉ gửi cho người **tự bật** ở mục Kênh thông báo cuối
+chuông (Action `myChannels`, `setMyChannel`, bảng `core.notification_subscriptions`). `Router.route` khai `sms`,
+`zalo` cho mọi dòng thông báo, trừ văn bản hạn chế; trigger CSDL chỉ xếp hàng khi người nhận còn bật kênh, tài khoản
+chưa khóa và — với SMS — danh bạ có số. Lúc gửi xét lại cả ba điều. Tin ngắn, không tên người, không ý kiến hay trích
+yếu: `Signet: <như chuông>` kèm liên kết.
+
+- SMS: [SMS Gateway for Android](https://github.com/capcom6/android-sms-gateway) (Apache-2.0) chế độ Local Server
+  trên một điện thoại có SIM cùng mạng LAN với máy chủ: `POST <MOC_SMS_GATEWAY_URL>/message`, Basic Auth, 202 là đã
+  vào hàng gửi của điện thoại. Số lấy từ `core.users.phone`, đồng bộ từ thuộc tính `phone_number` của Keycloak
+  (quản trị nhập; người dùng chỉ xem, không tự sửa), chuẩn hóa về `+84…` (`directory.py`). Giao diện chỉ thấy số đã
+  che (`+84••••••678`).
+- Zalo: bot của đơn vị trên Zalo Bot Platform (`MOC_ZALO_BOT_TOKEN`). Bật Zalo sinh mã 8 ký tự hạn 15 phút; người
+  dùng nhắn mã cho bot, vòng nền đọc tin bằng `getUpdates` (long polling 30 giây, lùi dần tới 5 phút khi lỗi — bot
+  không được đặt webhook), ghi `zalo_chat_id` rồi trả lời trong Zalo. Chỉ nhận chat ghi rõ là riêng
+  (`chat_type: PRIVATE`); mã sai, hết hạn thì bot báo lại; tin không phải mã nhận lời nhắc cách dùng, mỗi chat tối đa
+  một lần trong 10 phút. Tắt Zalo xóa chat_id, bật lại phải liên kết lại.
+
+Thử lại, `failed`, `skipped` như email; lỗi Zalo ghi mã lỗi của API (`Zalo <mã>`), 429 và lỗi tạm thử lại. Nhật ký
+không có số điện thoại, chat_id, mã liên kết hay nội dung tin.
 
 **Nhắc hạn** (`sla.py`): mỗi việc trong BPMN có timer `R2/${slaDuration}`; timer bắn thì Flowable tạo việc giao
 ra ngoài (external worker, topic `moc-sla`), dịch vụ lấy về mỗi `MOC_SLA_POLL_INTERVAL_S` giây: quá một thời
@@ -133,8 +172,9 @@ Mỗi `MOC_SUGGEST_POLL_INTERVAL_S` giây dịch vụ nhận tối đa 5 việc 
    văn bản tương tự, chưa văn bản nào được giao, hoặc đơn vị không có lãnh đạo phòng → `none` với lý do
    `no_similar`/`no_history`/`no_valid_unit`;
 5. hạn: trung vị (thấp) số ngày từ lúc vào sổ (giờ VN) tới hạn của các căn cứ ủng hộ, chỉ tính 1..365 ngày; hạn đề xuất
-   = ngày vào sổ + số ngày, sớm nhất là ngày mai, rơi vào thứ Bảy, Chủ nhật hay ngày lễ (`MOC_HOLIDAYS`) thì sang
-   ngày làm việc kế tiếp. Văn bản đã ghi hạn giải quyết thì không gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
+   = ngày vào sổ + số ngày, sớm nhất là ngày mai, rơi vào thứ Bảy, Chủ nhật (trừ ngày làm bù) hay ngày lễ
+   (`MOC_HOLIDAYS`, `MOC_HOLIDAYS_FILE`) thì sang ngày làm việc kế tiếp. Văn bản đã ghi hạn giải quyết thì không
+   gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
 6. lưu dòng `office.assignment_suggestions` (căn cứ chỉ có id, điểm, đơn vị, số ngày) và một dòng sổ
    `assignment.suggested` trong **cùng một mutation**, bằng vai trò `agent` danh tính `MOC_ASSIGNER_ID` (preset ép thuê
    ước, `agent_id`, `actor_id`, `actor_kind = agent`), mã yêu cầu `goi-y:<id việc>`. `diff` có đúng 9 khóa vô hướng:
@@ -159,12 +199,19 @@ mục F4.3.
 
 **Ngày lễ** (`MOC_HOLIDAYS`, #280). Các mục cách nhau bằng dấu phẩy: `MM-DD` lặp hằng năm, `YYYY-MM-DD` một ngày,
 `YYYY-MM-DD..YYYY-MM-DD` một khoảng tối đa 31 ngày. Mặc định `01-01,04-30,05-01,09-02` là các ngày lễ dương lịch cố
-định ở Điều 112 Bộ luật Lao động 2019. Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày liền kề Quốc khánh và ngày nghỉ bù đổi
-theo năm, nên người vận hành thêm theo lịch nghỉ Chính phủ công bố, rồi tạo lại container svc-workflow. Sai dạng, ngày
-không có thật, khoảng ngược hay dài quá 31 ngày thì dịch vụ dừng lúc khởi động. Đổi biến chỉ áp cho gợi ý mới, gợi ý đã
-lưu giữ nguyên hạn cũ. Thời hạn từng bước của quy trình (`MOC_SLA_DURATION`) vẫn đếm theo đồng hồ, không trừ ngày nghỉ.
+định ở Điều 112 Bộ luật Lao động 2019. Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày liền kề Quốc khánh, ngày nghỉ bù và thứ
+Bảy làm bù đổi theo năm: dịch vụ đọc thêm lịch nghỉ chính thức của nguồn công khai B (`MOC_HOLIDAYS_FILE`, #427), bản
+chụp `seed/du-lieu-mo/ngay-nghi-le/ngay-nghi.json` gắn chỉ đọc vào `/app/du-lieu-mo/ngay-nghi-le/`. Tệp có `fixed`
+(`MM-DD` hằng năm), `days_off` (khoảng `from`..`to`), `workdays` (thứ Bảy, Chủ nhật làm bù: ngày làm việc, trừ khi
+cũng là ngày lễ). Năm tệp chưa có thì người vận hành thêm vào `MOC_HOLIDAYS` theo lịch nghỉ Chính phủ công bố, rồi
+tạo lại container svc-workflow. Lấy mới tệp: `python3 scripts/nguon_ngay_nghi_le.py`
+([`docs/van-hanh.md`](../../docs/van-hanh.md), mục Lịch nghỉ lễ chính thức). Sai dạng, ngày không có thật, khoảng
+ngược hay dài quá 31 ngày — ở biến hay ở tệp — thì dịch vụ dừng lúc khởi động; không có tệp thì chỉ còn
+`MOC_HOLIDAYS`. Đổi biến chỉ áp cho gợi ý mới, gợi ý đã lưu giữ nguyên hạn cũ. Thời hạn từng bước của quy trình
+(`MOC_SLA_DURATION`) vẫn đếm theo đồng hồ, không trừ ngày nghỉ.
 
-Giới hạn: ngày lễ âm lịch và ngày nghỉ bù không tự có, người vận hành phải thêm mỗi năm; chỉ gợi ý đơn vị chủ trì và
+Giới hạn: lịch nghỉ chính thức chỉ có các năm đã công bố (bản chụp hiện tới hết 2027, chưa có Giỗ Tổ 2027) và là
+lịch của cán bộ, công chức, viên chức — đơn vị nghỉ khác thì sửa `MOC_HOLIDAYS`; chỉ gợi ý đơn vị chủ trì và
 hạn, **không** gợi ý người xử lý (việc của bước phân công); ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác top-1 dễ cao
 ảo — đọc kèm số căn cứ và số đơn vị. Ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt theo lần đo đầu trên stack thật.
 
@@ -192,9 +239,9 @@ svc-workflow python -m svc_workflow.pii count < tệp`. Loại, nhãn, giới h�
 
 Năm bí mật (khóa Hasura, khóa Actions, mật khẩu Flowable, client secret, khóa Centrifugo) không truyền qua biến môi
 trường: khi có `MOC_OPENBAO_ADDR`, lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc
-chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Mật khẩu SMTP và
-URL webhook (thường chứa khóa) cũng đi qua két, là bí mật tùy chọn: rỗng thì két không có. Két chưa sẵn sàng thì
-thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
+chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Mật khẩu SMTP,
+URL webhook (thường chứa khóa), token của Alertmanager cũng đi qua két, là bí mật tùy chọn: rỗng thì két không có.
+Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
 
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
@@ -227,6 +274,7 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_SUGGEST_MIN_SCORE` | `0.3` | Ngưỡng điểm `_rankingScore` (0..1) để một văn bản tương tự làm căn cứ |
 | `MOC_ASSIGNER_ID` | `moc-assigner` | Danh tính tác tử (1–64 ký tự): `actor_id` của dòng sổ, `agent_id` của bảng gợi ý |
 | `MOC_HOLIDAYS` | `01-01,04-30,05-01,09-02` | Ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật: `MM-DD` hằng năm, `YYYY-MM-DD`, `YYYY-MM-DD..YYYY-MM-DD` (≤ 31 ngày); trống thì như mặc định. Xem đoạn "Ngày lễ" |
+| `MOC_HOLIDAYS_FILE` | `/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json` | Lịch nghỉ chính thức (nguồn công khai B, #427) cộng vào `MOC_HOLIDAYS`, kể cả thứ Bảy làm bù; rỗng thì tắt, không có tệp thì bỏ qua, tệp hỏng thì dừng lúc khởi động |
 | `MOC_SMTP_HOST` | trống | Máy chủ thư; trống thì tắt kênh email |
 | `MOC_SMTP_TLS` | `starttls` | `starttls`, `ssl` hoặc `none` (không mã hóa, chỉ cho relay nội bộ như Mailpit, không bao giờ đăng nhập — xem dưới bảng) |
 | `MOC_SMTP_PORT` | theo `MOC_SMTP_TLS` | `587` (starttls), `465` (ssl), `25` (none) |
@@ -235,8 +283,14 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_NOTIFY_WEBHOOK_URL` | trống | URL `http`/`https` nhận tin; lấy từ két; trống thì tắt kênh webhook |
 | `MOC_NOTIFY_WEBHOOK_FORMAT` | `json` | `json` (`{"text": …}`: Mattermost, Slack) hoặc `ntfy` |
 | `MOC_NOTIFY_EMAIL_KINDS`, `MOC_NOTIFY_WEBHOOK_KINDS` | trống (mọi loại) | Chỉ gửi các loại này, cách nhau bằng dấu phẩy, vd `task.overdue,task.escalated`; loại lạ thì dịch vụ dừng khi khởi động |
+| `MOC_SMS_GATEWAY_URL` | trống | Địa chỉ `http(s)://` của SMS Gateway for Android (Local Server), vd `http://192.168.1.50:8080`; trống thì tắt kênh SMS |
+| `MOC_SMS_GATEWAY_USER`, `MOC_SMS_GATEWAY_PASSWORD` | trống | Basic Auth hiện trong ứng dụng trên điện thoại; bắt buộc khi đặt URL; mật khẩu lấy từ két |
+| `MOC_ZALO_BOT_TOKEN` | trống | Token bot Zalo (nằm trong đường dẫn API, lấy từ két); trống thì tắt kênh Zalo |
+| `MOC_ZALO_BOT_URL` | trống | Địa chỉ `https://` mở bot, hiện cho người dùng lúc liên kết |
+| `MOC_NOTIFY_SMS_KINDS`, `MOC_NOTIFY_ZALO_KINDS` | trống (mọi loại) | Như `MOC_NOTIFY_EMAIL_KINDS`; SMS tốn tiền, nên đặt vd `task.overdue,task.escalated` |
 | `MOC_NOTIFY_INTERVAL_S` | `5` | Chu kỳ vòng nền gửi thông báo ngoài; `0` tắt (dòng chờ nằm nguyên tới khi bật lại) |
 | `MOC_PUBLIC_URL` | trống | Địa chỉ trang web cho liên kết trong thư, tin webhook; trống thì không kèm liên kết |
+| `MOC_ALERT_TOKEN` | trống | Token của Alertmanager khi gọi `POST /ops/alerts` (16–200 ký tự chữ, số, `.` `_` `~` `+` `/` `-`; `make env` sinh), lấy từ két; trống thì route trả 404 |
 
 `MOC_SMTP_TLS=none` mà có `MOC_SMTP_USER`: svc-workflow không nối máy chủ thư để mật khẩu không đi qua kết nối rõ.
 Dịch vụ vẫn chạy, lúc khởi động ghi một dòng `config.warning`; mỗi thư báo lỗi với lý do trong `last_error` và được

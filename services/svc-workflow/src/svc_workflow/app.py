@@ -21,8 +21,10 @@ dùng, vai trò không do client tự khai. Yêu cầu không mang đúng ``X-Mo
 mạng nội bộ cũng không tin ai (zero-trust).
 
 ``create_app`` dựng phần chung (Hasura, Flowable, danh bạ, thông báo và kênh ngoài, ``/healthz``, ``/readyz``) rồi gắn
-từng phần nghiệp vụ đang bật theo khuôn của ``parts.py``. Hiện có một phần: Văn phòng điện tử (``office/api.py``),
-tắt bằng ``MOC_OFFICE_ENABLED=false``.
+từng phần nghiệp vụ đang bật theo khuôn của ``parts.py``: Văn phòng điện tử (``office/api.py``, tắt bằng
+``MOC_OFFICE_ENABLED=false``), quy trình của ứng dụng cắm (``apps/api.py``), kênh SMS, Zalo người dùng tự bật
+(``subscriptions.py``), cảnh báo vận hành Alertmanager gửi sang (``alerts.py``), robot của flow tự động hóa Node-RED
+báo người trong đơn vị (``tu_dong.py``).
 
 Chạy: ``uvicorn svc_workflow.app:create_app --factory``
 """
@@ -42,6 +44,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from . import __version__, pii
+from .alerts import OpsAlerts
 from .apps.api import AppWorkflow
 from .channels import Router
 from .config import Settings
@@ -54,6 +57,8 @@ from .office.api import Office
 from .openbao import with_secrets
 from .ot import OtBridge
 from .parts import Part
+from .subscriptions import Channels
+from .tu_dong import FlowNotices
 
 log = logging.getLogger("svc_workflow")
 # Mã yêu cầu nhận từ X-Request-Id: cùng luật với bước tách mã của Vector và make logs-tra (log tập trung F3.14)
@@ -92,7 +97,7 @@ def create_app(
     flowable = flowable or FlowableClient(settings.flowable_url, settings.flowable_user, settings.flowable_password)
     directory = directory or Directory(settings.keycloak_url, settings.realm, settings.directory_client_id,
                                        settings.directory_client_secret, hasura)
-    # kênh ngoài (email, webhook): None khi chưa cấu hình — chỉ có chuông trên web như trước
+    # kênh ngoài (email, webhook, SMS, Zalo): None khi chưa cấu hình — chỉ có chuông trên web như trước
     router = Router.from_settings(hasura, settings) if notifier is None else getattr(notifier, "router", None)
     notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key, router=router)
     # Phần nghiệp vụ trên phần chung, gắn route theo thứ tự trong danh sách. Thêm một phần (route, việc nền riêng):
@@ -102,6 +107,14 @@ def create_app(
     parts: list[Part] = [office] if office is not None else []
     # quy trình của ứng dụng cắm bằng manifest (#301, /api/workflow qua APISIX): luôn bật, không theo cờ Văn phòng
     parts.append(AppWorkflow.build(settings, flowable))
+    # kênh cá nhân SMS, Zalo (#365): Action xem, bật, tắt luôn có (chưa cấu hình kênh nào thì danh sách rỗng); vòng
+    # liên kết Zalo chỉ khi có bot
+    channels = Channels.build(settings, hasura, router)
+    parts.append(channels)
+    # cảnh báo vận hành (#284): Alertmanager gọi POST /ops/alerts → thông báo ops.alert cho quản trị đơn vị
+    parts.append(OpsAlerts.build(settings, hasura, notifier))
+    # tự động hóa Node-RED (#366): robot của flow báo người trong đơn vị theo vai trò (Action notifyFromFlow)
+    parts.append(FlowNotices.build(settings, hasura, notifier))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -139,6 +152,9 @@ def create_app(
                     "bằng manifest) đi qua cổng, cần token của client app-<tên> (docs/api/README.md).",
         lifespan=lifespan,
     )
+    if settings.trace_ratio > 0:            # #364: chỉ nạp OpenTelemetry khi bật truy vết
+        from . import tracing
+        tracing.install(app, "svc-workflow")
 
     @app.middleware("http")
     async def request_id(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -156,6 +172,7 @@ def create_app(
     app.state.directory = directory
     app.state.router = router
     app.state.office = office
+    app.state.channels = channels
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:

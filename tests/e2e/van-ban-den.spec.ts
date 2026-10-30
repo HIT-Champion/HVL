@@ -26,7 +26,8 @@ const summary = `Về việc rà soát chương trình đào tạo ngành Kỹ t
 
 async function openTask(page: Page, screenshot?: string) {
   await page.goto('/')
-  const item = page.getByRole('link', { name: new RegExp(tag) })
+  // trong hộp việc: tin realtime ở góc màn hình cũng là liên kết mang trích yếu (#415)
+  const item = page.getByTestId('inbox').getByRole('link', { name: new RegExp(tag) })
   await expect(item).toBeVisible()
   if (screenshot) await shot(page, screenshot)
   await item.click()
@@ -106,14 +107,15 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
   // 5. Tìm lại bằng chữ không dấu (Meilisearch đồng bộ sau vài giây)
   await expect(async () => {
     await staff.goto(`/tim-kiem?q=${encodeURIComponent(`ra soat chuong trinh ${tag}`)}`)
-    await expect(staff.getByRole('link', { name: new RegExp(tag) })).toBeVisible({ timeout: 3_000 })
+    // trong <main>: tin realtime (ngoài main) cũng là liên kết mang trích yếu (#415)
+    await expect(staff.getByRole('main').getByRole('link', { name: new RegExp(tag) })).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 30_000 })
   await shot(staff, '6-tim-kiem')
 
   // 6. Tìm bằng chữ chỉ có trong tệp PDF (F2.7): svc-files đọc lớp chữ ở vòng nền rồi đồng bộ sang Meilisearch
   await expect(async () => {
     await staff.goto(`/tim-kiem?q=${encodeURIComponent(`bang doi chieu chuan dau ra ${tag}`)}`)
-    const hit = staff.getByRole('link', { name: new RegExp(tag) })
+    const hit = staff.getByRole('main').getByRole('link', { name: new RegExp(tag) })
     await expect(hit).toBeVisible({ timeout: 3_000 })
     await expect(hit.getByText('Khớp trong nội dung')).toBeVisible()
   }).toPass({ timeout: 60_000 })

@@ -100,7 +100,8 @@ computed_fields:
 insert_permissions:
   - role: staff
     permission:
-      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id,
+                language]
       set:
         tenant_id: X-Hasura-Tenant-Id
         created_by: X-Hasura-User-Id
@@ -122,7 +123,7 @@ select_permissions:
       columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
                 urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
                 department_id, signer_id, recipients, recipient_tenant_ids, reply_to_id, content_sha256,
-                verify_code, source_id, process_id, created_by, created_at, updated_at]
+                verify_code, source_id, process_id, created_by, created_at, updated_at, language]
       filter:
         _and:
           - tenant_id: {_eq: X-Hasura-Tenant-Id}
@@ -134,18 +135,31 @@ select_permissions:
     permission: *user_select
   - role: director
     permission: *user_select
+  # Robot của flow Node-RED (#366, scripts/tu_dong.py): mỗi đơn vị một robot, chỉ đọc văn bản không hạn chế của đơn vị
+  # mình, không có nội dung (body), người tạo, người nhận; không ghi gì. Không dùng `visible`: quy tắc đó xét theo
+  # vai trò người dùng, robot không có trong danh sách người được xem nào
+  - role: tu_dong
+    permission:
+      columns: [id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency, register_number,
+                registered_at, due_on, department_id, created_at, updated_at]
+      filter:
+        _and:
+          - tenant_id: {_eq: X-Hasura-Tenant-Id}
+          - restricted: {_eq: false}
+      allow_aggregations: true
   - role: service
     permission:
       columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
                 urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
                 department_id, signer_id, recipients, recipient_tenant_ids, reply_to_id, content_sha256,
-                verify_code, source_id, process_id, created_by, created_at, updated_at]
+                verify_code, source_id, process_id, created_by, created_at, updated_at, language]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       allow_aggregations: true
 update_permissions:
   - role: staff
     permission:
-      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id,
+                language]
       filter:
         tenant_id: {_eq: X-Hasura-Tenant-Id}
         direction: {_eq: out}

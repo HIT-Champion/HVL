@@ -40,7 +40,7 @@ from test_duong_ham import service_block  # noqa: E402
 COMPOSE = ROOT / "docker-compose.yml"
 CONFIG = ROOT / "platform" / "apisix" / "config.yaml"
 APP = ROOT / "apps" / "bang-tin" / "app.yaml"
-APPS_NET = {"apisix", "app-office", "app-ca-nhan", "app-tai-lieu-api"}   # đúng các service ở mạng apps
+APPS_NET = {"apisix", "app-office", "app-ca-nhan", "app-tai-lieu-api", "wiki", "tu-dong"}   # các service ở mạng apps
 CORE_HOSTS = ("keycloak", "hasura", "postgres", "svc-files", "svc-workflow", "openbao", "seaweedfs", "centrifugo",
               "meilisearch", "flowable", "clamav", "ollama", "scorpio")
 

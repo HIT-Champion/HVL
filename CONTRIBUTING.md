@@ -117,12 +117,14 @@ Phần song ngữ Việt / Anh hiện có:
 
 - **Văn phòng điện tử** (`apps/office`): mọi câu trên giao diện. Ngôn ngữ chọn bằng nút trên thanh trên; trang công
   khai cũng có nút này.
-- **Không gian cá nhân** (`apps/ca-nhan`) và **Bảng tin** (`apps/bang-tin`): mọi câu trên giao diện. Nút đổi ngôn
-  ngữ ở thanh trên; lựa chọn lưu chung với Văn phòng điện tử.
+- **Không gian cá nhân** (`apps/ca-nhan`), **Bảng tin** (`apps/bang-tin`) và **Đơn nghỉ phép** (`apps/nghi-phep`):
+  mọi câu trên giao diện, bảng dịch ở `public/i18n.js` của từng ứng dụng. Nút đổi ngôn ngữ ở thanh trên; lựa chọn lưu
+  chung với Văn phòng điện tử. Nhãn, lựa chọn của form dựng từ JSON Schema nằm trong `x-moc-ui` `{vi, en}` của tệp
+  form (`schemas/README.md`).
 - **Trang đăng nhập**: theme Keycloak `signet`, câu nằm ở `platform/keycloak/themes/signet/login/messages/`
   (`messages_vi.properties`, `messages_en.properties`).
 
-Ứng dụng mẫu Nghỉ phép (`apps/nghi-phep`) chỉ có tiếng Việt. PDF phát hành và sổ in theo thể thức văn bản tiếng Việt.
+Văn bản đi in theo ngôn ngữ người soạn chọn (mặc định tiếng Việt), sổ đăng ký theo ngôn ngữ người in.
 
 Trong Văn phòng điện tử:
 
@@ -152,7 +154,7 @@ Trong Không gian cá nhân và Bảng tin (JavaScript thuần, mỗi ứng dụ
   trong `public/*.js`, chữ tĩnh của `index.html` không có khóa hay lệch bảng, khóa thiếu ở một trong hai bảng.
   e2e `tests/e2e/tieng-anh.spec.ts` mở cả hai ứng dụng bằng tiếng Anh.
 
-Tài liệu tiếng Anh: `README.en.md`. Bản tiếng Anh của hướng dẫn vận hành đang chờ người đóng góp (issue #59).
+Tài liệu tiếng Anh: `README.en.md` và hướng dẫn vận hành `docs/van-hanh.en.md` (#59).
 
 ## Báo lỗi
 

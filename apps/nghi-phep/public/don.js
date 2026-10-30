@@ -15,9 +15,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Phần không đụng trình duyệt (test bằng node --test): đường của API quy trình chung của lõi, dựng lời gọi, đọc câu
-// trả lời, trạng thái một đơn, ngày giờ, đối chiếu danh sách việc. Trang (app.js) chỉ vẽ.
+// trả lời, trạng thái một đơn, ngày giờ, đối chiếu danh sách việc. Trang (app.js) chỉ vẽ. Câu báo lấy từ bảng dịch
+// (i18n.js) theo ngôn ngữ đang dùng.
 
-/** API chung của lõi cho quy trình của ứng dụng; APISIX chỉ nhận token của client app-nghi-phep ở đây. */
+import { t } from './i18n.js'
+
+/**
+ * API chung của lõi cho quy trình của ứng dụng. APISIX kiểm token; svc-workflow chỉ nhận token của client
+ * app-nghi-phep (`azp`) ở đây.
+ */
 export const API = '/api/workflow/nghi-phep'
 export const QUY_TRINH = 'nghi-phep.don'
 export const FORM_DON = 'nghi-phep.don'
@@ -52,15 +58,16 @@ export function docThan(text) {
   }
 }
 
-export const LOI = {
-  mang: 'Không gọi được Signet. Kiểm tra kết nối mạng rồi thử lại.',
-  401: 'Phiên đăng nhập đã hết. Tải lại trang để đăng nhập lại.',
-  403: 'Tài khoản này không được làm việc đó trong ứng dụng Đơn nghỉ phép.',
-  404: 'Không còn mục này — có thể đơn đã có người duyệt. Danh sách vừa được tải lại.',
-  409: 'Đơn vừa có người khác xử lý. Danh sách vừa được tải lại.',
-  429: 'Gửi quá nhiều yêu cầu trong thời gian ngắn. Đợi một phút rồi thử lại.',
-  500: 'Hệ thống quy trình của Signet chưa trả lời. Thử lại sau ít phút.',
-}
+/** Mã trả lời của API (mang: không gọi được) → khóa câu báo trong bảng dịch; tests/i18n.test.js kiểm khóa có thật. */
+export const LOI = Object.freeze({
+  mang: 'error.network',
+  401: 'error.session',
+  403: 'error.forbidden',
+  404: 'error.gone',
+  409: 'error.conflict',
+  429: 'error.rateLimited',
+  500: 'error.unavailable',
+})
 
 const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 
@@ -72,19 +79,19 @@ const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 export function docTraLoi(status, body) {
   if (status >= 200 && status < 300) return { ok: true, data: body }
   if (status === 422 && isMap(body?.errors)) {
-    return { ok: false, status, errors: body.errors, message: 'Dữ liệu chưa hợp lệ: xem lời báo ở từng ô.' }
+    return { ok: false, status, errors: body.errors, message: t('error.invalid') }
   }
-  const message = LOI[status] || (status >= 500 ? LOI[500] : `Signet từ chối yêu cầu (HTTP ${status}).`)
-  return { ok: false, status, message }
+  const key = LOI[status] || (status >= 500 ? LOI[500] : '')
+  return { ok: false, status, message: key ? t(key) : t('error.rejected', { status }) }
 }
 
 /** Trạng thái một đơn của tôi: còn chạy là chờ duyệt; kết thúc thì theo quyết định của trưởng phòng. */
 export function trangThai(don) {
-  if (!don?.endedAt) return { ma: 'cho', nhan: 'Chờ trưởng phòng duyệt' }
+  if (!don?.endedAt) return { ma: 'cho', nhan: t('state.pending') }
   const q = don.data?.quyetDinh
-  if (q === 'dong-y') return { ma: 'dong-y', nhan: 'Đã duyệt' }
-  if (q === 'tu-choi') return { ma: 'tu-choi', nhan: 'Bị từ chối' }
-  return { ma: 'xong', nhan: 'Đã kết thúc' }
+  if (q === 'dong-y') return { ma: 'dong-y', nhan: t('state.approved') }
+  if (q === 'tu-choi') return { ma: 'tu-choi', nhan: t('state.declined') }
+  return { ma: 'xong', nhan: t('state.ended') }
 }
 
 const NGAY = /^(\d{4})-(\d{2})-(\d{2})$/
@@ -92,8 +99,8 @@ const NGAY = /^(\d{4})-(\d{2})-(\d{2})$/
 function utc(text) {
   const m = typeof text === 'string' ? NGAY.exec(text) : null
   if (!m) return null
-  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-  return new Date(t).toISOString().slice(0, 10) === text ? t : null       // 2026-02-30 không phải ngày có thật
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return new Date(ms).toISOString().slice(0, 10) === text ? ms : null       // 2026-02-30 không phải ngày có thật
 }
 
 /** Số ngày nghỉ, tính cả hai đầu; ngày sai hay đến trước từ → null. */
@@ -103,7 +110,8 @@ export function soNgay(tuNgay, denNgay) {
   return Math.round((b - a) / 86400000) + 1
 }
 
-/** Thời điểm theo giờ Việt Nam, dạng 26/10/2026 14:05; sai thì rỗng. */
+/** Thời điểm theo giờ Việt Nam, dạng 26/10/2026 14:05 (cả khi dùng tiếng Anh: đơn theo giờ của đơn vị); sai thì
+ *  rỗng. */
 export function ngayGio(iso) {
   const d = new Date(iso)
   if (typeof iso !== 'string' || Number.isNaN(d.getTime())) return ''
@@ -114,8 +122,8 @@ export function ngayGio(iso) {
 }
 
 const at = (iso) => {
-  const t = new Date(iso).getTime()
-  return Number.isNaN(t) ? 0 : t
+  const ms = new Date(iso).getTime()
+  return Number.isNaN(ms) ? 0 : ms
 }
 
 /** Đơn của tôi: mới gửi lên đầu. */
@@ -129,8 +137,8 @@ export const sapXepViec = (list) => [...list].sort((a, b) => at(a.createdAt) - a
  * sách không xóa ghi chú người duyệt đang gõ.
  */
 export function doiChieu(dangHien, moi) {
-  const ids = new Set(moi.map((t) => t.id))
-  return { them: sapXepViec(moi.filter((t) => !dangHien.includes(t.id))), bo: dangHien.filter((id) => !ids.has(id)) }
+  const ids = new Set(moi.map((v) => v.id))
+  return { them: sapXepViec(moi.filter((v) => !dangHien.includes(v.id))), bo: dangHien.filter((id) => !ids.has(id)) }
 }
 
 function claims(token) {

@@ -182,7 +182,14 @@ sys.exit(1 if r["created"] else 0)' || return 1
 import json, sys
 r = json.load(sys.stdin)
 print("theme đăng nhập:", r["current"] or "mặc định của Keycloak")
-sys.exit(1 if r["action"] == "set" else 0)'
+sys.exit(1 if r["action"] == "set" else 0)' || return 1
+  # moc realm profile có từ bản thêm kênh SMS, Zalo (#365)
+  in_dest python3 scripts/moc.py realm profile --help >/dev/null 2>&1 || return 0
+  in_dest python3 scripts/moc.py realm profile --dry-run --json | python3 -c '
+import json, sys
+r = json.load(sys.stdin)
+print("user profile còn thiếu:", ", ".join(r["added"]) or "không")
+sys.exit(1 if r["added"] else 0)'
 }
 
 # smoke trượt ở bước hỏi đáp khi máy quá tải: chữ của PDF chưa kịp vào chỉ mục trong hạn chờ (lần nâng 1.1.0 ngày
@@ -210,7 +217,7 @@ check() {
 kiem_all() {
   check "phiên bản $1 trên trang trạng thái" check_status "$1"
   check "dịch vụ khỏe" check_health
-  check "client, theme của realm" check_realm
+  check "client, theme, user profile của realm" check_realm
   check "sổ kiểm toán, mốc neo" in_dest python3 scripts/moc.py audit verify
   check "smoke" check_smoke
 }
@@ -266,9 +273,10 @@ print(max(r["run"] for r in json.load(sys.stdin)["runs"] if r["complete"]))')
   (cd "$SRC" && MOC_VERSION="$new" make install PREFIX="$DEST")
   step "Chạy (Hasura áp migration mới)"
   in_dest docker compose up -d --wait --wait-timeout 900
-  step "Client ứng dụng, theme đăng nhập của realm"
+  step "Client ứng dụng, theme đăng nhập, user profile của realm"
   in_dest python3 scripts/moc.py realm clients
   in_dest python3 scripts/moc.py realm theme
+  in_dest python3 scripts/moc.py realm profile
 
   PHASE=kiem
   trap - ERR

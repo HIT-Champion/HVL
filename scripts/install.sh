@@ -36,16 +36,24 @@ COMPOSE=(docker compose --profile core --profile app)
 MANIFEST=.moc-install
 # Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py (cả
 # sao lưu, thêm đơn vị, client ứng dụng của realm, kiểm chữ ký mốc neo), màn demo (demo.py và lô mẫu nap_lo_mau.py nó
-# import, demo_ca_nhan.py), reconciler GitOps (reconcile.py), cảm biến giả lập của profile iot (compose chỉ đọc ở đây
-# profile core, app nên không thấy bind mount của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ,
-# lệnh chuẩn bị và tra Parseable), cắm ứng dụng bằng manifest (moc app: ung_dung.py, bộ đọc YAML, JSON Schema của
-# manifest)
+# import, demo_ca_nhan.py, demo_tat_van_phong.py), reconciler GitOps (reconcile.py), cảm biến giả lập của profile iot
+# (compose chỉ đọc ở đây profile core, app nên không thấy bind mount của nó), log tập trung của profile logs (cấu hình
+# Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable), cắm ứng dụng bằng manifest (moc app: ung_dung.py, bộ đọc
+# YAML, JSON Schema của manifest), cấu hình Jaeger của profile trace (#364), cấu hình và lệnh đồng bộ của wiki nội bộ,
+# màn demo của nó (profile wiki, #367), lệnh, màn demo, flow mẫu của Node-RED (profile tu-dong, #366), kiểm, nạp bản
+# chụp dữ liệu công khai (du_lieu_mo.py, #424; lệnh lấy mới nguon_*.py chỉ chạy ở máy của đội). Không chép
+# apps/: gói ứng dụng nằm ngoài lõi, nên demo.py cai-ung-dung, quy-trinh chỉ chạy trong thư mục mã nguồn
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
          scripts/moc.py scripts/audit_chain.py scripts/anchor_sig.py scripts/backup.py scripts/tenants.py
          scripts/demo.py scripts/nap_lo_mau.py scripts/reconcile.py scripts/realm_clients.py scripts/demo_ca_nhan.py
+         scripts/demo_tat_van_phong.py scripts/du_lieu_mo.py
          seed services/ot-sensor/sensor.py
          platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py
-         scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json)
+         scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json
+         platform/trace/jaeger.yaml
+         platform/wiki/signet.protected.php scripts/wiki.py scripts/demo_wiki.py
+         scripts/tu_dong.py scripts/demo_tu_dong.py platform/tu-dong/flow-mau.json
+         docker-compose.gpu.yml scripts/co-gpu.sh)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -156,7 +164,14 @@ do_install() {
   if grep '^OUTSIDE' <<<"$mounts" >&2; then die "có bind mount trỏ ra ngoài thư mục mã nguồn"; fi
 
   echo "==> Dựng image của đội, thẻ $ver"
-  (cd "$SRC" && MOC_VERSION="$ver" "${COMPOSE[@]}" build)
+  # Image wiki nội bộ (#367), Node-RED (#366) chỉ dựng khi bật profile của nó: theo .env của bản cài nếu đã có, không
+  # thì .env sắp chép
+  local envf extra extra_build=()
+  envf="$dest/.env"; [ -f "$envf" ] || envf="$SRC/.env"
+  extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$envf" | tail -n 1 | tr -d ' ')"
+  [[ ",$extra," != *,wiki,* ]] || extra_build+=(--profile wiki)
+  [[ ",$extra," != *,tu-dong,* ]] || extra_build+=(--profile tu-dong)
+  (cd "$SRC" && MOC_VERSION="$ver" "${COMPOSE[@]}" "${extra_build[@]}" build)
 
   local files=()
   while IFS= read -r rel; do files+=("$rel"); done \
@@ -194,17 +209,35 @@ do_install() {
     (umask 077 && cp "$SRC/.env" "$dest/.env")
     echo "    .env: chép từ thư mục mã nguồn (chỉ chủ sở hữu đọc được)"
   fi
+  # #284: bản cài trước cảnh báo vận hành chưa có token Alertmanager → svc-workflow: sinh như make env
+  # (scripts/gen-env.sh), không in giá trị. Dòng có mà rỗng là đã chọn tắt: giữ nguyên
+  grep -q '^MOC_ALERT_TOKEN=' "$dest/.env" || {
+    printf '\n# Cảnh báo ra chuông (#284), make install thêm\nMOC_ALERT_TOKEN=%s\n' \
+      "$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')" >> "$dest/.env"
+    echo "    .env: thêm MOC_ALERT_TOKEN (ngẫu nhiên) cho cảnh báo vận hành"
+  }
   grep -q '^MOC_VERSION=' "$dest/.env" || printf '\n# Do make install đặt: thẻ image của đội và profile chạy mặc định\n' >> "$dest/.env"
   set_env "$dest/.env" MOC_VERSION "$ver"
   # profile thêm (MOC_EXTRA_PROFILES của bản cài, vd tunnel) chạy cùng mỗi lần docker compose up trong bản cài
   extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
   set_env "$dest/.env" COMPOSE_PROFILES "core,app${extra:+,$extra}"
-  # Log tập trung (F3.14, profile logs): tệp phủ đổi driver log của 8 dịch vụ. docker compose đọc COMPOSE_FILE trong
-  # .env của bản cài (reconciler, lệnh gõ tay); bỏ logs thì trả về chỉ docker-compose.yml
-  if [[ ",$extra," == *,logs,* ]]; then
-    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml:platform/logs/docker-compose.logs.yml
-  elif grep -q '^COMPOSE_FILE=' "$dest/.env"; then
-    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml
+  # Tệp phủ trong COMPOSE_FILE của .env bản cài (docker compose đọc ở reconciler, lệnh gõ tay), cùng thứ tự với
+  # Makefile: GPU cho ollama khi MOC_AI_DEVICE=gpu; log tập trung (F3.14, profile logs) đổi driver log của 9 dịch vụ.
+  # Không bật gì thì trả về chỉ docker-compose.yml
+  device="$(sed -n 's/^MOC_AI_DEVICE=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
+  files=docker-compose.yml
+  [ "$device" != gpu ] || files+=":docker-compose.gpu.yml"
+  [[ ",$extra," != *,logs,* ]] || files+=":platform/logs/docker-compose.logs.yml"
+  if [ "$files" != docker-compose.yml ] || grep -q '^COMPOSE_FILE=' "$dest/.env"; then
+    set_env "$dest/.env" COMPOSE_FILE "$files"
+  fi
+  # GPU (docs/van-hanh.md mục Chạy mô hình bằng GPU): chỉ báo, không đổi .env thay người vận hành
+  have="$(bash "$SRC/scripts/co-gpu.sh")"
+  if [ "$device" = gpu ] && [ "$have" != gpu ]; then
+    echo "    Cảnh báo: MOC_AI_DEVICE=gpu nhưng chưa thấy GPU NVIDIA hay runtime nvidia của Docker — ollama sẽ không" \
+         "khởi động. Cài driver, NVIDIA Container Toolkit, hoặc đặt lại MOC_AI_DEVICE=cpu." >&2
+  elif [ "$device" != gpu ] && [ "$have" = gpu ]; then
+    echo "    Máy có GPU NVIDIA dùng được trong Docker: đặt MOC_AI_DEVICE=gpu trong $dest/.env rồi make install lại."
   fi
   # Ứng dụng cài bằng moc app (docs/them-ung-dung.md): dựng lại tệp chạy từ lõi vừa chép và bản ghi trong .moc-apps/ của
   # bản cài (không cần CSDL), thêm lại tệp phủ vào COMPOSE_FILE. Đang giữ khóa của bản cài: MOC_OPS_LOCKED

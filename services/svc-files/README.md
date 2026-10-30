@@ -10,7 +10,8 @@ trả lời người ngoài một văn bản có thật, còn nguyên vẹn khô
 Văn bản đi gửi đơn vị khác trong hệ thống thì bản phát hành được chép sang kho của đơn vị nhận ở đây (liên thông).
 Văn thư tải văn bản đến lên thì tác tử `moc-doc-reader` đọc tệp (lớp chữ PDF hoặc OCR) và gợi ý thông tin tiếp nhận.
 Người dùng hỏi bằng lời thì trợ lý `moc-assistant` tìm đoạn liên quan trong các văn bản **chính họ được đọc** và trả
-lời bằng câu trích nguyên văn kèm số ký hiệu, số trang; mô hình chạy tại chỗ viết câu trả lời ngắn nếu có (F4.2).
+lời bằng câu trích nguyên văn kèm số ký hiệu, số trang; mô hình chạy tại chỗ viết câu trả lời ngắn nếu có (F4.2),
+hoặc máy chủ chuẩn OpenAI khi đơn vị chọn `MOC_ASK_API=openai` (#430).
 
 Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 và F2.7 (tìm kiếm, cả nội dung PDF),
 F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực), F3.12 (liên thông), F4.1 (đọc văn
@@ -68,11 +69,11 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `422` `unstampable` + `reason` không đóng dấu được (quá `MOC_RESTRICTED_MAX_PAGES` trang, quá nặng, hỏng), `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng, `busy` (+ `Retry-After: 10`) |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
-| `GET /api/registers/{in\|out}/{năm}` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ hay năm (2000–2100) sai · `401` · `503` |
-| `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf`; ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
+| `GET /api/registers/{in\|out}/{năm}[?lang=vi\|en]` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ, năm (2000–2100) hay `lang` sai · `401` · `503` |
+| `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf` (`lang=en`: `register-{incoming\|outgoing}-<năm>.pdf`); ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
 | `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456`. `document.signature`: chữ ký số của bản phát hành `{level, signer, ca, serial, signed_at, illustrative: true}`, `null` với văn bản cũ, văn bản hạn chế (F4.5) |
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
-| `GET /api/status` | **Không cần token.** `200` `{status, checked_at, version, uptime_s, last_backup_at, ai: {enabled, model, semantic}, layers, components: [{id, layer, label, software, status}]}`, `Cache-Control: no-store`; trạng thái `ok` · `degraded` · `down` (thành phần) và `off` (tắt theo cấu hình). Mọi người gọi trong 10 giây nhận cùng một kết quả · `429` quá `MOC_RATE_STATUS_PER_MIN` lần một phút mỗi IP (APISIX) — mục Trạng thái hệ thống |
+| `GET /api/status` | **Không cần token.** `200` `{status, checked_at, version, uptime_s, last_backup_at, ai: {enabled, model, semantic, device}, layers, components: [{id, layer, label, software, status}], open_data: [{source, name, publisher, home_url, reuse_basis, licence, fetched_at, age_days, max_age_days, state, files}]}`, `Cache-Control: no-store`; trạng thái `ok` · `degraded` · `down` (thành phần) và `off` (tắt theo cấu hình). Mọi người gọi trong 10 giây nhận cùng một kết quả · `429` quá `MOC_RATE_STATUS_PER_MIN` lần một phút mỗi IP (APISIX) — mục Trạng thái hệ thống |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `files[]` `{file_id, filename, mime_type, sha256, bytes, document_ids, viewable}` — tệp gắn với các văn bản đó, `viewable` khi là PDF; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL hoặc thiếu một phần · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
 | `GET /api/case-files/{id}/archive/files/{file_id}` | Phòng đọc xem một tệp, cùng quy tắc quyền như trên: hồ sơ xem được, tệp gắn với văn bản người gọi đọc được. `200` `application/pdf` — bản có dấu tên người xem và giờ xem trên mọi trang (như F3.7, chữ "PHÒNG ĐỌC"), `Content-Disposition: inline`, `Cache-Control: no-store`, CSP sandbox · `404` không có, tệp không thuộc gói hoặc không được xem (trả như nhau) · `409` `not_archived` · `415` `not_viewable` không phải PDF · `422` `unstampable` + `reason` (quá `MOC_RESTRICTED_MAX_PAGES` trang, quá nặng, hỏng) · `502` `archive_mismatch` manifest không khớp CSDL, tệp không khớp manifest, hoặc gói thiếu manifest hay tệp — không trả byte nào · `401` · `503` (cả `busy` + `Retry-After: 10`). Ghi `case_file.file_viewed` vào sổ kiểm toán trước khi trả; ghi không được thì `503`, không trả tệp. Không ghi gì vào bucket lạnh |
 | `POST /api/case-files/{id}/archive` | Chỉ `manager` (vai trò Hasura áp cho token), chỉ hồ sơ của phòng mình. `200` `{case_file_id, code, archive_key, archive_sha256, documents, files, bytes, run_id}` · `403` `forbidden` vai trò khác · `404` không có hoặc hồ sơ phòng khác · `409` `not_closed`, `already_archived` (kể cả lượt khác vừa xong), `archive_failed` + `message` (văn bản không còn nộp lưu được, đang gửi liên thông, tệp nóng không khớp băm… — chưa đổi gì), `archive_conflict` (hàm SQL từ chối vì dữ liệu đổi giữa chừng — chưa đổi gì) · `503` kho, CSDL, sổ kiểm toán chưa sẵn sàng; `busy` (+ `Retry-After: 10`) khi tiến trình đang có lượt nộp lưu khác (nút bấm hay vòng nền) — chưa ghi sổ. Giành được lượt rồi mới ghi `case_file.archive_requested`; các bước như vòng nền (mục Nộp lưu hồ sơ) |
@@ -351,8 +352,40 @@ volume nếu cần chính xác hơn). OCR bản scan cho tìm kiếm toàn văn 
 
 `assist/`. Trang "Hỏi đáp văn bản" gọi `POST /api/documents/ask`: người dùng hỏi bằng lời (vd "Điều kiện xét học bổng
 khuyến khích học tập là gì?"), trợ lý tìm đoạn liên quan trong các văn bản **chính người hỏi được đọc** và trả câu trích
-nguyên văn kèm nguồn "88/CTSV · tr. 1". Văn thư, chuyên viên, trưởng phòng, lãnh đạo hỏi được; vai trò khác `403`. Mỗi
-câu hỏi độc lập, không lưu hội thoại.
+nguyên văn kèm nguồn "88/CTSV · tr. 1". Văn thư, chuyên viên, trưởng phòng, lãnh đạo hỏi được; vai trò khác `403`. Máy
+chủ không lưu hội thoại: câu nối tiếp gửi kèm câu hỏi lượt trước (`previous`).
+
+**Bộ định tuyến** (`route.py`, `guide.py`, #423). Trước khi tìm, mỗi câu hỏi đi qua các mẫu tất định so trên chữ bỏ
+dấu, có cả tiếng Anh; mỗi mẫu có mã lý do (`route_reason`, vd `kw:lam-duoc-gi`, `kw:o-dau`, `kw:thoi-tiet`; mặc định
+`mac-dinh`). Không mô hình nào chọn đường. Câu có từ chỉ văn bản ("văn bản", "quyết định", "học bổng", "Điều 5"…) luôn
+về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất là như trước khi có bộ định tuyến.
+
+| `route` | Nhận ra bằng | Trả lời | Tìm trong kho · gọi mô hình |
+|---|---|---|---|
+| `gioi_thieu` | "làm được gì", "bạn là ai", "dùng mô hình nào", "xin chào", "cảm ơn", "what can you do"… | Câu đầu của mục ứng với mã lý do trong tệp Giới thiệu trợ lý (`assist/gioi_thieu/vi.md`, `en.md` khi câu hỏi tiếng Anh), các mục khác của tệp làm nguồn phụ; `answer.source: extract` | không · không, kể cả `mode: generate` |
+| `huong_dan` | "ở đâu", "làm thế nào để", "hướng dẫn cách"… kèm tên chức năng (nghỉ phép, văn bản đi, ký số, mật khẩu…), không có số ký hiệu, "số N" | Như `van_ban` nhưng nguồn là các mục của hướng dẫn sử dụng (`docs/huong-dan/*.md`, thư mục `MOC_ASK_GUIDE_DIR`); không mục nào khớp thì tìm văn bản như `van_ban` (mã lý do `khong-khop-huong-dan`) | không · như `van_ban` (bộ kiểm căn cứ y nguyên) |
+| `ngoai_pham_vi` | thời tiết, giá cả, thể thao, viết hộ, lập trình… | Câu cố định nói trợ lý làm được gì, `answer.source: fixed`, `status: no_evidence`, `sources: []` | không · không |
+| `viec_cua_toi` (#441) | việc của chính người hỏi: "việc (nào) của tôi", "tôi có bao nhiêu việc", "tôi được giao", "hộp việc … quá hạn", "my tasks"; ngôi thứ nhất so trên chữ có dấu ("tối", "tới" không phải "tôi"); không có từ chỉ văn bản | Action `myTasks` bằng token người hỏi (như Hộp việc): số việc, quá hạn, đến hạn hôm nay, đến hạn trong 2 ngày (như Lịch hạn, giờ Việt Nam), ba việc gần hạn nhất kèm số ký hiệu văn bản người hỏi đọc được; `answer.source: data`, `data`, `link: /` | không · không |
+| `dem_van_ban` (#441) | "bao nhiêu", "đếm", "mấy" (so trên chữ có dấu), "số lượng", "thống kê"… rồi, cách tối đa hai từ không phải giới từ hay đơn vị ("bao nhiêu năm theo thông tư" không tính), "văn bản" hay tên loại (quyết định, công văn…), "how many … documents"; không có số ký hiệu (`12/HD`), không có mốc chưa đọc được (ngày cụ thể, "từ … đến", quý, tuần) | `office_documents_aggregate` bằng token người hỏi: văn bản đến ("đến", "nhận") theo ngày vào sổ, văn bản đi ("đi", "ban hành") theo ngày ban hành, không nói thì đếm cả hai; "tháng 10", "tháng 10/2026", "tháng này", "tháng trước", "năm 2026", "năm nay", "năm ngoái", "hôm nay"; tên loại → `type_code`; `answer.source: data`, `data`, `link: /van-ban-den` hoặc `/van-ban-di` | không · không |
+| `van_ban` | còn lại | Như mô tả bên dưới | có · như bên dưới |
+
+Hỏi trong một văn bản (`document_id`) thì "ở đâu", "làm thế nào", "bao nhiêu" là câu về văn bản đó, không phải
+hướng dẫn hay đường dữ liệu. Đường dữ liệu (`assist/data.py`) không có SQL hay GraphQL do mô hình viết: mẫu chữ chọn
+một trong hai truy vấn cố định, Hasura áp quyền theo token như ở trang danh sách; câu trả lời là mẫu câu có số và "Căn
+cứ: …" (ngày tính, cột ngày đã dùng). Hasura từ chối token → `401`; Hasura hay svc-workflow (myTasks) không trả lời →
+`503 database_unavailable`, nhật ký `office.assist.count_failed` {route, error, code}. "Hướng
+dẫn" đứng một mình là loại văn bản (HD), chỉ là câu hỏi cách dùng khi theo sau là "cách", "tôi", "sử dụng"…. Nguồn của
+tệp giới thiệu và hướng dẫn là đoạn `kind: guide`: `document_id`, `page`, `file_id` null, `symbol` là tên tài liệu,
+`summary` là tiêu đề mục, `path` là tệp kèm neo mục (`docs/huong-dan/viec-chung.md#đơn-nghỉ-phép`). Kho tĩnh nạp lúc
+khởi động, tìm bằng từ của câu hỏi (`vi.terms`), mục phủ < 35 % trọng số câu hỏi bị bỏ. Thiếu thư mục hướng dẫn thì
+ghi `office.assist.guides_missing`, câu hỏi cách dùng tìm trong kho văn bản.
+
+**Câu nối tiếp** (`route.follow_up`). `previous` (tùy chọn, câu hỏi lượt trước; rỗng, quá 500 ký tự hay có ký tự điều
+khiển thì bị bỏ qua, không lỗi) được dùng khi câu mới ≤ 6 từ và có dấu hiệu nối tiếp ("còn … thì sao", "thế còn …",
+"nó", "văn bản đó"…). "Còn khoa Kinh tế thì sao?" sau "Điều kiện xét học bổng khoa CNTT là gì?" thành "Điều kiện xét
+học bổng khoa Kinh tế là gì": từ đầu của phần sau "còn" có trong câu trước thì thay cụm danh từ bắt đầu từ đó, không
+thì nối vào cuối câu trước. Câu ghép (`rewritten`) đi qua bộ định tuyến lần nữa rồi đem đi tìm, trích, hỏi mô hình;
+trang hiện "Đã hiểu là: …". Không ghép được thì câu hỏi đi như câu độc lập.
 
 **Chỉ mục đoạn** (`chunks.py`, `index.py`, `meili.py`). Chỉ mục Meilisearch riêng `MOC_ASK_INDEX` (`chunks`), một tài
 liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
@@ -449,21 +482,25 @@ người hỏi không được đọc.
 - **Trợ lý có danh tính, có sổ.** Mỗi lượt hỏi ghi **một** dòng `assistant.answered` (thực thể `ai.questions`, id =
   `ask_id`) bằng vai trò Hasura `agent`: preset ép `actor_id = moc-assistant`, `actor_kind = agent`, thuê ước. `diff`
   chỉ có siêu dữ liệu: `user_id, ask_id, mode, status, answer_source, hits, cited` (số nguồn được trích), `documents`
-  (id các văn bản trả về), `semantic, model, embed_model, duration_ms, warnings` — **không câu hỏi, câu trả lời, đoạn
-  trích**. **Không ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
-  hai dòng sổ cùng một thực thể.
+  (id các văn bản trả về), `semantic, model, embed_model, duration_ms, warnings, route, route_reason, followup` (có
+  ghép câu nối tiếp không), `model_where` (`local`: Ollama, `external`: API ngoài, #430; rỗng khi không gọi mô hình) —
+  **không câu hỏi, câu trước, câu ghép, câu trả lời, đoạn trích**. **Không ghi được sổ thì không trả lời** (`503
+  database_unavailable`). Lượt `generate` gửi lại `ask_id` nên hai dòng sổ cùng một thực thể.
 - **Nhật ký không có chữ**: `office.assist.asked` {tenant_id, actor_id, mode, status, q_length, terms, candidates, hits,
-  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms}, `office.assist.ask_failed`
-  {code}, `office.assist.model_rejected` {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` /
-  `ai_unavailable` (khi đổi trạng thái), `office.assist.embed_dims_mismatch` {dims, expected} (mức error),
+  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms, route, route_reason,
+  followup}, `office.assist.ask_failed` {code}, `office.assist.model_rejected` {reason}, `office.assist.embed_failed`
+  {reason}, `office.assist.ai_ready` / `ai_unavailable` (khi đổi trạng thái), `office.assist.embed_dims_mismatch`
+  {dims, expected} (mức error),
   `office.assist.indexed` / `embedded` / `embed_skipped` {ids} / `index_failed` {error, stage, reason},
   `config.warning` {message} lúc khởi động.
 
 | Kết quả | Ý nghĩa |
 |---|---|
 | `status` | `answered` có câu trả lời · `passages_only` có đoạn liên quan mà không câu nào đủ khớp để trích · `no_evidence` không đoạn nào (`sources: []`) |
-| `answer`, `extract` | `{text, source: extract\|model, model}`; `extract` luôn là câu trích, `answer` là câu của mô hình khi đạt kiểm, không thì bằng `extract`; null khi không có |
-| `sources[]` | Tối đa `MOC_ASK_TOP_K`, theo thứ tự xếp hạng, `n` từ 1: `document_id, symbol, type_code, type_name, summary, issuer_name, issued_on, direction, status` (từ Hasura), `kind: page\|meta, file_id, file_role: main\|attachment\|issued, page, excerpt` (≤ 600 ký tự quanh câu tốt nhất, một dòng), `cited` |
+| `answer`, `extract` | `{text, source: extract\|model\|fixed\|data, model}`; `data`: câu có số của `viec_cua_toi`, `dem_van_ban` (`extract` null); `extract` luôn là câu trích, `answer` là câu của mô hình khi đạt kiểm, không thì bằng `extract`; `fixed`: câu cố định của `ngoai_pham_vi` (`extract` null); null khi không có |
+| `sources[]` | Tối đa `MOC_ASK_TOP_K`, theo thứ tự xếp hạng, `n` từ 1: `document_id, symbol, type_code, type_name, summary, issuer_name, issued_on, direction, status` (từ Hasura), `kind: page\|meta\|guide, file_id, file_role: main\|attachment\|issued, page, excerpt` (≤ 600 ký tự quanh câu tốt nhất, một dòng), `cited`; nguồn `guide` có thêm `path`, các trường của văn bản là null |
+| `route` · `route_reason` · `rewritten` | Đường bộ định tuyến chọn · mã lý do (máy đọc, không dịch) · câu nối tiếp đã ghép, null khi không phải câu nối tiếp |
+| `data` · `link` | Đường dữ liệu: `{kind: tasks, on, tasks, overdue, today, soon, no_due}` hoặc `{kind: documents, counts: {in?, out?}, type_code, from, to}` (`to` là ngày sau ngày cuối; `from`, `to` null: mọi thời gian) · trang xem danh sách đã đếm (`/`, `/van-ban-den`, `/van-ban-di`); null với đường khác |
 | `semantic` · `ai_available` | Lượt này có tìm theo nghĩa · mô hình viết câu trả lời đang sẵn sàng |
 | `warnings` | `embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`, `model_declined` (mô hình nói không đủ căn cứ) |
 | `400 invalid_question` | Rỗng sau chuẩn hóa, > 500 ký tự, có ký tự điều khiển, chỉ toàn từ dừng |
@@ -572,7 +609,7 @@ Che luôn bật, không có biến cấu hình để tắt.
 |---|---|---|---|
 | Số định danh / CCCD 12 số | `[CCCD]` | `[CCCD-n]` | 3 số đầu là một trong 63 mã tỉnh (Thông tư 59/2021/TT-BCA), chữ số thứ 4 là 0–3, năm sinh không ở tương lai; **hoặc** 12 số bất kỳ ngay sau từ khóa ("CCCD", "căn cước", "số định danh"…) |
 | CMND | `[CMND]` | `[CMND-n]` | **chỉ** ngay sau từ khóa ("CMND", "CMT", "chứng minh nhân dân"…), 9 hoặc 12 số |
-| Điện thoại | `[SĐT]` | `[SĐT-n]` | di động 10 số có đầu số đã cấp (10/2026, gồm 095), máy bàn `02x` 11 số, di động 11 số cũ; `+84`, `(+84)`, `0084`, `+84 (0)`, `84…` liền, mã vùng `(024)`; viết liền hay theo nhóm (nhóm đầu ≥ 3 chữ số, trừ sau `+84` / mã vùng) |
+| Điện thoại | `[SĐT]` | `[SĐT-n]` | di động 10 số có đầu số đã cấp (10/2026, gồm 095), máy bàn `02x` 11 số, di động 11 số cũ; `+84`, `(+84)`, `0084`, `+84 (0)`, `84…` liền, mã vùng `(024)`; viết liền hay theo nhóm (nhóm đầu ≥ 3 chữ số, trừ sau `+84` / mã vùng); di động 10 số viết liền sau `ĐT`, `SĐT`, `DĐ`, `Tel`, `Phone` (`ĐT0912…`, không phân biệt dấu, hoa thường) khi tiền tố đứng đầu dòng hay sau khoảng trắng, dấu câu |
 | Email | `[EMAIL]` | `[EMAIL-n]` | cú pháp địa chỉ có tên miền cấp cao (`user@localhost`, `@pytest.fixture` không khớp) |
 | Số tài khoản | `[STK]` | `[STK-n]` | **chỉ** ngay sau từ khóa ("số tài khoản", "STK", "tài khoản ngân hàng số"…), 6–19 chữ số |
 
@@ -628,28 +665,30 @@ bản che idempotent. Thời gian tuyến tính theo độ dài chữ (chuỗi b
   ```
 
 **Đo — `make do-che-pii`** (không cần Docker; `test_pii_corpus.py` và `test_pii_mutation.py` đã chạy trong
-`make test`). Che nhầm trên kho mẫu (đo 22/10/2026, 22 văn bản đến), đọc như bản chạy thật (lớp chữ và bố cục của
-PDF, TSV OCR có sẵn) — tổng 81 023 ký tự, 747 chuỗi số ứng viên, 0 chỗ bị che:
+`make test`). Che nhầm trên kho mẫu (đo lại 28/10/2026, 22 văn bản đến), đọc như bản chạy thật (lớp chữ và bố cục của
+PDF, TSV OCR có sẵn) — tổng 81 063 ký tự, 747 chuỗi số ứng viên, 0 chỗ bị che:
 
 | Nguồn | Tệp / chuỗi | Ký tự | Chuỗi số ứng viên | Bị che |
 |---|---|---|---|---|
 | `seed/van-ban-den`, PDF có lớp chữ | 15 | 37 416 | 370 | **0** |
 | `seed/van-ban-den`, bản scan (TSV OCR) | 7 | 6 442 | 68 | **0** |
-| `seed/hoi-dap`, mọi trang | 6 | 19 957 | 144 | **0** |
+| `seed/hoi-dap`, mọi trang | 6 | 19 997 | 144 | **0** |
 | Nhãn, câu hỏi, lịch sử giao việc | 1 248 chuỗi | 17 208 | 165 | **0** |
 
 Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp (`test_pii.py`), vì kho mẫu không có — và không được có —
-dữ liệu thật mang thông tin cá nhân: 95 chỗ dương tính trong 84 chuỗi đều bị che (cả số ngắt dòng, tên tệp
-`don_0912…`), 80 chuỗi âm tính khó (giấy tờ, ngày, tiền, UUID, hex, mã số thuế, đầu số chưa cấp, dãy số nhỏ của bảng,
-email giả…) không bị che, 1 144 ca đột biến dữ liệu vào (11 toán tử) đúng kỳ vọng. Đột biến mã: 15 đột biến của
-`pii.py` (bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu số, bỏ cổng mã số thuế, giữ chuỗi truy vấn, xuống dòng không
-là phân cách, bỏ điều kiện nhóm đầu ≥ 3 chữ số, che một lượt…) — **15/15 bị test giết**, khoảng 1,5 giây. Có chỗ che
-nhầm, sót một ca dương tính hay một đột biến sống sót thì lệnh thoát 1.
+dữ liệu thật mang thông tin cá nhân: 109 chỗ dương tính trong 96 chuỗi đều bị che (cả số ngắt dòng, tên tệp
+`don_0912…`, số dính sau `ĐT`/`SĐT`/`Tel`), 87 chuỗi âm tính khó (giấy tờ, ngày, tiền, UUID, hex, mã số thuế, đầu số
+chưa cấp, dãy số nhỏ của bảng, mã có chữ dính số như `HSĐT0912…`, email giả…) không bị che, 1 291 ca đột biến dữ liệu
+vào (11 toán tử) đúng kỳ vọng. Đột biến mã: 18 đột biến của `pii.py` (bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu
+số, bỏ cổng mã số thuế, giữ chuỗi truy vấn, xuống dòng không là phân cách, bỏ điều kiện nhóm đầu ≥ 3 chữ số, che một
+lượt, bỏ đường tiền tố điện thoại…) — **18/18 bị test giết**, khoảng 2 giây. Có chỗ che nhầm, sót một ca dương tính
+hay một đột biến sống sót thì lệnh thoát 1.
 
 **Giới hạn:**
 
-- **Sót có chủ đích:** số dính chữ (`ĐT0912…`), số có hai ký tự trắng liền (hai dấu cách, dòng trống, cách rồi
-  xuống dòng), CCCD sau `/`; số viết từng cặp (`09 12 34 56 78`: nhóm đầu 2 chữ số), `84 912 345 678` (bỏ dấu cộng mà
+- **Sót có chủ đích:** số dính chữ, trừ di động 10 số sau tiền tố điện thoại (`HS0912…`, `ĐTDĐ0912…`, máy bàn
+  sau `Tel`, tiền tố sau `/`, `-`), số có hai ký tự trắng liền (hai dấu cách, dòng trống, cách rồi xuống dòng), CCCD
+  sau `/`; số viết từng cặp (`09 12 34 56 78`: nhóm đầu 2 chữ số), `84 912 345 678` (bỏ dấu cộng mà
   có cách — viết liền `84912345678` thì che), số viết theo nhóm nối bằng phẩy không cách (`0912 345 678,0987 654 321`;
   hai dãy ≥ 9 chữ số liền nối bằng phẩy thì che cả hai); số máy bàn kiểu cũ 10 số (trước 2017), số nước ngoài; CMND
   và số tài khoản không có từ khóa; chữ không ở dạng NFC có thể sót từ khóa.
@@ -694,6 +733,11 @@ Căn cứ: Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị 
   "V/v …" dưới số, "Kính gửi"), nội dung, nơi nhận kèm "Lưu: VT, <phòng>.", chức vụ và tên người ký, giờ ký duyệt
   trên Signet. Bản phát hành có mã QR dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. Mọi chữ người dùng nhập được thoát
   HTML. Phông Liberation Serif (cùng số đo Times New Roman) cài trong image.
+- **Văn bản tiếng Anh** (F2.9, cột `language` = `en`, người soạn chọn): cùng thể thức, phần cố định theo cách dịch
+  thường dùng (`TEXT` trong `render.py`): "Socialist Republic of Vietnam", "Independence - Freedom - Happiness",
+  "No.:", ngày "Hà Nội, October 19, 2026", "Re:", "To:", "Recipients:", "As above", "Archived: Records office",
+  khối xác thực, chữ "DRAFT" chìm; tên loại theo mã (`TYPE_NAMES_EN`). Chữ người dùng nhập (tên đơn vị, địa danh,
+  chức danh người ký, trích yếu, nội dung, nơi nhận) giữ nguyên. Giá trị khác `vi`, `en` dựng như tiếng Việt.
 - **"Đã duyệt trên hệ thống Signet"** chỉ ghi lại việc người ký bấm duyệt trong Signet. Tính toàn vẹn đến từ SHA-256 của
   tệp, lưu trong CSDL và trong sổ kiểm toán chuỗi băm, kiểm được ở cổng xác thực. Từ F4.5 bản phát hành (không hạn
   chế) có thêm chữ ký số PAdES bằng PKI nội bộ — chỉ minh họa (mục Ký số văn bản đi).
@@ -813,7 +857,11 @@ các trường theo mẫu sổ ở Phụ lục IV, ký nhận và đóng sổ.
 - **Một chỗ dựng ô.** Bản JSON cho giao diện và bản PDF cùng các ô đã định dạng (ngày `dd/mm/yyyy` theo giờ Việt
   Nam), nên màn hình và giấy không lệch nhau. PDF A4 ngang: bìa (cơ quan chủ quản, đơn vị, năm, từ ngày đến ngày,
   từ số đến số), bảng có hàng đánh số cột lặp lại ở mỗi trang, chỗ văn thư ký cuối sổ.
-- **Mỗi lần in** ghi `register.printed` (`entity_id` `in/2026`, kèm số dòng và số dòng bị che) vào sổ kiểm toán.
+- **Tiếng Anh** (F2.9, `?lang=en`; mặc định `vi`). Giao diện gửi ngôn ngữ đang chọn. Chữ cố định đổi theo ngôn ngữ:
+  tên sổ, tên cột, bìa, chân trang, chỗ ký, ghi chú (độ khẩn, "Restricted", hạn giải quyết), tên loại văn bản theo
+  mã (`TYPE_NAMES_EN` trong `render.py`; mã không có trong bảng thì giữ tên đã khai). Chữ người dùng nhập (trích
+  yếu, tác giả, nơi nhận, tên đơn vị) giữ nguyên. Ngày vẫn `dd/mm/yyyy`.
+- **Mỗi lần in** ghi `register.printed` (`entity_id` `in/2026`, kèm số dòng, số dòng bị che, `lang`) vào sổ kiểm toán.
   Mỗi lúc dựng tối đa hai bản in, để in sổ dài không chiếm hết luồng của tải tệp lên, xuống.
 
 ### Neo sổ kiểm toán (F2.12)
@@ -978,6 +1026,11 @@ nhất, trợ lý AI bật hay tắt kèm tên mô hình. Không có tên máy, 
 người dùng hay số văn bản, thông báo lỗi; lý do chi tiết chỉ vào nhật ký (`core.status.changed`, ghi khi một thành phần
 đổi trạng thái).
 
+`ai.device` (#442): mô hình Ollama đang nạp nằm ở đâu, theo `size_vram` so với `size` trong `GET /api/ps` mà svc-files
+gọi sau mỗi lần dò `/api/tags` thấy mô hình: `gpu` (hết trong bộ nhớ GPU), `gpu+cpu` (một phần), `cpu`; `null` khi trợ
+lý tắt hay chưa từng thấy mô hình nào nạp (giữ giá trị cũ khi Ollama vừa dỡ mô hình). Bật GPU: `MOC_AI_DEVICE=gpu`,
+`docs/van-hanh.md` mục Chạy mô hình bằng GPU.
+
 | Mã | Nhãn | Dò bằng | Gián đoạn thì cả hệ thống |
 |---|---|---|---|
 | `cong-api` | Cổng API | `GET /status/ready` của APISIX (cổng 7085, chỉ trong mạng nội bộ); `503` — còn worker chưa nạp cấu hình: `degraded` | `down` |
@@ -1002,6 +1055,13 @@ người dùng hay số văn bản, thông báo lỗi; lý do chi tiết chỉ v
   `/metrics`, nên chỉ gọi được trong mạng nội bộ.
 - **Sao lưu gần nhất:** dòng `system.backed_up` mới nhất trong sổ kiểm toán (`moc backup create` ghi sau mỗi lượt sao
   lưu), hoặc giờ của lượt vừa khôi phục (`system.restored`), lấy cái mới hơn; chưa có thì `null`.
+- **Nguồn dữ liệu công khai (#424, `open_data.py`):** `open_data` liệt kê các bản chụp trong `MOC_OPEN_DATA_DIR`
+  (compose mount chỉ đọc `seed/du-lieu-mo`), mỗi thư mục con có `manifest.json` là một nguồn: tên, nơi công bố, trang
+  gốc, căn cứ dùng lại, ngày lấy, tuổi (ngày), từng tệp với URL, SHA-256, `meta` tùy nguồn. `state`: `ok`; `stale` khi
+  tuổi quá `max_age_days`; `broken` khi manifest hỏng, thiếu tệp, sai cỡ hay sai SHA-256. Bản cài không gọi nguồn lúc
+  chạy: bản chụp do `moc du-lieu-mo lay` lấy ở máy của đội, đổi qua PR. Không tính vào trạng thái chung; chỉ khóa trong
+  danh sách trắng đi ra, tên tệp chỉ là tên trơn trong thư mục của nguồn; SHA-256 lưu đệm tới khi tệp đổi. Lỗi vào
+  nhật ký (`core.open_data.changed`); đọc quá `MOC_STATUS_TIMEOUT_S` thì lượt đó trả `[]`.
 - **Tên mô hình** bỏ phần trước dấu `/` cuối (registry có thể là tên máy nội bộ), chỉ nhận `[0-9A-Za-z._:-]`; phiên
   bản chỉ nhận `[0-9A-Za-z._+-]`, lạ thì trả `dev`.
 - Hợp đồng trả về khóa bằng mô hình pydantic `StatusOut`: thêm trường mới phải sửa mô hình, không lọt qua tình cờ.
@@ -1255,9 +1315,13 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_ASK_MIN_SCORE` · `MOC_ASK_MIN_SCORE_SEMANTIC` | `0` · `0.75` | Ngưỡng `_rankingScore` khi tìm từ khóa · tìm lai (0–1). Từ khóa để 0: chiến lược `frequency` đã buộc đoạn chứa từ hiếm nhất của câu hỏi, điểm `words` thấp cả với nguồn đúng. Tìm lai 0,75: trên kho mẫu nguồn đúng đứng đầu ≥ 0,88, câu không có đáp án ≤ 0,70 |
 | `MOC_ASK_SEMANTIC_RATIO` | `0.5` | Tỷ trọng tìm theo nghĩa trong tìm lai (0–1); câu hỏi có số ký hiệu, ngày, cụm trong ngoặc kép dùng tối đa 0,2 |
 | `MOC_ASK_DEADLINE_S` | `50` | Hạn tổng một lượt hỏi, tối đa 55 (dưới 60 giây của APISIX) |
-| `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
+| `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` (với `MOC_ASK_API=openai`: bắt buộc) | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
 | `MOC_ASK_MODEL_TIMEOUT_S` | `40` | Hạn gọi mô hình viết câu trả lời (`model_timeout`) |
+| `MOC_ASK_API` | `ollama` | Nơi viết câu trả lời: `ollama` (tại chỗ) hoặc `openai` — máy chủ chuẩn OpenAI ở `MOC_ASK_API_URL`, tên mô hình ở `MOC_ASK_MODEL`, bắt buộc (#430). URL `http://` thì ghi `config.warning`. Chỉ bước viết đi ra ngoài (đã che thông tin cá nhân, bộ kiểm căn cứ giữ nguyên); nhúng vẫn ở Ollama. Xem `docs/van-hanh.md` mục Trợ lý hỏi đáp qua API ngoài |
+| `MOC_ASK_API_URL` | rỗng | Gốc API, vd `https://máy-chủ/v1` (bắt buộc khi `MOC_ASK_API=openai`); dò `GET …/models`, gọi `POST …/chat/completions` |
+| `MOC_ASK_API_KEY` | rỗng | Khóa API (tùy chọn) — bí mật trong két (`platform/openbao/start.sh`), không đặt trong biến môi trường của container; chỉ đi trong tiêu đề `Authorization` |
 | `MOC_ASK_CONTEXT_CHARS` | `2800` | Tổng ký tự các đoạn gửi mô hình |
+| `MOC_ASK_GUIDE_DIR` | `/app/huong-dan` | Thư mục hướng dẫn sử dụng cho đường `huong_dan` (#423); compose gắn `docs/huong-dan` vào đây, chỉ đọc. Không có thì câu hỏi cách dùng tìm trong kho văn bản |
 | `MOC_ASK_CONCURRENCY` · `MOC_ASK_QUEUE_S` | `1` · `20` | Số lượt `generate` cùng lúc · chờ lượt quá thì `503 busy` |
 | `MOC_AI_EMBED_MODEL` | `qwen3-embedding:0.6b` | Mô hình nhúng trong Ollama (`bge-m3` thay được); đặt rỗng: không nhúng, chỉ tìm từ khóa |
 | `MOC_AI_EMBED_DIMS` · `MOC_AI_EMBED_BATCH` | `1024` · `8` | Số chiều véc-tơ, phải đúng của mô hình (sai thì tắt tìm theo nghĩa, ghi lỗi `embed_dims_mismatch`) · số đoạn mỗi lô nhúng nền |
@@ -1266,6 +1330,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_GATEWAY_STATUS_URL` | `http://apisix:7085/status/ready` | Điểm sẵn sàng của APISIX; rỗng: Cổng API `off` |
 | `MOC_WORKFLOW_URL` | `http://svc-workflow:8000` | svc-workflow cho dòng Quy trình (`/readyz`); rỗng: `off` |
 | `MOC_STATUS_CACHE_S` · `MOC_STATUS_TIMEOUT_S` | `10` · `3` | Lưu đệm kết quả trạng thái (≥ 1) · hạn mỗi lần dò một thành phần (0–10) |
+| `MOC_OPEN_DATA_DIR` | `/srv/du-lieu-mo` | Thư mục bản chụp nguồn dữ liệu công khai cho `open_data` của `/api/status` (đường dẫn tuyệt đối); rỗng: `[]` |
 | `MOC_IMPORT_INTERVAL_S` | `2` | Chu kỳ vòng nền nạp lô khi rảnh; `0` tắt vòng nền **và** API tạo lô trả `503 imports_disabled` (không nhận lô sẽ không bao giờ chạy) |
 | `MOC_IMPORT_CHUNK` | `20` | Số dòng mỗi mẻ (1–200), rồi nhường lô khác |
 | `MOC_IMPORT_MAX_ROWS` | `1000` | Trần số dòng mỗi lô (1–100000); vượt → `413 too_many_rows` |

@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Định tuyến thông báo đa kênh: ngoài chuông trên web, gửi thêm qua email (SMTP) và webhook khi được cấu hình.
+"""Định tuyến thông báo đa kênh: ngoài chuông trên web, gửi thêm qua email (SMTP), webhook, SMS, Zalo khi được cấu hình.
 
 Chuông trên web (``core.notifications`` + Centrifugo, notify.py) giữ nguyên. Lúc ghi thông báo, ``Notifier`` hỏi
 ``Router.route`` kênh ngoài nào cần gửi và ghi vào cột ``channels``; trigger CSDL tạo một dòng
@@ -27,7 +27,11 @@ nền ``Router.serve`` gửi các dòng đến hạn, ngoài luồng nghiệp v�
   - webhook: một tin cho mỗi sự kiện (gắn vào thông báo của người nhận đầu tiên theo id), dạng ``json``
     (``{"text": …}`` của incoming webhook Mattermost, Slack) hoặc ``ntfy`` (thân là chữ, tiêu đề và liên kết trong tham
     số). Webhook là kênh chung của cả đơn vị nên không ghi tên người, không ghi ý kiến, và văn bản hạn chế không bao giờ
-    lên webhook — biết có văn bản là đã lộ (F3.7).
+    lên webhook — biết có văn bản là đã lộ (F3.7);
+  - SMS (cổng SMS Gateway for Android trên một điện thoại trong mạng LAN), Zalo (Bot API chính thức, #365): chỉ người
+    đã tự bật kênh (``core.notification_subscriptions``, subscriptions.py) — trigger CSDL không tạo dòng cho người chưa
+    bật; lúc gửi xét lại, người vừa tắt thì ``skipped``. Tin ngắn: tiêu đề không tên người, liên kết; không ý kiến,
+    không trích yếu, không văn bản hạn chế — tin đi qua nhà mạng, máy chủ Zalo.
 
 Câu chữ như chuông trên web (``apps/office/app/locales/vi.json``; test giữ hai bên khớp nhau). Lỗi tạm (mạng, máy chủ
 thư bận, HTTP 5xx, 408, 429) thì thử lại sau 30 s·2^lần, tối đa ``MAX_ATTEMPTS`` lần rồi ``failed``; lỗi chắc chắn
@@ -36,8 +40,9 @@ kết quả (dịch vụ dừng, Hasura lỗi) thì lần sau gửi lại: ít n
 ``Message-ID`` cố định theo dòng nên hộp thư nhận ra bản lặp.
 
 Nhật ký và ``last_error`` không có thông tin cá nhân hay bí mật (F4.4): chỉ id dòng, kênh, loại thông báo, số lần, tên
-lớp lỗi và mã SMTP/HTTP — không địa chỉ email, không tên người, không URL webhook (khóa nằm trong đường dẫn). Lỗi của
-smtplib mang nguyên địa chỉ người nhận, lỗi của httpx2 mang URL, nên không bao giờ ghi ``str(exc)``.
+lớp lỗi và mã SMTP/HTTP/Zalo — không địa chỉ email, số điện thoại, chat_id Zalo, tên người, không URL webhook hay token
+bot (khóa nằm trong đường dẫn). Lỗi của smtplib mang nguyên địa chỉ người nhận, lỗi của httpx2 mang URL, mô tả lỗi của
+Zalo có thể nhắc chat_id, nên không bao giờ ghi ``str(exc)`` hay ``description``.
 """
 
 from __future__ import annotations
@@ -66,14 +71,16 @@ from .hasura import Actor, HasuraClient, HasuraError
 log = logging.getLogger("svc_workflow")
 
 ACTOR = "svc-workflow"
-# Loại thông báo svc-workflow gửi (notify.py, sla.py, workflow.py, dispatch.py, ot.py)
+# Loại thông báo svc-workflow gửi (notify.py, sla.py, workflow.py, dispatch.py, ot.py, alerts.py, tu_dong.py)
 KINDS = ("task.assigned", "task.overdue", "task.escalated", "document.issued", "document.processed",
-         "document.overdue", "document.incoming", "ot.alarm")
+         "document.overdue", "document.incoming", "ot.alarm", "ops.alert", "flow.message")
 SMTP_PORTS = {"starttls": 587, "ssl": 465, "none": 25}
 # Lý do ghi vào last_error khi MOC_SMTP_TLS=none đi cùng MOC_SMTP_USER (SmtpConfig.plain_login)
 PLAIN_LOGIN = ("Không đăng nhập máy chủ thư qua kết nối không mã hóa (MOC_SMTP_TLS=none, có MOC_SMTP_USER): "
                "dùng starttls hoặc ssl")
 WEBHOOK_FORMATS = ("json", "ntfy")
+# Bot API của Zalo (https://bot.zapps.me/docs): https://bot-api.zaloplatforms.com/bot<token>/<phương thức>
+ZALO_API = "https://bot-api.zaloplatforms.com"
 MAX_ATTEMPTS = 5
 BATCH = 20
 BACKOFF_FIRST = timedelta(seconds=30)
@@ -98,7 +105,10 @@ TITLES = {
     "document.overdue": "Văn bản quá hạn giải quyết ({due})",
     "ot.alarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố",
     "document.incoming": "Văn bản đến liên thông từ {name}",
+    "ops.alert": "Cảnh báo vận hành: {message}",
+    "flow.message": "Tự động: {title}",
 }
+OPS_RESOLVED = "Hết cảnh báo: {message}"
 SOMEONE = "Người được giao"
 RESTRICTED = "Văn bản hạn chế"
 NOTE = "Ý kiến: {note}"
@@ -109,7 +119,8 @@ query DueDeliveries($now: timestamptz!, $limit: Int!) {
                                order_by: {id: asc}, limit: $limit) {
     id tenant_id channel attempts
     notification { kind document_id data created_at }
-    recipient { full_name email enabled }
+    recipient { full_name email enabled phone }
+    subscriptions { channel enabled zalo_chat_id }
   }
 }"""
 
@@ -160,7 +171,9 @@ class Text:
 
 
 def describe(kind: str, data: dict[str, Any], *, names: bool = True) -> Text:
-    """Câu thông báo như ``describeNotification`` của giao diện. names=False (webhook): không tên người, ý kiến."""
+    """Câu thông báo như ``describeNotification`` của giao diện.
+
+    names=False (webhook, SMS, Zalo): không tên người, ý kiến."""
     d = data or {}
     form = str(d.get("form_key") or "")
     task = FORMS.get(form, form)
@@ -186,6 +199,12 @@ def describe(kind: str, data: dict[str, Any], *, names: bool = True) -> Text:
         title = template.format(name=d.get("name") or "", value=_number(d.get("temperature")))
     elif kind == "document.incoming":
         title = template.format(name=d.get("from_name") or "")
+    elif kind == "ops.alert":     # cảnh báo của Prometheus (alerts.py): không gắn văn bản nào
+        title = (OPS_RESOLVED if d.get("status") == "resolved" else template).format(message=d.get("message") or "")
+    elif kind == "flow.message":  # robot của flow tự động hóa (tu_dong.py): tiêu đề, lời nhắn do flow soạn sẵn
+        title = TITLES[kind].format(title=d.get("title") or "")
+        # như chuông: lời nhắn thay phần văn bản; webhook, SMS, Zalo không mang lời nhắn (có thể có dữ liệu cá nhân)
+        doc = (str(d.get("text") or "") if names else "") or doc
     else:
         title = kind
     return Text(_one_line(title), doc, note)
@@ -213,6 +232,21 @@ class SmtpConfig:
 class WebhookConfig:
     url: str = field(repr=False)    # khóa của webhook nằm trong đường dẫn: không in, không ghi nhật ký
     format: str = "json"            # json | ntfy
+    timeout_s: float = 10.0
+
+
+@dataclass(frozen=True)
+class SmsConfig:
+    url: str                        # cổng SMS Gateway for Android (Local Server), vd http://192.168.1.50:8080
+    user: str
+    password: str = field(default="", repr=False)
+    timeout_s: float = 15.0
+
+
+@dataclass(frozen=True)
+class ZaloConfig:
+    token: str = field(repr=False)  # nằm trong đường dẫn API: không in, không ghi nhật ký
+    bot_url: str = ""               # địa chỉ mở bot, hiện cho người dùng lúc liên kết
     timeout_s: float = 10.0
 
 
@@ -266,23 +300,89 @@ def smtp_failure(exc: Exception) -> Failure:
     return Failure(name)
 
 
+def _transient(code: int) -> bool:
+    return code in (408, 429) or code >= 500
+
+
+class ZaloBot:
+    """Bot API của Zalo: gửi tin tới một chat, đọc tin người dùng nhắn cho bot (long polling ``getUpdates``).
+
+    Trả lời có ``ok``; lỗi mang ``error_code`` (bảng mã: https://bot.zapps.me/docs/error-code/): 408 là hết giờ chờ,
+    429 vượt hạn mức, 403 theo bảng là lỗi máy chủ của Zalo nên cũng thử lại. ``Failure`` chỉ mang mã, không
+    ``description`` hay URL (token nằm trong đường dẫn)."""
+
+    def __init__(self, cfg: ZaloConfig, *, transport: httpx2.AsyncBaseTransport | None = None,
+                 base_url: str = ZALO_API) -> None:
+        self.cfg = cfg
+        self._http = httpx2.AsyncClient(base_url=f"{base_url}/bot{cfg.token}", timeout=cfg.timeout_s,
+                                        transport=transport, follow_redirects=False)
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
+    async def _call(self, method: str, body: dict[str, Any], *, timeout_s: float | None = None) -> Any:
+        try:
+            r = await self._http.post(f"/{method}", json=body,
+                                      **({"timeout": timeout_s} if timeout_s is not None else {}))
+        except httpx2.HTTPError as exc:
+            raise Failure(type(exc).__name__) from None
+        try:
+            data = r.json()
+        except ValueError:
+            data = None
+        if not isinstance(data, dict):
+            data = {}
+        if 200 <= r.status_code < 300 and data.get("ok") is True:
+            return data.get("result")
+        code = data.get("error_code")
+        if isinstance(code, int) and not isinstance(code, bool):
+            raise Failure(f"Zalo {code}", final=not (_transient(code) or code == 403))
+        raise Failure(f"HTTP {r.status_code}", final=200 <= r.status_code < 300 or not _transient(r.status_code))
+
+    async def send(self, chat_id: str, text: str) -> None:
+        await self._call("sendMessage", {"chat_id": chat_id, "text": text})
+
+    async def updates(self, wait_s: int = 30) -> list[dict[str, Any]]:
+        """Tin người dùng nhắn cho bot; rỗng khi hết ``wait_s`` giây chưa có tin (Zalo trả mã 408).
+
+        Tài liệu ghi ``result`` là một sự kiện; nhận cả danh sách cho chắc."""
+        try:
+            result = await self._call("getUpdates", {"timeout": str(wait_s)}, timeout_s=wait_s + self.cfg.timeout_s)
+        except Failure as failure:
+            if failure.reason == "Zalo 408":
+                return []
+            raise
+        items = result if isinstance(result, list) else [result]
+        return [x for x in items if isinstance(x, dict)]
+
+
 class Router:
     """Chọn kênh ngoài cho từng thông báo lúc ghi, và gửi các dòng chờ ở vòng nền."""
 
     def __init__(self, hasura: HasuraClient, *, smtp: SmtpConfig | None = None, webhook: WebhookConfig | None = None,
-                 public_url: str = "", email_kinds: tuple[str, ...] = (), webhook_kinds: tuple[str, ...] = (),
+                 sms: SmsConfig | None = None, zalo: ZaloConfig | None = None, public_url: str = "",
+                 email_kinds: tuple[str, ...] = (), webhook_kinds: tuple[str, ...] = (),
+                 sms_kinds: tuple[str, ...] = (), zalo_kinds: tuple[str, ...] = (),
                  transport: httpx2.AsyncBaseTransport | None = None, clock: Callable[[], datetime] | None = None,
-                 mailer: Callable[[SmtpConfig, EmailMessage], None] = send_smtp) -> None:
+                 mailer: Callable[[SmtpConfig, EmailMessage], None] = send_smtp, zalo_api: str = ZALO_API) -> None:
         self.hasura = hasura
         self.smtp = smtp
         self.webhook = webhook
+        self.sms = sms
+        self.zalo = zalo
         self.public_url = public_url.rstrip("/")
         self.email_kinds = frozenset(email_kinds)
         self.webhook_kinds = frozenset(webhook_kinds)
+        self.sms_kinds = frozenset(sms_kinds)
+        self.zalo_kinds = frozenset(zalo_kinds)
         self._clock = clock or (lambda: datetime.now(UTC))
         self._mailer = mailer
         self._http = (httpx2.AsyncClient(timeout=webhook.timeout_s, transport=transport, follow_redirects=False)
                       if webhook else None)
+        self._sms_http = (httpx2.AsyncClient(timeout=sms.timeout_s, transport=transport, follow_redirects=False)
+                          if sms else None)
+        # subscriptions.py dùng chung bot này để đọc tin liên kết
+        self.zalo_bot = ZaloBot(zalo, transport=transport, base_url=zalo_api) if zalo else None
         self._wake: asyncio.Event | None = None
 
     @classmethod
@@ -293,14 +393,26 @@ class Router:
                 if settings.smtp_host else None)
         webhook = (WebhookConfig(settings.notify_webhook_url, settings.notify_webhook_format)
                    if settings.notify_webhook_url else None)
-        if smtp is None and webhook is None:
+        sms = (SmsConfig(settings.sms_gateway_url, settings.sms_gateway_user, settings.sms_gateway_password)
+               if settings.sms_gateway_url else None)
+        zalo = ZaloConfig(settings.zalo_bot_token, settings.zalo_bot_url) if settings.zalo_bot_token else None
+        if smtp is None and webhook is None and sms is None and zalo is None:
             return None
-        return cls(hasura, smtp=smtp, webhook=webhook, public_url=settings.public_url,
-                   email_kinds=settings.notify_email_kinds, webhook_kinds=settings.notify_webhook_kinds)
+        return cls(hasura, smtp=smtp, webhook=webhook, sms=sms, zalo=zalo, public_url=settings.public_url,
+                   email_kinds=settings.notify_email_kinds, webhook_kinds=settings.notify_webhook_kinds,
+                   sms_kinds=settings.notify_sms_kinds, zalo_kinds=settings.notify_zalo_kinds)
+
+    @property
+    def personal(self) -> tuple[str, ...]:
+        """Kênh người dùng tự bật mà bản cài đã cấu hình (subscriptions.py), theo thứ tự hiện trên giao diện."""
+        return tuple(c for c, cfg in (("sms", self.sms), ("zalo", self.zalo)) if cfg is not None)
 
     async def aclose(self) -> None:
-        if self._http is not None:
-            await self._http.aclose()
+        for http in (self._http, self._sms_http):
+            if http is not None:
+                await http.aclose()
+        if self.zalo_bot is not None:
+            await self.zalo_bot.aclose()
 
     # --- lúc ghi thông báo -----------------------------------------------------------------------------------------
 
@@ -308,15 +420,22 @@ class Router:
         """Đặt cột ``channels`` cho các dòng sắp ghi (đã xếp theo người nhận) → có kênh ngoài nào không.
 
         Email: mỗi người nhận một thư. Webhook: một tin cho cả sự kiện, gắn vào dòng đầu — dòng đó đã có (gọi lại
-        Action, timer bắn lại) thì sự kiện đã lên webhook rồi."""
-        email = self.smtp is not None and (not self.email_kinds or kind in self.email_kinds)
-        hook = (self.webhook is not None and (not self.webhook_kinds or kind in self.webhook_kinds)
-                and not (data or {}).get("restricted"))
+        Action, timer bắn lại) thì sự kiện đã lên webhook rồi. SMS, Zalo: khai cho mọi người nhận, trigger CSDL chỉ tạo
+        dòng chờ cho người đã bật kênh; văn bản hạn chế không đi qua hai kênh này."""
+        restricted = bool((data or {}).get("restricted"))
+
+        def wanted(cfg: Any, kinds: frozenset[str], *, open_ok: bool = True) -> bool:
+            return cfg is not None and (not kinds or kind in kinds) and (open_ok or not restricted)
+
+        email = wanted(self.smtp, self.email_kinds)
+        hook = wanted(self.webhook, self.webhook_kinds, open_ok=False)
+        personal = [c for c, cfg, kinds in (("sms", self.sms, self.sms_kinds), ("zalo", self.zalo, self.zalo_kinds))
+                    if wanted(cfg, kinds, open_ok=False)]
         for i, row in enumerate(rows):
-            channels = (["email"] if email else []) + (["webhook"] if hook and i == 0 else [])
+            channels = (["email"] if email else []) + (["webhook"] if hook and i == 0 else []) + personal
             if channels:
                 row["channels"] = channels
-        return bool(rows) and (email or hook)
+        return bool(rows) and (email or hook or bool(personal))
 
     def wake(self) -> None:
         """Có dòng chờ mới: vòng nền gửi ngay, không đợi hết chu kỳ."""
@@ -368,6 +487,10 @@ class Router:
                 await self._email(row, note)
             elif channel == "webhook":
                 await self._webhook(note)
+            elif channel == "sms":
+                await self._sms(row, note)
+            elif channel == "zalo":
+                await self._zalo(row, note)
             else:
                 raise Skip("Kênh không còn được hỗ trợ")
         except Skip as skip:
@@ -398,6 +521,8 @@ class Router:
 
     def _link(self, note: dict[str, Any]) -> str:
         doc = note.get("document_id")
+        if note.get("kind") == "ops.alert" and self.public_url:     # cảnh báo vận hành: trang trạng thái công khai
+            return f"{self.public_url}/trang-thai"
         return f"{self.public_url}/van-ban/{doc}" if doc and self.public_url else ""
 
     # --- email -------------------------------------------------------------------------------------------------------
@@ -469,8 +594,56 @@ class Router:
             raise Failure(type(exc).__name__) from None
         if 200 <= r.status_code < 300:
             return
-        transient = r.status_code in (408, 429) or r.status_code >= 500
-        raise Failure(f"HTTP {r.status_code}", final=not transient)
+        raise Failure(f"HTTP {r.status_code}", final=not _transient(r.status_code))
+
+    # --- SMS, Zalo ---------------------------------------------------------------------------------------------------
+
+    def short(self, note: dict[str, Any]) -> str:
+        """Tin SMS, Zalo: tiêu đề không tên người, liên kết. Không ý kiến, không trích yếu."""
+        text = describe(note.get("kind", ""), note.get("data") or {}, names=False)
+        return "\n".join(x for x in (f"Signet: {text.title}", self._link(note)) if x)
+
+    @staticmethod
+    def _personal(row: dict[str, Any], note: dict[str, Any], channel: str, label: str) -> dict[str, Any]:
+        """Lượt đăng ký kênh còn bật của người nhận; Skip khi không gửi được nữa (xét lại lúc gửi)."""
+        # CSDL gọt thông báo khi văn bản chuyển sang hạn chế (trigger notifications_restricted)
+        if (note.get("data") or {}).get("restricted"):
+            raise Skip(f"Văn bản hạn chế không gửi qua {label}")
+        person = row.get("recipient")
+        if not person or not person.get("enabled"):
+            raise Skip("Người nhận đã khóa hoặc không còn trong danh bạ")
+        found = next((s for s in row.get("subscriptions") or [] if s.get("channel") == channel and s.get("enabled")),
+                     None)
+        if found is None:
+            raise Skip(f"Người nhận đã tắt {label}")
+        return found
+
+    async def _sms(self, row: dict[str, Any], note: dict[str, Any]) -> None:
+        cfg, http = self.sms, self._sms_http
+        if cfg is None or http is None:
+            raise Skip("Kênh SMS đã tắt")
+        self._personal(row, note, "sms", "SMS")
+        phone = (row.get("recipient") or {}).get("phone")
+        if not phone:
+            raise Skip("Người nhận chưa có số điện thoại trong danh bạ")
+        # API của SMS Gateway for Android: https://docs.sms-gate.app/integration/api/ — 202 là đã nhận vào hàng gửi
+        body = {"textMessage": {"text": self.short(note)}, "phoneNumbers": [phone]}
+        try:
+            r = await http.post(f"{cfg.url}/message", json=body, auth=(cfg.user, cfg.password))
+        except httpx2.HTTPError as exc:
+            raise Failure(type(exc).__name__) from None
+        if 200 <= r.status_code < 300:
+            return
+        raise Failure(f"HTTP {r.status_code}", final=not _transient(r.status_code))
+
+    async def _zalo(self, row: dict[str, Any], note: dict[str, Any]) -> None:
+        bot = self.zalo_bot
+        if bot is None:
+            raise Skip("Kênh Zalo đã tắt")
+        found = self._personal(row, note, "zalo", "Zalo")
+        if not found.get("zalo_chat_id"):
+            raise Skip("Người nhận chưa liên kết Zalo")
+        await bot.send(found["zalo_chat_id"], self.short(note))
 
 
 def _stamp(created_at: Any) -> str:

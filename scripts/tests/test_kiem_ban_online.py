@@ -19,12 +19,14 @@ mạng: bản lành đạt cả năm mục; chứng chỉ sắp hết hạn, b�
 down, lệch phiên bản, URL http:// hay :9080 của Keycloak, thiếu header bảo mật đều là lỗi; thành phần suy giảm chỉ
 cảnh báo; mọi mục đều chạy và lỗi liệt kê hết; địa chỉ sai bị từ chối trước khi gọi mạng. Bản dev theo develop phải
 dựng từ một commit đã nêu (--commit). Workflow chạy hằng ngày, chạy tay, chạy trên PR đổi chính nó, truyền thẻ phát
-hành mới nhất cho kịch bản, đầu develop cùng các commit gộp trong 30 phút cho job bản dev.
+hành mới nhất cho kịch bản, đầu develop cùng các commit gộp trong 30 phút cho job bản dev. Lượt ngay sau Release
+đợi bản online nâng tay (--wait-minutes, đồng hồ giả), lịch và chạy tay thì không đợi.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
 import contextlib
+import http.client
 import importlib.util
 import io
 import json
@@ -69,6 +71,7 @@ class FakeSite:
             {"id": "postgres", "label": "CSDL", "status": "ok"}, {"id": "ollama", "label": "Mô hình", "status": "off"}]}
         self.replies: dict[str, kiem.Reply] = {}
         self.unreachable: set[str] = set()
+        self.cut: set[str] = set()          # kết nối đứt giữa thân trả lời
         self.calls: list[str] = []
 
     def certificate(self) -> tuple[dict[str, Any], str]:
@@ -80,6 +83,8 @@ class FakeSite:
         self.calls.append(url)
         if url in self.unreachable:
             raise ConnectionRefusedError("connection refused")
+        if url in self.cut:
+            raise http.client.IncompleteRead(b'{"status"', 40)
         if url in self.replies:
             return self.replies[url]
         if url == "http://signet.example/":
@@ -172,6 +177,58 @@ class CheckTest(unittest.TestCase):
 
     def test_commit_is_a_full_sha_and_excludes_version(self) -> None:
         for args in (["--commit", HEAD[:7]], ["--commit", HEAD.upper()], ["--commit", HEAD, "--version", "1.2.0"]):
+            with self.subTest(args), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as stop:
+                    self.run_check(*args)
+                self.assertEqual(stop.exception.code, 2)
+        self.assertEqual(self.site.calls, [])
+
+    def clock(self) -> tuple[list[float], mock.Mock]:
+        """Đồng hồ giả cho --wait-minutes: time.sleep chỉ cộng giờ, không đợi thật."""
+        now = [0.0]
+        monotonic = mock.patch.object(kiem.time, "monotonic", side_effect=lambda: now[0])
+        monotonic.start()
+        self.addCleanup(monotonic.stop)
+        sleep = mock.patch.object(kiem.time, "sleep", side_effect=lambda s: now.__setitem__(0, now[0] + s))
+        self.addCleanup(sleep.stop)
+        return now, sleep.start()
+
+    def test_waits_for_the_upgrade_after_a_release(self) -> None:
+        # nâng tay: lúc đầu bản cũ, giữa chừng Signet dừng (không gọi được, đứt giữa thân trả lời, rồi 502 của proxy),
+        # sau đó lên bản mới
+        status = f"{BASE}/api/status"
+        self.site.status["version"] = "1.1.0"
+        steps = [lambda: self.site.unreachable.add(status),
+                 lambda: (self.site.unreachable.clear(), self.site.cut.add(status)),
+                 lambda: (self.site.cut.clear(), self.site.replies.update({status: kiem.Reply(502, {}, b"")})),
+                 lambda: (self.site.replies.clear(), self.site.status.update(version="1.2.0"))]
+        _, slept = self.clock()
+        slept.side_effect = lambda s: steps.pop(0)()
+        code, out = self.run_check("--version", "1.2.0", "--wait-minutes", "60")
+        self.assertEqual(code, 0, out)
+        self.assertEqual([c.args for c in slept.call_args_list], [(30,)] * 4)
+        self.assertEqual(re.findall(r"… bản online đang chạy (\S+),", out), ["1.1.0", "None", "None", "None"])
+        self.assertIn("✓ /api/status: status ok, bản 1.2.0", out)
+
+    def test_wait_for_a_dev_build_uses_the_commits(self) -> None:
+        self.site.status["version"] = "88a3417"
+        _, slept = self.clock()
+        slept.side_effect = lambda s: self.site.status.update(version="0.1.0-329-g2e1ba0c")
+        code, out = self.run_check("--commit", HEAD, "--wait-minutes", "20")
+        self.assertEqual((code, slept.call_count), (0, 1), out)
+
+    def test_wait_gives_up_and_the_status_check_fails(self) -> None:
+        self.site.status["version"] = "1.1.0"
+        _, slept = self.clock()
+        code, out = self.run_check("--version", "1.2.0")       # lịch, chạy tay: không đợi
+        self.assertEqual((code, slept.call_count), (1, 0), out)
+        code, out = self.run_check("--version", "1.2.0", "--wait-minutes", "1")
+        self.assertEqual((code, slept.call_count), (1, 2), out)     # hỏi lúc 0, 30, 60 giây
+        self.assertIn("… đợi hết 1 phút, bản online vẫn chạy 1.1.0", out)
+        self.assertIn("  - /api/status: chạy bản 1.1.0, bản phát hành mới nhất là 1.2.0", out)
+
+    def test_wait_needs_a_target_and_a_non_negative_time(self) -> None:
+        for args in (["--wait-minutes", "5"], ["--version", "1.2.0", "--wait-minutes", "-1"]):
             with self.subTest(args), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit) as stop:
                     self.run_check(*args)
@@ -282,8 +339,21 @@ class WorkflowTest(unittest.TestCase):
         self.assertNotRegex(self.text, r"(?m)^  release:")
 
     def test_checks_the_latest_release_tag(self) -> None:
-        self.assertIn('python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}"', self.text)
+        self.assertIn('python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}" --wait-minutes'
+                      ' "$WAIT_MINUTES"', self.text)
         self.assertIn("permissions:\n  contents: read", self.text)
+
+    def test_waits_for_the_upgrade_only_right_after_a_release(self) -> None:
+        # lượt sau Release đợi bản online nâng tay; lịch, chạy tay kiểm ngay. Job phải sống lâu hơn lúc đợi
+        job = self.text[self.text.index("\n  kiem:\n"):self.text.index("\n  kiem-dev:\n")]
+        after = r"\$\{\{ github\.event_name == 'workflow_run' && (\d+) \|\| (\d+) \}\}"
+        wait = re.search(rf"WAIT_MINUTES: {after}", job)
+        timeout = re.search(rf"timeout-minutes: {after}", job)
+        self.assertIsNotNone(wait, job)
+        self.assertIsNotNone(timeout, job)
+        self.assertEqual(wait[2], "0")
+        self.assertGreaterEqual(int(timeout[1]), int(wait[1]) + 10)
+        self.assertEqual(timeout[2], "10")
 
     def test_dev_job_checks_recent_develop_commits(self) -> None:
         job = self.text[self.text.index("\n  kiem-dev:\n"):]

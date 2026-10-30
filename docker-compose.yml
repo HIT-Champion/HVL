@@ -26,6 +26,8 @@
 #   profile tunnel — Cloudflare Tunnel ra Internet (tùy chọn, MOC_EXTRA_PROFILES=tunnel; docs/trien-khai.md)
 #   profile mail   — Mailpit, hộp thư thử cho thông báo email (chỉ để demo, MOC_EXTRA_PROFILES=mail)
 #   profile logs   — log tập trung Vector + Parseable (tắt mặc định; make logs-up; docs/van-hanh.md mục Log tập trung)
+#   profile trace  — truy vết phân tán Jaeger (tắt mặc định; MOC_EXTRA_PROFILES=trace, MOC_TRACE_RATIO; docs/van-hanh.md
+#                    mục Truy vết)
 #
 #   make up        # = docker compose --profile core --profile app up -d
 # ---------------------------------------------------------------------------
@@ -162,6 +164,8 @@ services:
       # F3.15: On chặn | DetectionOnly chỉ ghi nhật ký | Off; số worker (mỗi worker nạp một bộ luật WAF)
       MOC_WAF: ${MOC_WAF:-On}
       MOC_APISIX_WORKERS: ${MOC_APISIX_WORKERS:-4}
+      # #364: tỉ lệ yêu cầu được truy vết (0–1); 0 thì không ghi span nào. Gửi tới Jaeger của profile trace
+      MOC_TRACE_RATIO: ${MOC_TRACE_RATIO:-0}
     volumes:
       - ./platform/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./platform/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
@@ -308,6 +312,9 @@ services:
       MEILI_ENV: production
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?}
       MEILI_NO_ANALYTICS: "true"
+      # mỗi dòng nhật ký một đối tượng JSON: lời lỗi nhiều dòng không tách thành nhiều dòng log, Vector che được theo
+      # khóa (log tập trung F3.14, platform/logs/vector.yaml)
+      MEILI_EXPERIMENTAL_LOGS_MODE: json
     volumes:
       - meili_data:/meili_data
 
@@ -338,6 +345,12 @@ services:
       # tùy chọn (thông báo đa kênh của svc-workflow): rỗng thì không nạp
       MOC_SMTP_PASSWORD: ${MOC_SMTP_PASSWORD:-}
       MOC_NOTIFY_WEBHOOK_URL: ${MOC_NOTIFY_WEBHOOK_URL:-}
+      MOC_SMS_GATEWAY_PASSWORD: ${MOC_SMS_GATEWAY_PASSWORD:-}
+      MOC_ZALO_BOT_TOKEN: ${MOC_ZALO_BOT_TOKEN:-}
+      # tùy chọn (#284): token Alertmanager gọi svc-workflow; bản cài cũ chưa có thì tắt cảnh báo ra chuông
+      MOC_ALERT_TOKEN: ${MOC_ALERT_TOKEN:-}
+      # tùy chọn (#430): khóa API ngoài viết câu trả lời của trợ lý hỏi đáp (svc-files, MOC_ASK_API=openai)
+      MOC_ASK_API_KEY: ${MOC_ASK_API_KEY:-}
     volumes:
       - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
@@ -368,6 +381,8 @@ services:
       MOC_RESTRICTED_MAX_PAGES: ${MOC_RESTRICTED_MAX_PAGES:-500}
       # in vào mã QR của văn bản đi phát hành: <MOC_PUBLIC_URL>/xac-thuc/<mã>
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      # #364: > 0 thì ghi span của yêu cầu APISIX đã chọn, gửi Jaeger (profile trace)
+      MOC_TRACE_RATIO: ${MOC_TRACE_RATIO:-0}
       # F2.12 — neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi
       MOC_AUDIT_ANCHOR_INTERVAL_S: ${MOC_AUDIT_ANCHOR_INTERVAL_S:-600}
       MOC_AUDIT_ANCHOR_RETENTION_DAYS: ${MOC_AUDIT_ANCHOR_RETENTION_DAYS:-3650}
@@ -395,6 +410,10 @@ services:
       MOC_ASK_MODEL: ${MOC_ASK_MODEL:-}
       MOC_ASK_DEADLINE_S: ${MOC_ASK_DEADLINE_S:-50}
       MOC_ASK_MODEL_TIMEOUT_S: ${MOC_ASK_MODEL_TIMEOUT_S:-40}
+      # #430 — openai: viết câu trả lời qua API ngoài chuẩn OpenAI ở MOC_ASK_API_URL, tên mô hình ở MOC_ASK_MODEL;
+      # khóa MOC_ASK_API_KEY đến từ két, không ở đây. Nhúng, trích yếu vẫn ở Ollama. Mặc định ollama
+      MOC_ASK_API: ${MOC_ASK_API:-ollama}
+      MOC_ASK_API_URL: ${MOC_ASK_API_URL:-}
       # F4.5 — ký số PAdES bản phát hành văn bản đi bằng khóa Transit của đơn vị, chứng thư do CA nội bộ trong két
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
@@ -410,6 +429,10 @@ services:
       MOC_IMPORT_STORE_MAX_MB: ${MOC_IMPORT_STORE_MAX_MB:-200}
     volumes:
       - openbao_svc_files:/run/openbao:ro
+      # #424 — bản chụp nguồn dữ liệu công khai (manifest, SHA-256): /api/status báo nguồn gốc, tuổi dữ liệu
+      - ./seed/du-lieu-mo:/srv/du-lieu-mo:ro
+      # #423 — trợ lý hỏi đáp trả lời câu hỏi cách dùng từ hướng dẫn sử dụng (MOC_ASK_GUIDE_DIR, mặc định thư mục này)
+      - ./docs/huong-dan:/app/huong-dan:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
     # không xuống đĩa. Đủ cho vài lượt tải song song cỡ MOC_FILES_MAX_MB.
     tmpfs:
@@ -428,7 +451,7 @@ services:
     build: {context: ./services/svc-workflow, additional_contexts: {schemas: ./schemas}}
     image: moc/svc-workflow:${MOC_VERSION:-dev}
     profiles: [core]
-    networks: [moc, secrets, iot]
+    networks: [moc, secrets, iot, alerts]
     environment:
       # F3.2 — khóa Hasura, khóa Actions, mật khẩu Flowable, khóa Centrifugo, client secret lấy từ két (AppRole)
       MOC_OPENBAO_ADDR: http://openbao:8200
@@ -437,6 +460,8 @@ services:
       # Action, vòng nền của Văn phòng (docs/architecture.md §4.7); dùng để kiểm lõi đứng được một mình
       MOC_OFFICE_ENABLED: ${MOC_OFFICE_ENABLED:-true}
       MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
+      # #364: > 0 thì ghi span của Action mà APISIX đã chọn (Hasura chuyển tiếp traceparent), gửi Jaeger
+      MOC_TRACE_RATIO: ${MOC_TRACE_RATIO:-0}
       # F3.10 — context broker NGSI-LD (profile iot); chưa bật profile thì chỉ ghi nhật ký một lần
       MOC_NGSI_URL: http://scorpio:9090
       MOC_OT_THRESHOLD: ${MOC_OT_THRESHOLD:-35}
@@ -452,11 +477,14 @@ services:
       MOC_ASSIGNER_ID: ${MOC_ASSIGNER_ID:-moc-assigner}
       # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật (cú pháp ở .env.example); để trống thì như mặc định
       MOC_HOLIDAYS: ${MOC_HOLIDAYS:-01-01,04-30,05-01,09-02}
+      # lịch nghỉ chính thức (nguồn công khai B, #427): seed/du-lieu-mo/ngay-nghi-le gắn ở volumes; rỗng thì tắt
+      MOC_HOLIDAYS_FILE: ${MOC_HOLIDAYS_FILE-/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
-      # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP) và webhook (Mattermost, Slack, ntfy) qua hộp thư đi
-      # core.notification_deliveries. MOC_SMTP_HOST và MOC_NOTIFY_WEBHOOK_URL đều rỗng (mặc định) thì tắt hẳn. Mật
-      # khẩu SMTP và URL webhook lấy từ két; liên kết trong thư: <MOC_PUBLIC_URL>/van-ban/<id>
+      # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP), webhook (Mattermost, Slack, ntfy), SMS, Zalo qua
+      # hộp thư đi core.notification_deliveries. MOC_SMTP_HOST, MOC_NOTIFY_WEBHOOK_URL, MOC_SMS_GATEWAY_URL,
+      # MOC_ZALO_BOT_TOKEN đều rỗng (mặc định) thì tắt hẳn. Mật khẩu SMTP, URL webhook, mật khẩu cổng SMS, token bot
+      # Zalo lấy từ két; liên kết trong thư: <MOC_PUBLIC_URL>/van-ban/<id>
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
       MOC_SMTP_HOST: ${MOC_SMTP_HOST:-}
       MOC_SMTP_PORT: ${MOC_SMTP_PORT:-}
@@ -466,9 +494,15 @@ services:
       MOC_NOTIFY_WEBHOOK_FORMAT: ${MOC_NOTIFY_WEBHOOK_FORMAT:-json}
       MOC_NOTIFY_EMAIL_KINDS: ${MOC_NOTIFY_EMAIL_KINDS:-}
       MOC_NOTIFY_WEBHOOK_KINDS: ${MOC_NOTIFY_WEBHOOK_KINDS:-}
+      MOC_SMS_GATEWAY_URL: ${MOC_SMS_GATEWAY_URL:-}
+      MOC_SMS_GATEWAY_USER: ${MOC_SMS_GATEWAY_USER:-}
+      MOC_ZALO_BOT_URL: ${MOC_ZALO_BOT_URL:-}
+      MOC_NOTIFY_SMS_KINDS: ${MOC_NOTIFY_SMS_KINDS:-}
+      MOC_NOTIFY_ZALO_KINDS: ${MOC_NOTIFY_ZALO_KINDS:-}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
       - ./services/svc-workflow/processes:/app/processes:ro
+      - ./seed/du-lieu-mo/ngay-nghi-le:/app/du-lieu-mo/ngay-nghi-le:ro
       - openbao_svc_workflow:/run/openbao:ro
     depends_on:
       # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới
@@ -528,6 +562,7 @@ services:
     <<: *common
     image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     profiles: [core]
+    networks: [moc, alerts]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -544,6 +579,36 @@ services:
       retries: 12
     depends_on:
       apisix: {condition: service_started}
+
+  # Alertmanager (Apache-2.0, #284): nhận cảnh báo của Prometheus, gọi svc-workflow POST /ops/alerts → thông báo
+  # ops.alert cho quản trị đơn vị. Không mở cổng ra ngoài, không giữ trạng thái: nhật ký gửi trên tmpfs, mất khi khởi
+  # động lại thì lần gửi lại không sinh thông báo thứ hai (svc-workflow chống trùng). Token chung với svc-workflow
+  # (két nạp cho svc-workflow); alertmanager.sh chép vào tệp cho credentials_file, thiếu thì chạy cấu hình không gửi.
+  # API 9093 không cần đăng nhập (đẩy cảnh báo, tạo silence): chỉ ở mạng alerts, dịch vụ khác của mạng moc không tới
+  alertmanager:
+    <<: *common
+    image: prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    profiles: [core]
+    networks: [alerts]
+    entrypoint: ["sh", "/etc/alertmanager/alertmanager.sh"]
+    environment:
+      MOC_ALERT_TOKEN: ${MOC_ALERT_TOKEN:-}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /alertmanager:size=16m
+      - /tmp:size=1m
+    mem_limit: 64m
+    volumes:
+      - ./platform/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./platform/monitoring/alertmanager-khong-gui.yml:/etc/alertmanager/alertmanager-khong-gui.yml:ro
+      - ./platform/monitoring/alertmanager.sh:/etc/alertmanager/alertmanager.sh:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   # Grafana (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản; Signet chỉ nạp cấu hình qua tệp
   grafana:
@@ -566,7 +631,11 @@ services:
       GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/cong-api.json
     mem_limit: 512m
-    # không giữ trạng thái: không tài khoản, bảng điều khiển nạp từ tệp — dựng lại container là như cũ
+    # không giữ trạng thái: không tài khoản, bảng điều khiển nạp từ tệp — dựng lại container là như cũ. CSDL SQLite
+    # của Grafana để trong RAM: mỗi lần dựng lại chạy ~800 migration, đĩa đồng bộ chậm (WSL2) mất 3 phút, quá hạn
+    # healthcheck (#417)
+    tmpfs:
+      - /var/lib/grafana:size=64m
     volumes:
       - ./platform/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./platform/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
@@ -581,12 +650,31 @@ services:
     depends_on:
       prometheus: {condition: service_healthy}
 
+  # ---- Truy vết phân tán (#364), profile trace — tắt mặc định (docs/van-hanh.md mục Truy vết) -----------------------
+  # Jaeger (Apache-2.0) nhận span OTLP/HTTP ở cổng 4318, chỉ trong mạng moc: APISIX chọn MOC_TRACE_RATIO yêu cầu,
+  # svc-files và svc-workflow ghi tiếp theo traceparent APISIX gửi. Giữ 10 000 trace mới nhất trong RAM, mất khi khởi
+  # động lại (platform/trace/jaeger.yaml). Giao diện chỉ nghe 127.0.0.1 trên máy chủ, không tài khoản như Grafana: xem
+  # từ xa qua đường hầm SSH. Image distroless, không có shell nên không có healthcheck
+  jaeger:
+    <<: *common
+    image: jaegertracing/jaeger:2.22.0@sha256:836b967b5abcf1f7758066aa6b348619267a2f1459f72d472840570f9bd88a17
+    profiles: [trace]
+    command: ["--config", "/etc/jaeger/jaeger.yaml"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # đỉnh đo được 123 MiB khi đầy 10 000 trace
+    volumes:
+      - ./platform/trace/jaeger.yaml:/etc/jaeger/jaeger.yaml:ro
+    ports:
+      - 127.0.0.1:${MOC_TRACE_PORT:-16686}:16686
+
   # ---- Log tập trung (F3.14), profile logs — tắt mặc định (docs/van-hanh.md mục Log tập trung) ---------------------
-  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của 8 dịch vụ sang fluentd: apisix, app-office,
-  # app-ca-nhan, svc-files, svc-workflow tự che thông tin cá nhân (F4.4); hasura, keycloak, postgres do Vector che bằng
-  # luật riêng (#202). dockerd gửi dòng log vào Vector qua cổng 127.0.0.1. Không gắn docker.sock, không đọc
-  # /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ nào khác của Signet. Không dùng x-common (mạng
-  # moc); log của chính chúng ghi json-file, không gửi vào mình.
+  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của 9 dịch vụ sang fluentd: apisix, app-office,
+  # app-ca-nhan, svc-files, svc-workflow tự che thông tin cá nhân (F4.4); hasura, keycloak, postgres (#202), meilisearch
+  # (#395) do Vector che bằng luật riêng. dockerd gửi dòng log vào Vector qua cổng 127.0.0.1. Không gắn docker.sock,
+  # không đọc /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ nào khác của Signet. Không dùng
+  # x-common (mạng moc); log của chính chúng ghi json-file, không gửi vào mình.
   vector:
     image: timberio/vector:0.59.0-distroless-static@sha256:2138c72ef15477d3a60126da851407a198ec61d2ff4cd600a4e69db5f6a29ff7
     profiles: [logs]
@@ -776,6 +864,8 @@ services:
     volumes:
       - seaweedfs_data:/data/seaweedfs
       - openbao_data:/data/openbao            # F3.7: khóa transit bọc khóa của tệp văn bản hạn chế
+      - wiki_data:/data/wiki                  # #367: trang, tệp, tài khoản của wiki nội bộ (profile wiki)
+      - tu_dong_data:/data/tu-dong            # #366: flow, thông tin đăng nhập đã mã hóa của Node-RED (profile tu-dong)
 
   # ===========================================================================
   # Tầng 2 — ứng dụng
@@ -819,12 +909,73 @@ services:
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
 
+  # Wiki nội bộ ([H] Quản trị tri thức, #367), profile wiki — tắt mặc định (make wiki-up; docs/van-hanh.md mục Wiki
+  # nội bộ). DokuWiki (GPL-2.0, dịch vụ riêng nên không lây sang Signet): image chính thức ghim digest cộng nguyên bản
+  # plugin oauth, oauthgeneric (platform/wiki/Dockerfile), dưới /wiki/, đăng nhập Keycloak bằng client bí mật `wiki`.
+  # Mỗi đơn vị một không gian riêng theo danh sách quyền do `moc wiki sync` ghi. Chỉ ở mạng apps như ứng dụng: gọi
+  # Keycloak qua APISIX, không tới CSDL hay dịch vụ lõi nào. Trang, tệp, tài khoản là tệp trong volume wiki_data (moc
+  # backup chép)
+  wiki:
+    <<: *common
+    build: ./platform/wiki
+    image: moc/wiki:${MOC_VERSION:-dev}
+    profiles: [wiki]
+    networks: [apps]
+    user: "33:33"                         # www-data của image, cả Apache; không qua root
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # issue #367 đo container trống 37–70 MiB
+    environment:
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      MOC_REALM: ${MOC_REALM:-moc}
+      MOC_WIKI_CLIENT_SECRET: ${MOC_WIKI_CLIENT_SECRET:-}
+      PHP_TIMEZONE: Asia/Ho_Chi_Minh
+      # mặc định của image 256M mỗi yêu cầu bằng cả mem_limit; tệp tải lên tới đúng client_max_body_size của APISIX
+      PHP_MEMORYLIMIT: 128M
+      PHP_UPLOADLIMIT: 64M
+    volumes:
+      - wiki_data:/storage
+      # cấu hình của Signet đè lên tệp protected của image (nạp sau cùng, trang quản trị không ghi đè được)
+      - ./platform/wiki/signet.protected.php:/var/www/html/conf.core/docker.protected.php:ro
+
+  # Tự động hóa không sửa mã (#366), profile tu-dong — tắt mặc định (make tu-dong-up; docs/van-hanh.md mục Tự động hóa
+  # bằng Node-RED). Node-RED 5 (Apache-2.0) bản minimal ghim digest cộng openid-client (platform/tu-dong/Dockerfile),
+  # trình soạn dưới /tu-dong/, đăng nhập Keycloak, chỉ người có vai trò operator của client `tu-dong` (moc tu-dong).
+  # Một không gian flow chung cho người vận hành nền tảng, không tách theo đơn vị. Chỉ ở mạng apps: flow gọi lõi qua
+  # APISIX như ứng dụng, không tới CSDL hay dịch vụ lõi nào. Flow, thông tin đăng nhập của flow (mã hóa bằng
+  # MOC_TU_DONG_SECRET), phiên trình soạn là tệp trong volume tu_dong_data (moc backup chép)
+  tu-dong:
+    <<: *common
+    build: ./platform/tu-dong
+    image: moc/tu-dong:${MOC_VERSION:-dev}
+    profiles: [tu-dong]
+    networks: [apps]
+    read_only: true                       # chỉ ghi vào /data (volume) và /tmp
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # issue #366 đo container trống khoảng 75 MiB
+    environment:
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      MOC_REALM: ${MOC_REALM:-moc}
+      MOC_TU_DONG_SECRET: ${MOC_TU_DONG_SECRET:-}
+      TZ: Asia/Ho_Chi_Minh                # node inject hẹn giờ (07:00 hằng ngày) theo giờ Việt Nam
+    volumes:
+      - tu_dong_data:/data
+    healthcheck:
+      # healthcheck.js của image đọc /data/settings.js, bản này để settings ở /moc: hỏi thẳng trang đăng nhập
+      test: ["CMD", "node", "-e",
+             "fetch('http://127.0.0.1:1880/tu-dong/auth/login').then(r => process.exit(+!r.ok), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
 networks:
   moc:
     driver: bridge
-  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, ứng dụng cài bằng moc app
-  # install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra
-  # Internet
+  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, wiki, tu-dong, ứng dụng cài
+  # bằng moc app install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt.
+  # Không ra Internet
   apps:
     driver: bridge
     internal: true
@@ -847,6 +998,11 @@ networks:
     driver: bridge
     internal: true
   iot-db:
+    driver: bridge
+    internal: true
+  # #284: chỉ prometheus, alertmanager, svc-workflow. API của Alertmanager không đăng nhập: dịch vụ khác không tới được
+  # để đẩy cảnh báo giả hay tắt cảnh báo thật. Không ra Internet
+  alerts:
     driver: bridge
     internal: true
   # F4.1: svc-files ↔ Ollama (profile ai). Không ra Internet: mô hình không gửi được thân văn bản đi đâu
@@ -874,6 +1030,10 @@ volumes:
   ollama_models:
   # phông của theme đăng nhập (#305): keycloak-fonts chép lại mỗi lần docker compose up; không sao lưu
   keycloak_fonts:
+  # wiki nội bộ (#367, profile wiki): trang, tệp tải lên, tài khoản, danh sách quyền; moc backup chép
+  wiki_data:
+  # tự động hóa Node-RED (#366, profile tu-dong): flow, thông tin đăng nhập của flow đã mã hóa, phiên; moc backup chép
+  tu_dong_data:
 
 secrets:
   # F3.14: mật khẩu Parseable cho Vector. Biến chưa đặt (tắt logs) thì compose vẫn chạy như cũ

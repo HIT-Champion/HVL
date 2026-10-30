@@ -25,6 +25,7 @@ import {
   API, FORM_DON, FORM_DUYET, LOI, QUY_TRINH, docThan, docTraLoi, doiChieu, duong, ngayGio, sapXepDon, sapXepViec,
   soNgay, tenNguoi, trangThai, yeuCau,
 } from '../public/don.js'
+import { t } from '../public/i18n.js'
 
 const APP = new URL('../', import.meta.url)
 const ROOT = new URL('../../../', import.meta.url)
@@ -55,9 +56,9 @@ test('trả lời: 2xx là xong, 422 giữ lỗi từng trường, mã khác th�
   assert.deepEqual(bad.errors, { denNgay: 'x-moc-range' })
   assert.equal(bad.status, 422)
   for (const status of [401, 403, 404, 409, 429]) {
-    assert.deepEqual(docTraLoi(status, { error: 'x' }), { ok: false, status, message: LOI[status] })
+    assert.deepEqual(docTraLoi(status, { error: 'x' }), { ok: false, status, message: t(LOI[status]) })
   }
-  assert.equal(docTraLoi(503, null).message, LOI[500])
+  assert.equal(docTraLoi(503, null).message, t(LOI[500]))
   assert.match(docTraLoi(418, null).message, /HTTP 418/)
   // 422 không mang lỗi từng trường (cổng, WAF) thì không giả làm lỗi của form
   for (const body of [null, { errors: [] }, { errors: 'sai' }, { detail: 'x' }]) {
@@ -144,7 +145,7 @@ test('trang không có script nội tuyến, không innerHTML; form chỉ dựng
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/)
   assert.doesNotMatch(html, /\son[a-z]+=/i)
   for (const id of ['tieu-de-gui-don', 'tieu-de-don-cua-toi', 'tieu-de-viec-can-duyet']) {
-    assert.match(html, new RegExp(`<h1 id="${id}" tabindex="-1">`))
+    assert.match(html, new RegExp(`<h1 id="${id}" tabindex="-1"[^>]*>`))
   }
   assert.match(html, /role="status"/)
   assert.match(html, /role="alert"/)

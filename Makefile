@@ -28,21 +28,33 @@ ENV_FILE := .env
 # COMPOSE_PROFILES trong bản cài (make install)
 EXTRA_PROFILES := $(shell sed -n 's/^MOC_EXTRA_PROFILES=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr ',' ' ')
 COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXTRA_PROFILES),--profile $(p)))
-# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 8 dịch vụ sang
+# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 9 dịch vụ sang
 # fluentd → Vector. Chỉ nạp khi bật; tắt thì docker compose chỉ đọc docker-compose.yml như cũ. export: lệnh con
 # (demo.py, moc.py… gọi docker compose) cũng nạp tệp phủ
 # Ứng dụng cài bằng manifest (moc app install, docs/them-ung-dung.md): tệp phủ compose sinh trong .moc-apps/. Có thì
 # đi cùng mọi COMPOSE_FILE mà Makefile tự đặt (log tập trung); không đặt thì compose đọc COMPOSE_FILE trong .env
 APPS_COMPOSE_FILE := $(wildcard .moc-apps/docker-compose.apps.yml)
 APPS_SUFFIX := $(if $(APPS_COMPOSE_FILE),:$(APPS_COMPOSE_FILE))
-BASE_COMPOSE_FILE := docker-compose.yml$(APPS_SUFFIX)
-LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
-LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow hasura keycloak postgres
+# Mô hình chạy trên GPU NVIDIA (MOC_AI_DEVICE=gpu, docs/van-hanh.md mục Chạy mô hình bằng GPU): tệp phủ cấp GPU cho
+# ollama, đi cùng mọi COMPOSE_FILE mà Makefile đặt. cpu (mặc định) thì compose chỉ đọc docker-compose.yml như cũ
+AI_DEVICE := $(shell sed -n 's/^MOC_AI_DEVICE=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr -d ' ')
+GPU_SUFFIX := $(if $(filter gpu,$(AI_DEVICE)),:docker-compose.gpu.yml)
+BASE_COMPOSE_FILE := docker-compose.yml$(GPU_SUFFIX)$(APPS_SUFFIX)
+LOGS_COMPOSE_FILE := docker-compose.yml$(GPU_SUFFIX):platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
+LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow hasura keycloak postgres meilisearch
 # Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
 LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
 ifneq ($(LOGS_ON),)
 export COMPOSE_FILE := $(LOGS_COMPOSE_FILE)
+else ifneq ($(GPU_SUFFIX),)
+export COMPOSE_FILE := $(BASE_COMPOSE_FILE)
 endif
+# Wiki nội bộ (#367, profile wiki; docs/van-hanh.md mục Wiki nội bộ). Bật lâu dài (wiki trong MOC_EXTRA_PROFILES): make
+# up cũng thêm bí mật client vào .env cũ (wiki-env) và đồng bộ client Keycloak, quyền theo đơn vị (moc wiki sync)
+WIKI_ON := $(filter wiki,$(EXTRA_PROFILES))
+# Tự động hóa bằng Node-RED (#366, profile tu-dong; docs/van-hanh.md mục Tự động hóa bằng Node-RED). Bật lâu dài
+# (tu-dong trong MOC_EXTRA_PROFILES): make up cũng thêm khóa vào .env cũ (tu-dong-env) và đồng bộ client Keycloak
+TU_DONG_ON := $(filter tu-dong,$(EXTRA_PROFILES))
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
@@ -50,10 +62,12 @@ PREFIX ?= /opt/moc
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
         demo-che-pii do-che-pii \
-        demo-nap-lo nap-lo-mau \
+        demo-nap-lo nap-lo-mau du-lieu-mo du-lieu-mo-lay \
         demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
-        logs-env logs-up logs-down logs-tra demo-log-tap-trung \
+        logs-env logs-up logs-down logs-tra demo-log-tap-trung alert-env demo-canh-bao \
+        wiki-env wiki-up wiki-down demo-wiki \
+        tu-dong-env tu-dong-up tu-dong-down demo-tu-dong \
         reconcile \
         backup restore install uninstall license-check license-fix sbom license-audit lint release clean
 
@@ -72,18 +86,22 @@ env: ## Sinh .env từ .env.example, thay mọi change_me bằng chuỗi ngẫu 
 	  || { rm -f $(ENV_FILE).tmp; exit 1; }
 	@chmod 600 $(ENV_FILE)
 	@echo "Đã tạo $(ENV_FILE). Mật khẩu của các tài khoản mẫu là giá trị MOC_DEMO_PASSWORD trong tệp này."
+	@[ "$$(./scripts/co-gpu.sh)" != gpu ] || echo "Máy có GPU NVIDIA và Docker có runtime nvidia: đặt MOC_AI_DEVICE=gpu \
+	trong $(ENV_FILE) để Ollama chạy mô hình trên GPU (docs/van-hanh.md, mục Chạy mô hình bằng GPU)."
 
 # .env chép tay từ .env.example mà quên sửa: mật khẩu, khóa (cả khóa quản trị Hasura) ai đọc mã nguồn cũng biết
 env-ready: $(ENV_FILE)
 	@! grep -qE '^[A-Z0-9_]+=change_me' $(ENV_FILE) || { echo "$(ENV_FILE) còn giá trị mẫu change_me:" \
 	  $$(grep -oE '^[A-Z0-9_]+=change_me' $(ENV_FILE) | cut -d= -f1) \
 	  "— đổi thành chuỗi ngẫu nhiên, hoặc xóa $(ENV_FILE) rồi make env" >&2; exit 1; }
-	@# F3.15: MOC_WAF, MOC_APISIX_WORKERS sai thì APISIX dừng ngay lúc khởi động — kiểm trước bằng chính script
-	@# entrypoint của image (cùng nguồn với reconciler GitOps), với giá trị compose sẽ dùng: shell rồi .env, mặc định
+	@# F3.15: MOC_WAF, MOC_APISIX_WORKERS (#364: MOC_TRACE_RATIO) sai thì APISIX dừng ngay lúc khởi động — kiểm trước
+	@# bằng chính script entrypoint của image (cùng nguồn với reconciler GitOps), với giá trị compose sẽ dùng: shell rồi
+	@# .env, mặc định
 	@json=$$($(COMPOSE) config --format json apisix 2>/dev/null) || exit 0; \
 	  get() { printf '%s\n' "$$json" | sed -n "s/^ *\"$$1\": \"\(.*\)\",*\$$/\1/p"; }; \
-	  w=$$(get MOC_WAF); n=$$(get MOC_APISIX_WORKERS); \
+	  w=$$(get MOC_WAF); n=$$(get MOC_APISIX_WORKERS); r=$$(get MOC_TRACE_RATIO); \
 	  if [ -n "$$w" ]; then export MOC_WAF="$$w"; fi; if [ -n "$$n" ]; then export MOC_APISIX_WORKERS="$$n"; fi; \
+	  if [ -n "$$r" ]; then export MOC_TRACE_RATIO="$$r"; fi; \
 	  sh platform/apisix/kiem-moi-truong.sh --chi-kiem
 
 check: ## Kiểm tra tiền điều kiện của môi trường
@@ -97,10 +115,12 @@ check: ## Kiểm tra tiền điều kiện của môi trường
 build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
-up: env-ready $(if $(LOGS_ON),logs-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+up: env-ready alert-env $(if $(LOGS_ON),logs-env) $(if $(WIKI_ON),wiki-env) $(if $(TU_DONG_ON),tu-dong-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
 	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync --files)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	$(if $(LOGS_ON),@python3 scripts/log_tap_trung.py init)
+	$(if $(WIKI_ON),@python3 scripts/moc.py wiki sync)
+	$(if $(TU_DONG_ON),@python3 scripts/moc.py tu-dong sync)
 	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync)
 	@echo "Signet đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
@@ -111,16 +131,25 @@ ai-model: $(ENV_FILE) ## Tải mô hình sinh MOC_AI_MODEL (mặc định qwen3:
 	@$(COMPOSE) --profile ai-pull run --rm ollama-pull
 
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down
+	@$(COMPOSE) --profile iot --profile iot-sim --profile tu-dong \
+	  --profile ai --profile ai-pull --profile logs --profile wiki down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
 	@read -p "Xóa toàn bộ dữ liệu của Signet trên máy này? [y/N] " a && [ "$$a" = y ]
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down -v
+	@$(COMPOSE) --profile iot --profile iot-sim --profile tu-dong \
+	  --profile ai --profile ai-pull --profile logs --profile wiki down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
 logs: ## Theo dõi nhật ký của mọi dịch vụ
 	@$(COMPOSE) logs -f --tail=100
+
+alert-env: $(ENV_FILE)
+	@# .env sinh trước #284 thiếu token Alertmanager → svc-workflow: sinh như make env, không in giá trị. Dòng có mà
+	@# rỗng là đã chọn tắt cảnh báo ra chuông: giữ nguyên
+	@grep -q '^MOC_ALERT_TOKEN=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Cảnh báo ra chuông (#284), make up thêm\nMOC_ALERT_TOKEN=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) && echo "Đã thêm MOC_ALERT_TOKEN (ngẫu nhiên) vào $(ENV_FILE)."; }
 
 logs-env: $(ENV_FILE)
 	@# .env sinh trước F3.14 thiếu mật khẩu: sinh đúng như make env (scripts/gen-env.sh), không in giá trị
@@ -130,13 +159,13 @@ logs-env: $(ENV_FILE)
 	@sed -n 's/^MOC_LOGS_PASSWORD=//p' $(ENV_FILE) | tail -n 1 | grep -q . || { echo "MOC_LOGS_PASSWORD trong" \
 	  "$(ENV_FILE) rỗng: Parseable không khởi động với mật khẩu rỗng — đặt một chuỗi ngẫu nhiên" >&2; exit 1; }
 
-logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; 8 dịch vụ (LOGGED_SERVICES) gửi log qua driver fluentd (tạo lại 8 container: CSDL, Hasura, Keycloak gián đoạn vài giây). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
+logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; 9 dịch vụ (LOGGED_SERVICES) gửi log qua driver fluentd (tạo lại 9 container: CSDL, Hasura, Keycloak, tìm kiếm gián đoạn vài giây). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
 	@COMPOSE_FILE=$(LOGS_COMPOSE_FILE) $(COMPOSE) --profile logs up -d --wait vector parseable $(LOGGED_SERVICES)
 	@python3 scripts/log_tap_trung.py init
-	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 8 dịch vụ về json-file" \
+	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 9 dịch vụ về json-file" \
 	  "(Vector, Parseable vẫn chạy mà không nhận gì) — bật lâu dài thì thêm logs vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
 
-logs-down: env-ready ## Tắt log tập trung: 8 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
+logs-down: env-ready ## Tắt log tập trung: 9 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
 	@! echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || { echo "Bỏ logs khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
 	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
 	@COMPOSE_FILE=$(BASE_COMPOSE_FILE) $(COMPOSE) up -d --wait --no-deps $(LOGGED_SERVICES)
@@ -147,6 +176,48 @@ logs-tra: $(ENV_FILE) ## Tra log tập trung theo mã yêu cầu (header X-Reque
 
 demo-log-tap-trung: $(ENV_FILE) ## Màn log tập trung (F3.14): một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → svc-files; Parseable trả dòng của cả ba cùng mã, sổ kiểm toán cùng mã; không lộ token; docker logs vẫn đọc được
 	@python3 scripts/demo.py log-tap-trung
+
+wiki-env: $(ENV_FILE)
+	@# .env sinh trước #367 thiếu bí mật client: sinh đúng như make env (scripts/gen-env.sh), không in giá trị
+	@grep -q '^MOC_WIKI_CLIENT_SECRET=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Wiki nội bộ (#367), make up / make wiki-up thêm\nMOC_WIKI_CLIENT_SECRET=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) \
+	  && echo "Đã thêm MOC_WIKI_CLIENT_SECRET (ngẫu nhiên) vào $(ENV_FILE)."; }
+
+wiki-up: env-ready wiki-env ## Bật wiki nội bộ (#367, DokuWiki ở /wiki/): đăng nhập Keycloak, mỗi đơn vị một không gian riêng; tạo client Keycloak wiki, ghi quyền theo đơn vị (chạy lại sau khi thêm đơn vị). Giữ qua make up: thêm wiki vào MOC_EXTRA_PROFILES
+	@$(COMPOSE) --profile wiki up -d --build --wait wiki
+	@python3 scripts/moc.py wiki sync
+	@echo " $(EXTRA_PROFILES) " | grep -q ' wiki ' || echo "Lưu ý: make down tắt wiki, make up sau đó không bật" \
+	  "lại — bật lâu dài thì thêm wiki vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
+
+wiki-down: env-ready ## Tắt wiki nội bộ: dừng, xóa container; giữ trang, tệp đã lưu (volume wiki_data — make reset mới xóa)
+	@! echo " $(EXTRA_PROFILES) " | grep -q ' wiki ' || { echo "Bỏ wiki khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
+	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
+	@$(COMPOSE) --profile wiki rm -sf wiki
+
+tu-dong-env: $(ENV_FILE)
+	@# .env sinh trước #366 thiếu khóa mã hóa thông tin đăng nhập của flow: sinh như make env, không in giá trị
+	@grep -q '^MOC_TU_DONG_SECRET=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Tự động hóa Node-RED (#366), make up / make tu-dong-up thêm\nMOC_TU_DONG_SECRET=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) \
+	  && echo "Đã thêm MOC_TU_DONG_SECRET (ngẫu nhiên) vào $(ENV_FILE)."; }
+
+tu-dong-up: env-ready tu-dong-env ## Bật tự động hóa Node-RED (#366, trình soạn ở /tu-dong/): đăng nhập Keycloak, chỉ vai trò operator; tạo client Keycloak tu-dong. Cấp vai trò: python3 scripts/moc.py tu-dong operator add <tên>. Giữ qua make up: thêm tu-dong vào MOC_EXTRA_PROFILES
+	@$(COMPOSE) --profile tu-dong up -d --build --wait tu-dong
+	@python3 scripts/moc.py tu-dong sync
+	@echo " $(EXTRA_PROFILES) " | grep -q ' tu-dong ' || echo "Lưu ý: make down tắt Node-RED, make up sau đó không" \
+	  "bật lại — bật lâu dài thì thêm tu-dong vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
+
+tu-dong-down: env-ready ## Tắt tự động hóa Node-RED: dừng, xóa container; giữ flow đã lưu (volume tu_dong_data — make reset mới xóa)
+	@! echo " $(EXTRA_PROFILES) " | grep -q ' tu-dong ' || { echo "Bỏ tu-dong khỏi MOC_EXTRA_PROFILES trong" \
+	  "$(ENV_FILE) trước, không thì make up lần sau lại bật" >&2; exit 1; }
+	@$(COMPOSE) --profile tu-dong rm -sf tu-dong
+
+demo-tu-dong: $(ENV_FILE) ## Màn tự động hóa (#366, cần make tu-dong-up): chưa đăng nhập, không có vai trò operator thì không vào được trình soạn; người vận hành đăng nhập Keycloak, triển khai flow qua cổng (WAF bật); không node exec, không cài node từ npm; robot của đơn vị, hai flow mẫu (Hỏa tốc báo lãnh đạo, văn bản sắp hạn)
+	@python3 scripts/demo_tu_dong.py
+
+demo-wiki: $(ENV_FILE) ## Màn wiki nội bộ (#367, cần make wiki-up): người phòng CNTT viết trang trong không gian đơn vị mình; văn thư phòng KT và khách chưa đăng nhập không đọc được; tài khoản đến từ Keycloak, không mật khẩu riêng
+	@python3 scripts/demo_wiki.py
 
 ps: ## Liệt kê trạng thái các dịch vụ
 	@$(COMPOSE) ps
@@ -182,6 +253,9 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
+
+demo-canh-bao: $(ENV_FILE) ## Màn cảnh báo vận hành (F3.13): cảnh báo giả qua Alertmanager thành thông báo ở chuông của quản trị mọi đơn vị, hết cảnh báo thêm một thông báo, token sai bị từ chối (docs/demo-script.md)
+	@python3 scripts/demo.py canh-bao
 
 demo-kiem-dich: $(ENV_FILE) ## Màn demo (iv) kiểm dịch: tệp EICAR bị chặn ở cửa ngõ, lần chặn vào sổ kiểm toán (docs/demo-script.md)
 	@python3 scripts/demo.py kiem-dich
@@ -219,7 +293,7 @@ van-ban-mau: $(ENV_FILE) ## Sinh lại văn bản đến mẫu seed/van-ban-den 
 demo-hoi-dap: $(ENV_FILE) ## Màn hỏi đáp trên kho văn bản (F4.2): trợ lý trả câu trích kèm số ký hiệu, trang; chỉ trong văn bản người hỏi được xem; văn bản hạn chế không vào chỉ mục; sổ kiểm toán không có câu hỏi (docs/demo-script.md)
 	@python3 scripts/demo.py hoi-dap
 
-do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/hoi-dap/cau-hoi.json: recall@3, từ chối đúng, thời gian; có profile ai thì đo cả câu trả lời của mô hình (thoát 1 khi có nguồn bị cấm hoặc recall@3 dưới ngưỡng)
+do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/hoi-dap/cau-hoi.json: recall@3, từ chối đúng, đường theo loại câu, thời gian; có profile ai thì đo cả câu trả lời của mô hình (thoát 1 khi có nguồn bị cấm, recall@3 dưới ngưỡng hoặc câu đi sai đường)
 	@python3 scripts/demo.py do-hoi-dap
 
 hoi-dap-mau: $(ENV_FILE) ## Sinh lại kho văn bản mẫu nhiều trang seed/hoi-dap (PDF, cau-hoi.json) trong container svc-files (cần make up)
@@ -240,12 +314,18 @@ demo-ky-so: $(ENV_FILE) ## Màn ký số (F4.5, chỉ minh họa): văn bản đ
 demo-che-pii: $(ENV_FILE) ## Màn che thông tin cá nhân (F4.4): đơn giả lập có CCCD, số điện thoại, email, STK — tìm và trích nguyên văn vẫn có số thật; nhật ký apisix, app-office, svc-files, svc-workflow không còn giá trị nào, không còn chuỗi truy vấn; mô hình chỉ thấy nhãn (docs/demo-script.md)
 	@python3 scripts/demo.py che-pii
 
-do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số chỗ bị che trên kho mẫu seed/ (phải 0), 15 đột biến mã của pii.py (phải bị test bắt hết); thoát 1 khi che nhầm hoặc có đột biến sống sót
+do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số chỗ bị che trên kho mẫu seed/ (phải 0), 18 đột biến mã của pii.py (phải bị test bắt hết); thoát 1 khi che nhầm hoặc có đột biến sống sót
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s \
 	  tests/test_pii_corpus.py tests/test_pii_mutation.py
 
 demo-nap-lo: $(ENV_FILE) ## Màn nạp lô văn bản đến (cụm ⑤): 200 dòng + zip qua API, EICAR bị chặn, gửi lại không trùng
 	@python3 scripts/demo.py nap-lo
+
+du-lieu-mo: ## Kiểm bản chụp dữ liệu công khai seed/du-lieu-mo (SHA-256, tuổi dữ liệu; không cần Docker, Internet)
+	@python3 scripts/du_lieu_mo.py kiem
+
+du-lieu-mo-lay: ## Lấy mới bản chụp dữ liệu công khai từ nguồn (cần Internet; chỉ thay khi băm khớp, lỗi thì giữ bản cũ)
+	@python3 scripts/du_lieu_mo.py lay
 
 nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến mẫu, có dòng sai cố ý (không cần Docker)
 	@python3 scripts/nap_lo_mau.py

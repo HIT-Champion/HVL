@@ -466,14 +466,15 @@ def main(argv: list[str] | None = None) -> None:
     secrets = {"svc-files": ("SEAWEEDFS_S3_ACCESS_KEY", "SEAWEEDFS_S3_SECRET_KEY", "HASURA_ADMIN_SECRET",
                              "MEILI_MASTER_KEY"),
                "svc-workflow": ("HASURA_ADMIN_SECRET", "MOC_ACTION_SECRET", "FLOWABLE_ADMIN_PASSWORD",
-                                "CENTRIFUGO_API_KEY", "MOC_DIRECTORY_CLIENT_SECRET")}
+                                "CENTRIFUGO_API_KEY", "MOC_DIRECTORY_CLIENT_SECRET", "MOC_ALERT_TOKEN")}
     for service, names in secrets.items():
         # so băm giá trị chứ không so tên: bí mật không được nằm trong env dưới bất kỳ tên nào
         hashed = json.loads(compose("exec", "-T", service, "python", "-c",
                                     "import hashlib, json, os\n"
                                     "print(json.dumps({k: hashlib.sha256(v.encode()).hexdigest()"
                                     " for k, v in os.environ.items()}))"))
-        wanted = {hashlib.sha256(ENV[n].encode()).hexdigest(): n for n in names}
+        # MOC_ALERT_TOKEN (#284) tùy chọn: bản cài cũ có thể chưa có
+        wanted = {hashlib.sha256(ENV[n].encode()).hexdigest(): n for n in names if ENV.get(n)}
         leaked = sorted(f"{wanted[h]} (biến {k})" for k, h in hashed.items() if h in wanted)
         not leaked or fail(f"{service} còn nhận bí mật qua biến môi trường: {', '.join(leaked)}")
     ok("két đã mở khóa (static seal); svc-files, svc-workflow không có bí mật nào trong biến môi trường")
@@ -675,11 +676,11 @@ def main(argv: list[str] | None = None) -> None:
     final = staff.gql("""query ($id: uuid!) { office_documents_by_pk(id: $id) { status
         events(order_by: {id: asc}) { kind } assignments { role status } } }""", {"id": doc_id})["office_documents_by_pk"]
     kinds = [e["kind"] for e in final["events"]]
-    expected = ["office.document.registered", "office.document.directed", "office.document.assigned",
-                "office.document.processed"]
+    expected = ["office.document.received", "office.document.registered", "office.document.directed",
+                "office.document.assigned", "office.document.processed"]
     final["status"] == "done" or fail(f"văn bản chưa xong: {final['status']}")
     kinds == expected or fail(f"dòng thời gian sai: {kinds}")
-    ok("văn bản ở trạng thái done, dòng thời gian đủ 4 bước")
+    ok("văn bản ở trạng thái done, dòng thời gian đủ 5 bước, từ tiếp nhận")
 
     print("Cách ly")
     seen = other_tenant.gql("query ($id: uuid!) { office_documents_by_pk(id: $id) { id } }", {"id": doc_id})
@@ -921,6 +922,29 @@ def main(argv: list[str] | None = None) -> None:
         return compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
                        "-d", ENV.get("POSTGRES_DB", "moc"), "-c", query).decode().strip()
 
+    # Vừa khởi động lại thì vòng chỉ mục đoạn đồng bộ lại cả kho trước khi tới văn bản mới; kho lớn thì lượt đầu này
+    # vượt hạn chờ câu trích bên dưới (#360). Đợi /readyz của svc-files (cổng không mở ra máy chủ) báo "assist.index"
+    assist_info = (
+        "import json, urllib.error, urllib.request\n"
+        "try:\n"
+        "    raw = urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()\n"
+        "except urllib.error.HTTPError as exc:\n"
+        "    raw = exc.read()\n"
+        "print(json.dumps(json.loads(raw).get('assist')))\n"
+    )
+    started, assist = time.time(), None
+    while time.time() - started < 600:
+        try:
+            assist = json.loads(compose("exec", "-T", "svc-files", "python", "-c", assist_info))
+        except (subprocess.CalledProcessError, ValueError):
+            assist = None
+        if (assist or {}).get("index"):
+            break
+        time.sleep(5)
+    (assist or {}).get("index") \
+        or fail(f"sau {time.time() - started:.0f} giây chỉ mục đoạn của svc-files chưa đồng bộ xong lượt đầu: {assist}")
+    ok(f"chỉ mục đoạn đã đồng bộ cả kho (đợi {time.time() - started:.0f} giây; tìm theo nghĩa:"
+       f" {assist.get('semantic')}, đoạn chờ nhúng: {assist.get('embed_pending')})")
     audit_before = int(sql("select coalesce(max(id), 0) from core.audit_log") or 0)
     # Mỗi trang ≥ 40 ký tự không trắng, không thì bộ chia đoạn bỏ trang (assist/chunks.py MIN_CHARS); chỉ trang 2 có
     # dấu TRANG2 và hạn nộp (trang 1 không có từ nào gần giống, kể cả khi Meilisearch chịu gõ sai)
@@ -946,14 +970,22 @@ def main(argv: list[str] | None = None) -> None:
         or fail(f"sau {time.time() - started:.0f} giây trợ lý chưa trả câu trích ở trang 2 công văn hai trang: {got}")
     ok(f"lãnh đạo hỏi “{question}” → câu trích có 12/12/2026, nguồn [1] {first.get('symbol')} · tr. 2 (sau"
        f" {time.time() - started:.0f} giây, svc-files trả lời trong {got.get('duration_ms')} ms)")
-    # Câu chỉ có từ của riêng văn bản này: đơn vị khác không thấy gì, kể cả văn bản của mình có chữ "hạn", "ngày"
+    # Câu chỉ có từ của riêng văn bản này: đơn vị khác không thấy gì, kể cả văn bản của mình có chữ "hạn", "ngày".
+    # Chỉ tìm theo từ khóa (CI) thì không có nguồn nào. Tìm theo nghĩa (bản cài có mô hình nhúng) luôn trả vài đoạn gần
+    # nghĩa nhất trong văn bản người hỏi được xem (#360): khi đó chỉ đòi văn bản kia và chữ riêng của nó không có mặt
+    def withheld(got: dict, document_id: str, marker: str) -> bool:
+        texts = [s.get("excerpt") or "" for s in got["sources"]] + [(got.get("answer") or {}).get("text") or ""]
+        return not any(s.get("document_id") == document_id for s in got["sources"]) \
+            and not any(marker.casefold() in t.casefold() for t in texts) \
+            and (got.get("semantic") is True or got["status"] == "no_evidence" and got["sources"] == [])
+
     other = ask(other_tenant, f"TRANG2{tag} là gì?")
-    other["status"] == "no_evidence" and not any(s.get("document_id") == paged_id for s in other["sources"]) \
-        or fail(f"văn thư Khoa Kinh tế hỏi ra văn bản của Khoa CNTT: {other}")
+    withheld(other, paged_id, f"TRANG2{tag}") or fail(f"văn thư Khoa Kinh tế hỏi ra văn bản của Khoa CNTT: {other}")
     sealed_ask = ask(clerk, f"MATKIN{tag} là gì?")
-    sealed_ask["status"] == "no_evidence" and sealed_ask["sources"] == [] \
+    withheld(sealed_ask, secret_id, f"MATKIN{tag}") \
         or fail(f"hỏi nội dung văn bản hạn chế bằng chính người tạo vẫn có nguồn: {sealed_ask}")
-    ok("văn thư Khoa Kinh tế hỏi → no_evidence; nội dung văn bản hạn chế, hỏi bằng chính người tạo → no_evidence")
+    ok(f"văn thư Khoa Kinh tế hỏi → {other['status']}, không có văn bản Khoa CNTT; nội dung văn bản hạn chế, hỏi bằng"
+       f" chính người tạo → {sealed_ask['status']}, không có văn bản đó (tìm theo nghĩa: {sealed_ask.get('semantic')})")
     rows = [r.split("|", 3) for r in sql(
         "select actor_kind, actor_id, entity, diff::text from core.audit_log where action = 'assistant.answered'"
         f" and id > {audit_before} order by id").splitlines()]
@@ -1481,6 +1513,10 @@ def main(argv: list[str] | None = None) -> None:
     firing = sorted(r["name"] for r in rules if r.get("state") == "firing")
     ok(f"Prometheus nạp và tính được {len(rules)} luật cảnh báo (nhóm cong-api, thanh-phan, prometheus); đang bật:"
        f" {', '.join(firing) or 'không'}")
+    # #284: cảnh báo đang bật đi tiếp sang Alertmanager → svc-workflow (đường tới chuông: make demo-canh-bao)
+    managers = [a.get("url", "") for a in prometheus_api("alertmanagers").get("activeAlertmanagers", [])]
+    any("alertmanager:9093" in u for u in managers) or fail(f"Prometheus chưa nối Alertmanager: {managers}")
+    ok(f"Prometheus gửi cảnh báo tới Alertmanager ({', '.join(managers)})")
     # Prometheus thu /metrics của svc-files 15 giây một lần: mỗi thành phần khác `off` của /api/status có đúng một dòng
     # moc_component_up = 1. So với /api/status chứ không với một số cố định: smoke cũng chạy trên bản đang nâng cấp
     # (scripts/nang_cap.sh), cấu hình có thể khác. Ngay sau make up Prometheus có thể chưa thu lượt nào: chờ tới 60 giây

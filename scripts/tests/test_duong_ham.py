@@ -112,5 +112,72 @@ class KeycloakForwardedPortTest(unittest.TestCase):
             self.assertIn("plugin_config_id: cong-keycloak", route, route.splitlines()[0])
 
 
+# /proc/net/route của APISIX: eth0 ở mạng moc (172.18.0.0/16, route mặc định qua 172.18.0.1), eth1 ở mạng apps
+# (172.19.0.0/16, internal: không có route mặc định). Hex, byte thấp trước
+ROUTE_HEADER = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n"
+ROUTE_APPS = "eth1\t000013AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0\n"
+ROUTE_MOC = ("eth0\t00000000\t010012AC\t0003\t0\t0\t0\t00000000\t0\t0\t0\n"
+             "eth0\t000012AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0\n")
+
+
+class TrustedProxyAutoTest(unittest.TestCase):
+    """#211: MOC_TRUSTED_PROXY=auto → dải của mạng moc, đọc lúc APISIX khởi động; không bao giờ gồm mạng apps, nơi
+    container ứng dụng có thể gửi X-Forwarded-For giả."""
+
+    def run_entrypoint(self, routes: str, value: str | None, *args: str) -> subprocess.CompletedProcess[str]:
+        script = (ROOT / "platform" / "apisix" / "kiem-moi-truong.sh").read_text(encoding="utf-8")
+        self.assertIn("< /proc/net/route", script)
+        self.assertIn('\nexec /docker-entrypoint.sh "$@"\n', script)
+        with tempfile.TemporaryDirectory() as tmp:
+            table = pathlib.Path(tmp) / "route"
+            table.write_text(ROUTE_HEADER + routes, encoding="utf-8")
+            dry = script.replace("/proc/net/route", str(table)).replace(
+                'exec /docker-entrypoint.sh "$@"', 'echo "CHAY ${MOC_TRUSTED_PROXY-chua-dat}"')
+            env = {"PATH": "/usr/bin:/bin"} | ({} if value is None else {"MOC_TRUSTED_PROXY": value})
+            return subprocess.run(["sh", "-s", "--", *args], input=dry, capture_output=True, text=True, env=env)
+
+    def test_auto_trusts_the_network_with_the_default_route_only(self) -> None:
+        for routes in (ROUTE_APPS + ROUTE_MOC, ROUTE_MOC + ROUTE_APPS):
+            run = self.run_entrypoint(routes, "auto")
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout, "CHAY 172.18.0.0/16\n")
+            self.assertIn("MOC_TRUSTED_PROXY=auto → 172.18.0.0/16", run.stderr)
+
+    def test_auto_without_default_route_stops(self) -> None:
+        # không lùi về 172.16.0.0/12 hay giá trị nào khác: APISIX không khởi động, lỗi ở docker compose logs apisix
+        run = self.run_entrypoint(ROUTE_APPS, "auto")
+        self.assertEqual(run.returncode, 64)
+        self.assertNotIn("CHAY", run.stdout)
+        self.assertIn("MOC_TRUSTED_PROXY=auto", run.stderr)
+
+    def test_other_values_pass_unchanged(self) -> None:
+        for value, shown in (("172.16.0.0/12", "172.16.0.0/12"), ("127.0.0.1/32", "127.0.0.1/32"),
+                             (None, "chua-dat")):
+            run = self.run_entrypoint(ROUTE_MOC, value)
+            self.assertEqual((run.returncode, run.stdout), (0, f"CHAY {shown}\n"), run.stderr)
+
+    def test_check_only_on_the_host_does_not_read_routes(self) -> None:
+        # make up, reconciler GitOps chạy --chi-kiem trên máy chủ: route của máy chủ không phải route của container
+        run = self.run_entrypoint("", "auto", "--chi-kiem")
+        self.assertEqual((run.returncode, run.stdout, run.stderr), (0, "", ""))
+
+    def test_apps_network_is_internal_and_apisix_is_on_moc(self) -> None:
+        # điều kiện để mạng có route mặc định của APISIX đúng là mạng moc
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        self.assertIn("networks: [moc, apps]", service_block("apisix"))
+        self.assertRegex(compose, r"\n  apps:\n    driver: bridge\n    internal: true\n")
+        self.assertRegex(compose, r"\n  moc:\n    driver: bridge\n")
+
+    def test_env_example_and_ci_use_auto_behind_a_proxy(self) -> None:
+        env = (ROOT / (".e" + "nv.example")).read_text(encoding="utf-8")
+        self.assertIn("\nMOC_TRUSTED_PROXY=127.0.0.1/32\n", env)        # máy dev: không tin ai
+        self.assertIn("MOC_TRUSTED_PROXY=auto", env)
+        ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        self.assertIn("s#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=auto#", ci)
+        self.assertNotIn("172.16.0.0/12", ci)
+        guide = (ROOT / "docs" / "trien-khai.md").read_text(encoding="utf-8")
+        self.assertIn("s#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=auto#", guide)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -94,7 +94,7 @@ class Mau:
     """Một văn bản đến mẫu. Chữ in hoa như trên văn bản; nhãn (``*_label``) là điều văn thư nhập."""
 
     file: str
-    type_code: str | None             # nhãn; None: loại chưa có trong danh mục (Thông tư)
+    type_code: str | None             # nhãn; None: loại chưa có trong danh mục
     issuer: tuple[str, ...]           # dòng tên cơ quan (in hoa), trên cùng là cơ quan chủ quản nếu có
     issuer_label: str
     symbol: str
@@ -190,7 +190,7 @@ SAMPLES = (
               "III. TỔ CHỨC THỰC HIỆN",
               "Phòng Quản lý khoa học chủ trì, phối hợp với các đơn vị liên quan triển khai Kế hoạch này./."),
         signer=("KT. GIÁM ĐỐC", "PHÓ GIÁM ĐỐC"), receivers=("- UBND tỉnh (để b/c);", "- Lưu: VT, QLKH.")),
-    Mau("05-thong-tu.pdf", None, ("BỘ TÀI NGUYÊN MẪU",), "Bộ Tài nguyên Mẫu", "45/2026/TT-BTN", "Hà Nội",
+    Mau("05-thong-tu.pdf", "TT", ("BỘ TÀI NGUYÊN MẪU",), "Bộ Tài nguyên Mẫu", "45/2026/TT-BTN", "Hà Nội",
         date(2026, 9, 25), "Thông tư quy định kỹ thuật về số hóa tài liệu lưu trữ",
         title="THÔNG TƯ", trich_yeu="Quy định kỹ thuật về số hóa tài liệu lưu trữ",
         body=("Căn cứ Luật Lưu trữ;", "Theo đề nghị của Cục trưởng Cục Lưu trữ Mẫu;",

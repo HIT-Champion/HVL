@@ -24,6 +24,8 @@
    `moc tenant create` (tenants.py).
 4. Văn bản: chạy kịch bản nghiệp vụ qua API như người dùng thật (seed_documents.py) — không chèn thẳng
    vào CSDL, để quy trình trong Flowable khớp với dữ liệu.
+5. Văn bản từ nguồn dữ liệu công khai (#424): bản chụp seed/du-lieu-mo/ nạp qua API nạp lô như văn thư nạp tay
+   (du_lieu_mo.py nap), không cần Internet. Chạy lại không tạo trùng.
 """
 
 from __future__ import annotations
@@ -141,6 +143,7 @@ def main() -> None:
     seed_tenants()
     try:
         print("  " + realm_clients.describe(realm_clients.run(ENV)))
+        print("  " + realm_clients.describe_profile(realm_clients.run_profile(ENV)))
         seed_users()
         seed_organizations()
     except HTTPError as exc:
@@ -155,6 +158,9 @@ def main() -> None:
         wait_directory()
         import seed_documents
         seed_documents.run()
+        import du_lieu_mo
+        if du_lieu_mo.nap():
+            sys.exit("Nạp văn bản từ nguồn dữ liệu công khai lỗi (xem trên) — sửa rồi chạy lại make seed")
     print(f"Xong. Mở {PUBLIC_URL} — đăng nhập vanthu, truongkhoa, totruongdt, chuyenviendt, giamkhao… "
           "(mật khẩu: MOC_DEMO_PASSWORD trong .env)")
     print("Văn thư, lãnh đạo, tổ trưởng, quản trị còn phải nhập mã TOTP: make totp (bản cài: python3 scripts/totp.py) "

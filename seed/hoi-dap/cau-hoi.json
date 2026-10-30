@@ -82,6 +82,8 @@
     {
       "id": "q01",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Phải đăng ký tối thiểu bao nhiêu tín chỉ để được xét học bổng?",
       "expect": [
         {
@@ -97,6 +99,8 @@
     {
       "id": "q02",
       "user": "chuyenviendt",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Mức học bổng loại Xuất sắc là bao nhiêu?",
       "expect": [
         {
@@ -112,6 +116,8 @@
     {
       "id": "q03",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Học bổng được chuyển khoản trong bao lâu?",
       "expect": [
         {
@@ -127,6 +133,8 @@
     {
       "id": "q04",
       "user": "totruongdt",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Kỳ thi kết thúc học phần học kỳ I diễn ra khi nào?",
       "expect": [
         {
@@ -142,6 +150,8 @@
     {
       "id": "q05",
       "user": "totruongdt",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Hạn nộp đề thi và đáp án là ngày nào?",
       "expect": [
         {
@@ -157,6 +167,8 @@
     {
       "id": "q06",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Nhập điểm lên hệ thống trong bao nhiêu ngày?",
       "expect": [
         {
@@ -172,6 +184,8 @@
     {
       "id": "q07",
       "user": "truongkhoa",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Phụ cấp lưu trú khi đi công tác là bao nhiêu?",
       "expect": [
         {
@@ -187,6 +201,8 @@
     {
       "id": "q08",
       "user": "truongkhoa",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Tiền thuê phòng nghỉ được thanh toán tối đa bao nhiêu?",
       "expect": [
         {
@@ -202,6 +218,8 @@
     {
       "id": "q09",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Hồ sơ thanh toán gửi trong bao lâu?",
       "expect": [
         {
@@ -217,6 +235,8 @@
     {
       "id": "q10",
       "user": "giangvienktpm",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Phòng máy mở cửa từ mấy giờ?",
       "expect": [
         {
@@ -232,6 +252,8 @@
     {
       "id": "q11",
       "user": "truongbmktpm",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Tự ý cài đặt phần mềm bị xử lý thế nào?",
       "expect": [
         {
@@ -247,6 +269,8 @@
     {
       "id": "q12",
       "user": "truongkhoa",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Cán bộ nghỉ Tết từ ngày nào?",
       "expect": [
         {
@@ -262,6 +286,8 @@
     {
       "id": "q13",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Trực cơ quan dịp nghỉ Tết ở đâu?",
       "expect": [
         {
@@ -277,6 +303,8 @@
     {
       "id": "q14",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Điều kiện xét học bổng khuyến khích học tập là gì?",
       "expect": [
         {
@@ -292,6 +320,8 @@
     {
       "id": "q15",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Chuẩn đầu ra ngoại ngữ xét tốt nghiệp cần chứng chỉ gì?",
       "expect": [
         {
@@ -307,6 +337,8 @@
     {
       "id": "q16",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Khoa cử giảng viên nào tham dự hội thảo chuyển đổi số?",
       "expect": [
         {
@@ -320,14 +352,70 @@
       "evidence": "Phúc đáp Công văn số 47/KHCN của Phòng Khoa học và Hợp tác quốc tế, Khoa Công nghệ thông tin cử giảng viên Vũ Thị Mai, Bộ môn Kỹ thuật phần mềm, tham dự hội thảo và trình bày tham luận về ứng dụng nguồn mở trong quản lý văn bản."
     },
     {
+      "id": "c01",
+      "user": "vanthu",
+      "loai": "cong_khai",
+      "route": "van_ban",
+      "question": "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?",
+      "expect": [
+        {
+          "symbol": "06/2026/TT-BGDĐT",
+          "page": 18
+        }
+      ],
+      "keywords": [
+        "15 nguyện vọng"
+      ],
+      "evidence": "Thí sinh được đăng ký tối đa 15 nguyện vọng vào các chương trình đào tạo, các cơ sở giáo dục đại học khác nhau"
+    },
+    {
+      "id": "c02",
+      "user": "vanthu",
+      "loai": "noi_tiep",
+      "route": "van_ban",
+      "question": "Còn ngành đào tạo giáo viên thì sao?",
+      "expect": [
+        {
+          "symbol": "06/2026/TT-BGDĐT",
+          "page": 18
+        }
+      ],
+      "previous": "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?",
+      "keywords": [
+        "01 đến 05"
+      ],
+      "evidence": "Các chương trình đào tạo giáo viên chỉ xét tuyển thí sinh đăng ký ở các nguyện vọng có thứ tự từ 01 đến 05"
+    },
+    {
+      "id": "c03",
+      "user": "vanthu",
+      "loai": "cong_khai",
+      "route": "van_ban",
+      "question": "Thông tư số 10/2020/TT-BGDĐT hết hiệu lực từ ngày nào?",
+      "expect": [
+        {
+          "symbol": "58/2026/TT-BGDĐT",
+          "page": 5
+        }
+      ],
+      "keywords": [
+        "01 tháng 11 năm 2026"
+      ],
+      "evidence": "hết hiệu lực kể từ ngày 01 tháng 11 năm 2026"
+    },
+    {
       "id": "q17",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Thủ tục cấp hộ chiếu công vụ?",
       "expect": "none"
     },
     {
       "id": "q18",
       "user": "vanthu",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Phương án XANH LAM là gì?",
       "expect": "none",
       "forbid": [
@@ -337,11 +425,434 @@
     {
       "id": "q19",
       "user": "giangvienktpm",
+      "loai": "van_ban",
+      "route": "van_ban",
       "question": "Điều kiện xét học bổng khuyến khích học tập là gì?",
       "expect": "none",
       "forbid": [
         "15/QĐ-ĐHM",
         "88/CTSV"
+      ]
+    },
+    {
+      "id": "n01",
+      "user": "chuyenviendt",
+      "loai": "noi_tiep",
+      "route": "van_ban",
+      "question": "Thế còn loại Giỏi?",
+      "expect": [
+        {
+          "symbol": "15/QĐ-ĐHM",
+          "page": 2
+        }
+      ],
+      "previous": "Mức học bổng loại Xuất sắc là bao nhiêu?",
+      "keywords": [
+        "110%"
+      ],
+      "evidence": "Học bổng loại Giỏi bằng 110% mức học phí của học kỳ."
+    },
+    {
+      "id": "n02",
+      "user": "chuyenviendt",
+      "loai": "noi_tiep",
+      "route": "van_ban",
+      "question": "Còn loại Khá thì sao?",
+      "expect": [
+        {
+          "symbol": "15/QĐ-ĐHM",
+          "page": 2
+        }
+      ],
+      "previous": "Mức học bổng loại Xuất sắc là bao nhiêu?",
+      "keywords": [
+        "100%"
+      ],
+      "evidence": "Học bổng loại Khá bằng 100% mức học phí của học kỳ."
+    },
+    {
+      "id": "n03",
+      "user": "truongkhoa",
+      "loai": "noi_tiep",
+      "route": "van_ban",
+      "question": "Còn vé máy bay thì sao?",
+      "expect": [
+        {
+          "symbol": "31/HD-ĐHM",
+          "page": 2
+        }
+      ],
+      "previous": "Tiền thuê phòng nghỉ được thanh toán tối đa bao nhiêu?",
+      "keywords": [
+        "300 km"
+      ],
+      "evidence": "Vé máy bay hạng phổ thông chỉ thanh toán cho chuyến đi từ 300 km trở lên."
+    },
+    {
+      "id": "n04",
+      "user": "giangvienktpm",
+      "loai": "noi_tiep",
+      "route": "van_ban",
+      "question": "Còn ngày Chủ nhật thì sao?",
+      "expect": [
+        {
+          "symbol": "08/QC-ĐHM",
+          "page": 1
+        }
+      ],
+      "previous": "Phòng máy mở cửa từ mấy giờ?",
+      "keywords": [
+        "lịch học bù"
+      ],
+      "evidence": "Ngày Chủ nhật và ngày lễ, phòng máy chỉ mở khi có lịch thi hoặc lịch học bù."
+    },
+    {
+      "id": "n05",
+      "user": "vanthu",
+      "loai": "noi_tiep",
+      "route": "van_ban",
+      "question": "Còn lịch trực từng ngày thì sao?",
+      "expect": [
+        {
+          "symbol": "47/TB-ĐHM",
+          "page": 2
+        }
+      ],
+      "previous": "Trực cơ quan dịp nghỉ Tết ở đâu?",
+      "keywords": [
+        "Phòng Tổ chức – Hành chính"
+      ],
+      "evidence": "Lịch trực từng ngày do Phòng Tổ chức – Hành chính phân công."
+    },
+    {
+      "id": "g01",
+      "user": "vanthu",
+      "loai": "gioi_thieu",
+      "route": "gioi_thieu",
+      "question": "Bạn làm được gì?",
+      "expect": [
+        {
+          "guide": "services/svc-files/src/svc_files/assist/gioi_thieu/vi.md#lam-duoc-gi"
+        }
+      ]
+    },
+    {
+      "id": "g02",
+      "user": "giangvienktpm",
+      "loai": "gioi_thieu",
+      "route": "gioi_thieu",
+      "question": "Xin chào",
+      "expect": [
+        {
+          "guide": "services/svc-files/src/svc_files/assist/gioi_thieu/vi.md#gioi-thieu"
+        }
+      ]
+    },
+    {
+      "id": "g03",
+      "user": "truongkhoa",
+      "loai": "gioi_thieu",
+      "route": "gioi_thieu",
+      "question": "Bạn là ai?",
+      "expect": [
+        {
+          "guide": "services/svc-files/src/svc_files/assist/gioi_thieu/vi.md#gioi-thieu"
+        }
+      ]
+    },
+    {
+      "id": "g04",
+      "user": "chuyenviendt",
+      "loai": "gioi_thieu",
+      "route": "gioi_thieu",
+      "question": "Trợ lý dùng mô hình nào?",
+      "expect": [
+        {
+          "guide": "services/svc-files/src/svc_files/assist/gioi_thieu/vi.md#mo-hinh"
+        }
+      ]
+    },
+    {
+      "id": "g05",
+      "user": "vanthu",
+      "loai": "gioi_thieu",
+      "route": "gioi_thieu",
+      "question": "Tôi nên hỏi bạn thế nào?",
+      "expect": [
+        {
+          "guide": "services/svc-files/src/svc_files/assist/gioi_thieu/vi.md#cach-hoi"
+        }
+      ]
+    },
+    {
+      "id": "g06",
+      "user": "vanthu",
+      "loai": "gioi_thieu",
+      "route": "gioi_thieu",
+      "question": "What can you do?",
+      "expect": [
+        {
+          "guide": "services/svc-files/src/svc_files/assist/gioi_thieu/en.md#lam-duoc-gi"
+        }
+      ]
+    },
+    {
+      "id": "h01",
+      "user": "giangvienktpm",
+      "loai": "huong_dan",
+      "route": "huong_dan",
+      "question": "Nộp đơn nghỉ phép ở đâu?",
+      "expect": [
+        {
+          "guide": "docs/huong-dan/viec-chung.md#đơn-nghỉ-phép"
+        }
+      ]
+    },
+    {
+      "id": "h02",
+      "user": "chuyenviendt",
+      "loai": "huong_dan",
+      "route": "huong_dan",
+      "question": "Làm thế nào để soạn văn bản đi?",
+      "expect": [
+        {
+          "guide": "docs/huong-dan/chuyen-vien.md#soạn-và-trình-văn-bản-đi"
+        }
+      ]
+    },
+    {
+      "id": "h03",
+      "user": "truongkhoa",
+      "loai": "huong_dan",
+      "route": "huong_dan",
+      "question": "Làm thế nào để ký số văn bản đi?",
+      "expect": [
+        {
+          "guide": "docs/huong-dan/lanh-dao-don-vi.md#ký-duyệt-văn-bản-đi"
+        }
+      ]
+    },
+    {
+      "id": "h04",
+      "user": "truongkhoa",
+      "loai": "huong_dan",
+      "route": "huong_dan",
+      "question": "Xem sổ kiểm toán ở đâu?",
+      "expect": [
+        {
+          "guide": "docs/huong-dan/quan-tri.md#sổ-kiểm-toán"
+        }
+      ]
+    },
+    {
+      "id": "h05",
+      "user": "vanthu",
+      "loai": "huong_dan",
+      "route": "huong_dan",
+      "question": "Đổi mật khẩu ở đâu?",
+      "expect": [
+        {
+          "guide": "docs/huong-dan/README.md#đăng-nhập"
+        }
+      ]
+    },
+    {
+      "id": "o01",
+      "user": "vanthu",
+      "loai": "ngoai_pham_vi",
+      "route": "ngoai_pham_vi",
+      "question": "Thời tiết Hà Nội hôm nay thế nào?",
+      "expect": "none"
+    },
+    {
+      "id": "o02",
+      "user": "giangvienktpm",
+      "loai": "ngoai_pham_vi",
+      "route": "ngoai_pham_vi",
+      "question": "Giá vàng hôm nay bao nhiêu?",
+      "expect": "none"
+    },
+    {
+      "id": "o03",
+      "user": "truongkhoa",
+      "loai": "ngoai_pham_vi",
+      "route": "ngoai_pham_vi",
+      "question": "Tỷ giá đô la hôm nay là bao nhiêu?",
+      "expect": "none"
+    },
+    {
+      "id": "o04",
+      "user": "chuyenviendt",
+      "loai": "ngoai_pham_vi",
+      "route": "ngoai_pham_vi",
+      "question": "Kết quả bóng đá tối qua thế nào?",
+      "expect": "none"
+    },
+    {
+      "id": "o05",
+      "user": "vanthu",
+      "loai": "ngoai_pham_vi",
+      "route": "ngoai_pham_vi",
+      "question": "Viết giúp tôi một bài thơ",
+      "expect": "none"
+    },
+    {
+      "id": "o06",
+      "user": "vanthu",
+      "loai": "ngoai_pham_vi",
+      "route": "ngoai_pham_vi",
+      "question": "Write me a poem",
+      "expect": "none"
+    },
+    {
+      "id": "v01",
+      "user": "vanthu",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Việc nào của tôi sắp quá hạn?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v02",
+      "user": "truongkhoa",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Tôi có bao nhiêu việc quá hạn?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v03",
+      "user": "giangvienktpm",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Tôi được giao những việc gì?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v04",
+      "user": "totruongdt",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Có việc nào của mình đến hạn hôm nay không?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v05",
+      "user": "chuyenviendt",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Which of my tasks are almost overdue?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "d01",
+      "user": "vanthu",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Có bao nhiêu văn bản đến trong tháng 10/2026?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in"
+          ],
+          "from": "2026-10-01",
+          "to": "2026-11-01",
+          "type_code": null
+        }
+      ]
+    },
+    {
+      "id": "d02",
+      "user": "truongkhoa",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Thống kê số văn bản đi năm 2026",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "out"
+          ],
+          "from": "2026-01-01",
+          "to": "2027-01-01",
+          "type_code": null
+        }
+      ]
+    },
+    {
+      "id": "d03",
+      "user": "vanthu",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Có bao nhiêu quyết định đến trong năm 2026?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in"
+          ],
+          "from": "2026-01-01",
+          "to": "2027-01-01",
+          "type_code": "QĐ"
+        }
+      ]
+    },
+    {
+      "id": "d04",
+      "user": "giangvienktpm",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Có bao nhiêu văn bản?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in",
+            "out"
+          ],
+          "from": null,
+          "to": null,
+          "type_code": null
+        }
+      ]
+    },
+    {
+      "id": "d05",
+      "user": "chuyenviendt",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "How many incoming documents arrived in September 2026?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in"
+          ],
+          "from": "2026-09-01",
+          "to": "2026-10-01",
+          "type_code": null
+        }
       ]
     }
   ]

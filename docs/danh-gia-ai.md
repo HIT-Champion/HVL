@@ -27,7 +27,7 @@ Ba nguyên tắc chung:
 | F4.1 | `moc-doc-reader` · `services/svc-files/src/svc_files/docread/` | Quy tắc thể thức NĐ 30, pypdf, Tesseract `vie`; Qwen3-1.7B chỉ viết trích yếu | Đủ sáu ô, trích yếu theo quy tắc | `make do-doc-van-ban` | 22 văn bản mẫu: số ký hiệu đúng 20/22, ngày ban hành 22/22, 0 ô "chắc chắn" sai (22/10/2026; trùng ở 3 lần chạy CI ngày 26/10/2026) |
 | F4.2 | `moc-assistant` · `services/svc-files/src/svc_files/assist/` | Meilisearch tìm lai, Qwen3-Embedding-0.6B, Qwen3-1.7B | Tìm từ khóa, trả câu trích nguyên văn | `make do-hoi-dap` | 19 câu: recall@3 16/16, từ chối đúng 3/3, 0 nguồn bị cấm; câu trả lời của mô hình qua kiểm 16/16 (23/10/2026, bản online) |
 | F4.3 | `moc-assigner` · `services/svc-workflow/src/svc_workflow/advisor.py`, `suggest.py` | Bỏ phiếu kNN có trọng số trên phần truy xuất của F4.2; **không** mô hình sinh | Chạy đủ (tìm từ khóa) | `make do-giao-viec` | 29 văn bản lịch sử, bỏ một ra: top-1 29/29 (gốc so sánh 55 %), 0 căn cứ là văn bản hạn chế (22/10/2026) |
-| F4.4 | Bộ lọc, không phải tác tử · `services/svc-files/src/svc_files/pii.py` | Nhận dạng theo cấu trúc bằng `re`, chỉ thư viện chuẩn Python | Luôn bật | `make do-che-pii` | 81 063 ký tự kho mẫu: 0 chỗ che nhầm; 15/15 đột biến mã bị test bắt (23/10/2026) |
+| F4.4 | Bộ lọc, không phải tác tử · `services/svc-files/src/svc_files/pii.py` | Nhận dạng theo cấu trúc bằng `re`, chỉ thư viện chuẩn Python | Luôn bật | `make do-che-pii` | 81 063 ký tự kho mẫu: 0 chỗ che nhầm; 18/18 đột biến mã bị test bắt (28/10/2026) |
 
 **Không tính là AI ở đây:** ký số PAdES (F4.5) là mật mã khóa công khai (pyHanko, PKI nội bộ trong OpenBao), không có
 mô hình nào; dự thảo "Báo cáo sự cố" khi cảm biến vượt ngưỡng (F3.10) là ngưỡng cộng mẫu văn bản cố định
@@ -177,15 +177,42 @@ Chế độ `extract` tất định, không cần mô hình; chế độ `genera
 hậu kiểm. Đường ống tự viết trong `assist/` (không LlamaIndex, QĐ-004).
 
 **Dữ liệu đánh giá.** `seed/hoi-dap/`: 6 PDF hư cấu, 14 trang — 5 văn bản thường và 1 văn bản hạn chế (53/PA-ĐHM, cụm từ
-riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 19 câu, mỗi câu gắn người hỏi:
+riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 54 câu, mỗi câu gắn người hỏi và
+loại (`loai`). 19 câu tra cứu văn bản (`van_ban`) giữ nguyên từ trước để số đo so được:
 
 - 16 câu dương: đáp án là số ký hiệu + trang, từ khóa phải có, câu chứa câu trả lời;
 - 2 câu âm: hỏi điều không có trong kho (q17), hỏi nội dung chỉ có trong văn bản hạn chế (q18);
 - 1 câu bị cấm: giảng viên Bộ môn KTPM hỏi về văn bản giao Tổ Đào tạo, không được xem (q19).
 
+22 câu theo loại của bộ định tuyến (#423), mỗi câu ghi đường phải chọn (`route`):
+
+- 5 câu nối tiếp (`noi_tiep`): kèm câu hỏi lượt trước (`previous`); đáp án là số ký hiệu + trang, câu trả lời là một
+  câu khác của cùng văn bản ("Thế còn loại Giỏi?" sau câu hỏi về học bổng loại Xuất sắc);
+- 6 câu về chính trợ lý (`gioi_thieu`), 5 câu cách dùng Signet (`huong_dan`): đáp án là mục của tệp Giới thiệu trợ lý
+  hay của hướng dẫn sử dụng (`{"guide": "<tệp>#<neo>"}`);
+- 6 câu ngoài phạm vi (`ngoai_pham_vi`): thời tiết, giá vàng, tỷ giá, bóng đá, làm thơ (tiếng Việt, tiếng Anh).
+
+10 câu của hai đường dữ liệu (#441), không gọi mô hình:
+
+- 5 câu việc của người hỏi (`viec_cua_toi`): đáp án `{"data": "tasks"}`; `do-hoi-dap` gọi `myTasks` thẳng qua GraphQL
+  của Hasura bằng token người hỏi, đếm quá hạn, đến hạn hôm nay, đến hạn trong 2 ngày như Lịch hạn, so với `data` của
+  câu trả lời;
+- 5 câu đếm văn bản (`dem_van_ban`): đáp án ghi hướng, khoảng ngày, loại (`{"data": "documents", "directions": ["in"],
+  "from": "2026-10-01", "to": "2026-11-01", "type_code": null}`, mốc ghi rõ tháng, năm để không đổi theo ngày đo);
+  `do-hoi-dap` đếm bằng `office_documents_aggregate` đúng bộ lọc đó, bằng token người hỏi, so cả số lẫn bộ lọc trợ lý
+  đọc từ câu.
+
+3 câu trên văn bản thật của nguồn công khai A (#446), người hỏi là văn thư Khoa CNTT; `make seed` nạp các thông tư
+này thành văn bản đến, đáp án là số ký hiệu + trang của tệp PDF bản Công báo:
+
+- 2 câu `cong_khai`, tìm như câu `van_ban`: "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?" (06/2026/TT-BGDĐT,
+  tr. 18), "Thông tư số 10/2020/TT-BGDĐT hết hiệu lực từ ngày nào?" (58/2026/TT-BGDĐT, tr. 5);
+- 1 câu nối tiếp (`noi_tiep`) "Còn ngành đào tạo giáo viên thì sao?" sau câu về nguyện vọng (cùng trang).
+
 Nhãn: `scripts/hoi_dap_mau.py` viết mỗi thông tin cần hỏi trong đúng một câu, trên đúng một trang (ngắt trang tường
 minh), rồi kiểm bằng pypdf rằng câu trả lời nằm đúng trang và chỉ ở trang đó; câu hỏi và từ khóa do đội viết. Với văn
-bản của `make seed`, câu chứa câu trả lời lấy nguyên văn trong `scripts/seed_documents.py`.
+bản của `make seed`, câu chứa câu trả lời lấy nguyên văn trong `scripts/seed_documents.py`; với thông tư của nguồn A,
+test kiểm bằng pypdf rằng câu đó nằm đúng trang của tệp trong `seed/du-lieu-mo/cong-bao-gddt/`.
 
 **Đo lại.**
 
@@ -199,8 +226,14 @@ make do-hoi-dap                      # tìm lai + câu trả lời của mô hì
 Định nghĩa: **recall@3** — câu dương có nguồn khớp đáp án (cùng số ký hiệu và cùng trang) trong 3 nguồn đầu; **từ chối
 đúng** — câu âm, câu bị cấm nhận `no_evidence` hoặc `passages_only`; **nguồn bị cấm** — nguồn mang số ký hiệu trong danh
 sách cấm của câu, hoặc văn bản hạn chế 53/PA-ĐHM (cấm ở **mọi** câu, của mọi người hỏi); **qua kiểm** — câu trả lời
-`source: model` sau khi máy chủ kiểm trích dẫn; **trích đúng nguồn** — có `[n]` trỏ tới nguồn đáp án. Thoát 1 khi có
-bất kỳ nguồn bị cấm nào, hoặc recall@3 dưới 80 %.
+`source: model` sau khi máy chủ kiểm trích dẫn; **trích đúng nguồn** — có `[n]` trỏ tới nguồn đáp án; **đường đúng** —
+bộ định tuyến chọn đúng `route` của câu, câu nối tiếp được ghép (`rewritten`), câu ngoài phạm vi nhận câu cố định
+(`answer.source: fixed`), câu đường dữ liệu nhận câu có số (`answer.source: data`); **đếm đúng** — mọi số và bộ lọc
+trong `data` bằng số đếm thẳng qua GraphQL. recall@3, từ chối đúng chỉ tính trên 19 câu `van_ban`; các loại khác in
+riêng "đường đúng · trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu đi sai
+đường, hoặc một câu `gioi_thieu`, `huong_dan`, `ngoai_pham_vi`, `viec_cua_toi`, `dem_van_ban` trả lời sai: các đường
+này không qua tìm kiếm nên không cần ngưỡng. Câu nối tiếp và câu `cong_khai` tìm trong kho như câu `van_ban`, recall@3
+của chúng chỉ in ra, không làm đỏ.
 
 **Kết quả.**
 
@@ -220,6 +253,18 @@ bất kỳ nguồn bị cấm nào, hoặc recall@3 dưới 80 %.
   hình**, nên không cùng điều kiện với hai cột bật `ai`. Mọi số trừ độ trễ trùng nhau ở cả ba lần, ổn định qua 3 lần.
   So với cột 21/10 không bật `ai`, tổng từ chối đúng vẫn 3 / 3 nhưng chia khác (1 `no_evidence` + 2 `passages_only`
   thay vì 2 + 1): chưa rõ nguyên nhân.
+
+- 30/10/2026, CI, không bật `ai`, bộ 51 câu (bước `make do-hoi-dap` của job "Chạy thử: ai", run 40953517834 của PR
+  #444): recall@3 16 / 16, câu trích có từ khóa 15 / 16, từ chối đúng 3 / 3 (1 `no_evidence`, 2 `passages_only`), 0
+  lượt có nguồn bị cấm. Theo loại (đường đúng · trả lời đúng / số câu): `van_ban` 19 · 19 / 19, `noi_tiep` 5 · 5 / 5,
+  `gioi_thieu` 6 · 6 / 6, `huong_dan` 5 · 5 / 5, `ngoai_pham_vi` 6 · 6 / 6, `viec_cua_toi` 5 · 5 / 5, `dem_van_ban`
+  5 · 5 / 5. svc-files tự đo `extract` p50 14 ms, p95 62 ms.
+- 30/10/2026, CI, không bật `ai`, bộ 54 câu, kho có thêm 4 thông tư thật của nguồn A (#424) mà `make seed` nạp; lần
+  trên đo trước khi #431 vào nên kho chưa có các thông tư này (job "Chạy thử: ai" run 40964633417 của PR #447):
+  recall@3 16 / 16, câu trích có từ khóa 15 / 16, **từ chối đúng 1 / 3**: q17, q18 nay nhận đoạn không liên quan của
+  các thông tư (`answered`), chỉ q19 (câu quyền) còn `no_evidence`; 0 lượt có nguồn bị cấm. Theo loại: `van_ban` 19 ·
+  17 / 19, `cong_khai` 2 · 2 / 2 (c01, c03 nguồn đúng đứng đầu), `noi_tiep` 6 · 6 / 6 (c02 nguồn đúng thứ 2), các loại
+  khác như lần trước. svc-files tự đo `extract` p50 20 ms, p95 70 ms. Sửa từ chối: #448.
 
 - Lần đo 23/10 chạy trên chính máy B, gọi qua địa chỉ công khai của bản online (`MOC_PUBLIC_URL`), nên thời gian phía
   người gọi gồm cả đường mạng; trước khi đo, chờ svc-files nhúng xong các đoạn tồn (`embed_pending` = 0) để việc nhúng
@@ -272,8 +317,8 @@ sửa hay bỏ gợi ý. Chi tiết: [README svc-workflow](../services/svc-workf
 [README svc-files](../services/svc-files/README.md#văn-bản-tương-tự-cho-tác-tử-gợi-ý-giao-việc-f43).
 
 **Mô hình, công cụ.** **Không mô hình sinh nào chọn đơn vị** (QĐ-005): bỏ phiếu kNN có trọng số trên tối đa 5 căn cứ,
-hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` (`suggest.py`,
-thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
+hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` cùng lịch
+nghỉ chính thức của nguồn công khai B (#427) (`suggest.py`, thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
 phần truy xuất của F4.2 qua route nội bộ `POST /internal/similar-documents` (`assist/similar.py`): câu tìm từ trích yếu,
 tìm từ khóa kèm lượt tìm nới; có Qwen3-Embedding thì tìm lai, tối đa 3 giây. Flowable chạy nhánh song song và timer.
 
@@ -315,8 +360,9 @@ top-2, top-3 vô nghĩa khi chỉ có hai đơn vị hợp lệ. Dữ liệu chi
 **Chưa đo.** Với tìm theo nghĩa (bật `ai`: 0/29 lượt ở trên là tìm từ khóa); trên nhiều đơn vị hơn; trên dữ liệu thật —
 view `office.v_assignment_suggestion_accuracy` (tỉ lệ lãnh đạo giữ đơn vị, giữ hạn, sai số hạn).
 
-**Giới hạn.** Ngày lễ mặc định chỉ có lễ dương lịch cố định; Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù do người vận hành thêm
-vào `MOC_HOLIDAYS` mỗi năm (#280); chỉ gợi ý đơn vị và hạn, không gợi ý người xử lý; chỉ mục
+**Giới hạn.** Lịch nghỉ chính thức chỉ có các năm Chính phủ đã công bố (bản chụp tới hết 2027, chưa có Giỗ Tổ 2027),
+năm sau đó người vận hành lấy mới hoặc thêm vào `MOC_HOLIDAYS` (#280, #427); chỉ gợi ý đơn vị và hạn, không gợi ý
+người xử lý; chỉ mục
 đoạn đồng bộ vài giây một lần nên văn bản vừa giao chưa làm căn cứ ngay; trích yếu quá ngắn hay chỉ có từ chung thì ít
 kết quả đúng; ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt trên dữ liệu mẫu.
 
@@ -354,7 +400,7 @@ theo "dãy số đủ dài". `services/svc-workflow/src/svc_workflow/pii.py` là
 - *Bắt đúng* trên bộ định dạng tổng hợp (`tests/test_pii.py`): 95 chỗ dương tính trong 84 chuỗi, 80 chuỗi âm tính khó
   (giấy tờ, ngày, tiền, UUID, mã số thuế, đầu số chưa cấp, dãy số nhỏ của bảng…), 1 144 ca đột biến dữ liệu vào —
   số theo README svc-files.
-- *Đột biến mã:* 15 bản sửa hỏng có chủ đích của `pii.py`, mỗi bản phải bị ít nhất một test bắt
+- *Đột biến mã:* 18 bản sửa hỏng có chủ đích của `pii.py`, mỗi bản phải bị ít nhất một test bắt
   (`tests/test_pii_mutation.py`).
 
 **Đo lại.** `make do-che-pii` (không cần Docker); trên stack: `make demo-che-pii` (nhật ký `apisix`, `app-office`,
@@ -370,17 +416,17 @@ sót một ca dương tính hay một đột biến sống sót.
 | `seed/hoi-dap`, mọi trang | 6 | 19 997 | 144 | **0** |
 | Nhãn, câu hỏi, lịch sử giao việc | 1 248 chuỗi | 17 208 | 165 | **0** |
 
-Đột biến mã: **15/15 bị giết** trong 1,6 giây — gồm bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu số di động, bỏ cổng
-mã số thuế, số tài khoản không cần từ khóa, giữ chuỗi truy vấn ở nhật ký truy cập, xuống dòng không là phân cách, che
-một lượt thay vì tới điểm bất động.
+Đột biến mã: **18/18 bị giết** trong 1,9 giây (28/10/2026) — gồm bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu số di
+động, bỏ cổng mã số thuế, số tài khoản không cần từ khóa, giữ chuỗi truy vấn ở nhật ký truy cập, xuống dòng không là
+phân cách, che một lượt thay vì tới điểm bất động, bỏ đường số dính sau tiền tố `ĐT`/`SĐT`/`Tel`.
 
 **Chưa đo.** Độ nhạy trên dữ liệu thật — không đo được trong repo (không được chứa dữ liệu cá nhân thật); cách đo: trên
 bản cài của đơn vị, `python -m svc_files.pii count < tệp` đếm số chỗ che mà không in giá trị, đối chiếu với người đọc.
 
-**Giới hạn.** Sót có chủ đích: số dính chữ (`ĐT0912…`), số viết từng cặp, số nước ngoài, CMND và số tài khoản không có
-từ khóa; che dư dãy mã 3 chữ số trùng dạng CCCD hợp lệ; không nhận họ tên, địa chỉ (cần nhận dạng thực thể); email, số
-máy bàn của cơ quan cũng bị che trong chữ gửi mô hình; nhật ký của Hasura, PostgreSQL, Keycloak, Meilisearch, Ollama
-không qua bộ lọc. Danh sách đủ ở README svc-files.
+**Giới hạn.** Sót có chủ đích: số dính chữ (trừ di động 10 số sau `ĐT`, `SĐT`, `Tel`…), số viết từng cặp, số nước
+ngoài, CMND và số tài khoản không có từ khóa; che dư dãy mã 3 chữ số trùng dạng CCCD hợp lệ; không nhận họ tên, địa chỉ
+(cần nhận dạng thực thể); email, số máy bàn của cơ quan cũng bị che trong chữ gửi mô hình; nhật ký của Hasura,
+PostgreSQL, Keycloak, Meilisearch, Ollama không qua bộ lọc. Danh sách đủ ở README svc-files.
 
 **Cơ chế an toàn.**
 

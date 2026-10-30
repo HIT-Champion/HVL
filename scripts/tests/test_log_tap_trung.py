@@ -15,8 +15,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Log tập trung (F3.14, profile logs): Vector, Parseable chỉ chạy khi bật profile, chỉ nghe 127.0.0.1, không gắn
-docker.sock, mật khẩu rỗng thì Parseable không mở cổng; tệp phủ chỉ đổi driver log của 8 dịch vụ (5 dịch vụ tự che PII;
-Hasura, Keycloak, PostgreSQL có luật riêng trong Vector); Makefile
+docker.sock, mật khẩu rỗng thì Parseable không mở cổng; tệp phủ chỉ đổi driver log của 9 dịch vụ (5 dịch vụ tự che PII;
+Hasura, Keycloak, PostgreSQL, Meilisearch có luật riêng trong Vector); Makefile
 chỉ nạp tệp phủ khi MOC_EXTRA_PROFILES có logs; scripts/log_tap_trung.py không ghép chuỗi lạ vào SQL, không in mật
 khẩu. Kiểm chữ (không có PyYAML, không cần Docker) và một Parseable giả trên 127.0.0.1.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
@@ -49,9 +49,10 @@ from test_duong_ham import service_block  # noqa: E402
 
 LOGS = ROOT / "platform" / "logs"
 OVERRIDE = LOGS / "docker-compose.logs.yml"
-LOGGED = ["apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres"]
+LOGGED = ["apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres",
+          "meilisearch"]
 # Không tự che thông tin cá nhân trong nhật ký: Vector có luật riêng, vector.test.yaml có ca
-UNREDACTED = ("hasura", "keycloak", "postgres")
+UNREDACTED = ("hasura", "keycloak", "postgres", "meilisearch")
 SECRET_PATHS = ("docker.sock", "/var/lib/docker", "/var/run/docker")
 
 
@@ -130,7 +131,7 @@ class ComposeTest(unittest.TestCase):
 
     def test_services_without_rules_are_not_collected(self) -> None:
         text = OVERRIDE.read_text(encoding="utf-8")
-        for name in ("meilisearch", "openbao", "flowable"):
+        for name in ("openbao", "flowable", "seaweedfs"):
             self.assertNotRegex(text, rf"^  {name}:", name)
 
     @unittest.skipUnless(shutil.which("git") and (ROOT / ".git").exists(), "cần git và bản checkout")
@@ -178,6 +179,11 @@ class VectorConfigTest(unittest.TestCase):
         for name in UNREDACTED:
             self.assertIn(f'service == "{name}"', block, name)
             self.assertIn(f"'\"com.docker.compose.service\"': {name}\n", cases, name)
+
+    def test_meilisearch_writes_json_lines(self) -> None:
+        # luật của Vector che theo khóa (query_parameters, error); bản chữ tách lời lỗi nhiều dòng thành nhiều dòng log
+        block = service_block("meilisearch")
+        self.assertIn("      MEILI_EXPERIMENTAL_LOGS_MODE: json\n", block)
 
     def test_partial_lines_are_joined_per_container_and_partial_id(self) -> None:
         block = self.transform("ghep")
@@ -265,8 +271,8 @@ class MakefileTest(unittest.TestCase):
     def test_logged_services_match_the_override(self) -> None:
         text = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn(f"LOGGED_SERVICES := {' '.join(LOGGED)}\n", text)
-        self.assertIn("--profile ai-pull --profile logs down\n", text)
-        self.assertIn("--profile ai-pull --profile logs down -v\n", text)
+        self.assertIn("--profile ai-pull --profile logs --profile wiki down\n", text)
+        self.assertIn("--profile ai-pull --profile logs --profile wiki down -v\n", text)
 
 
 class PureFunctionTest(unittest.TestCase):
