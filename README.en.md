@@ -55,13 +55,29 @@ trust out of the box, without building them itself:
 the right column holds the outside notification channels: email, webhooks, SMS,
 Zalo](docs/anh/kien-truc-tong-the.en.gif)](docs/anh/kien-truc-tong-the.en.gif)
 
-Tier 1 is the headless core: identity, API gateway, data, workflow and the trust layer. Tier 2 holds the
-applications: the e-Office and the P.A.R.A personal space. That second application changes no core service code, but
-it was added by hand to the core configuration (a Keycloak client, a gateway route, tables and permissions in the
-database). A third application, the unit news board, plugs in with one `moc app install` command without changing any
-core file ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). Only the APISIX gateway is exposed, and
-every request passes its web application firewall before it reaches the core; the labels on its arrows are the real
-paths. The same holds inside the machine:
+Signet follows the three tiers of the DX-OS brief:
+
+- **Tier 1, the headless core:** identity, API gateway, structured and unstructured data, workflow, the trust layer
+  (the seven clusters ①–⑦, [`docs/architecture.md`](docs/architecture.md) section 3, Vietnamese). It has no business
+  screens; applications reach it through the gateway.
+- **Tier 2, the four H-P-D-I spaces with a user interface** (table below). The e-Office is one web application with
+  screens in all four spaces; its server side still runs in the same process as the core services (boundary and the
+  way out: [`docs/architecture.md`](docs/architecture.md) section 4). The P.A.R.A personal space changes no core
+  service code, but it was added by hand to the core configuration (a Keycloak client, a gateway route, tables and
+  permissions in the database). The unit news board and the leave request app plug in with one `moc app install`
+  command without changing any core file ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese).
+- **Tier 3, industry applications** (sales, warehouse, learning, customer relations…): optional in the brief, and
+  Signet has none. They would plug in like the news board, with `moc app install`.
+
+| Space | Tier 2 screens and applications |
+|---|---|
+| [H] Human | P.A.R.A personal space (each person's files), unit news board, the e-Office Apps page; DokuWiki wiki (`wiki` profile). Single sign-on, roles and units come from Keycloak in Tier 1 |
+| [P] Process | e-Office: intake, incoming and outgoing documents, task inbox and deadline calendar, registers; leave requests; the form builder for administrators |
+| [D] Data | e-Office: executive dashboard, metrics, data lineage, sensor map, audit log, case files (archiving to cold storage, reading room); the API docs page (REST, GraphQL) |
+| [I] Intelligence | e-Office: full-text search, Q&A (keyword and semantic retrieval), field suggestions when taking in an incoming document, assignment suggestions |
+
+Only the APISIX gateway is exposed, and every request passes its web application firewall before it reaches the core;
+the labels on its arrows are the real paths. The same holds inside the machine:
 - application containers sit on their own Docker network, `apps` (no Internet access), where APISIX is the only core
   service;
 - so an application's server side also reaches the core through the gateway, with the same token check, rate limits

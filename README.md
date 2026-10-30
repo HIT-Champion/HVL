@@ -49,12 +49,29 @@ chức tự cài, tự làm chủ. Ứng dụng mới chỉ cần cắm vào lõ
 [![Sơ đồ kiến trúc: người dùng đi qua cổng APISIX vào các ứng dụng Tầng 2 và các dịch vụ lõi Tầng 1; cột phải là
 kênh thông báo bên ngoài: email, webhook, SMS, Zalo](docs/anh/kien-truc-tong-the.gif)](docs/anh/kien-truc-tong-the.gif)
 
-Tầng 1 là lõi không giao diện: định danh, cổng API, dữ liệu, quy trình và lớp tin cậy. Tầng 2 là ứng dụng: Văn phòng
-điện tử và Không gian cá nhân P.A.R.A. Ứng dụng thứ hai này không sửa mã dịch vụ lõi, nhưng được thêm tay vào cấu hình
-lõi (client Keycloak, route ở cổng, bảng và quyền trong CSDL). Ứng dụng thứ ba, Bảng tin đơn vị, cắm vào bằng một lệnh
-`moc app install` mà không sửa tệp nào của lõi ([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Chỉ cổng APISIX mở
-ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Bên
-trong máy cũng vậy:
+Signet theo khung ba tầng của đề DX-OS:
+
+- **Tầng 1 — lõi không giao diện:** định danh, cổng API, dữ liệu có cấu trúc và phi cấu trúc, quy trình, lớp tin cậy
+  (bảy cụm ①–⑦, [`docs/architecture.md`](docs/architecture.md) §3). Không có màn hình nghiệp vụ; ứng dụng gọi lõi qua
+  cổng.
+- **Tầng 2 — bốn không gian H-P-D-I có giao diện** (bảng dưới). Văn phòng điện tử là một ứng dụng web nhưng có màn ở
+  cả bốn không gian; phần máy chủ của nó hiện còn chạy chung tiến trình với dịch vụ lõi (ranh giới và hướng tách:
+  [`docs/architecture.md`](docs/architecture.md) §4). Không gian cá nhân P.A.R.A không sửa mã dịch vụ lõi, nhưng được
+  thêm tay vào cấu hình lõi (client Keycloak, route ở cổng, bảng và quyền trong CSDL). Bảng tin đơn vị và Đơn nghỉ phép
+  cắm vào bằng một lệnh `moc app install` mà không sửa tệp nào của lõi
+  ([`docs/them-ung-dung.md`](docs/them-ung-dung.md)).
+- **Tầng 3 — ứng dụng ngành** (bán hàng, kho, học tập, quan hệ khách hàng…): đề không bắt buộc, Signet chưa làm. Ứng
+  dụng ngành sẽ cắm vào như Bảng tin, bằng `moc app install`.
+
+| Không gian | Màn hình, ứng dụng ở Tầng 2 |
+|---|---|
+| [H] Con người | Không gian cá nhân P.A.R.A (tệp của từng người), Bảng tin đơn vị, trang Ứng dụng của Văn phòng; wiki DokuWiki (profile `wiki`). Đăng nhập một lần, vai trò, đơn vị lấy từ Keycloak ở Tầng 1 |
+| [P] Quy trình | Văn phòng điện tử: tiếp nhận, văn bản đến, văn bản đi, hộp việc và Lịch hạn, sổ đăng ký; Đơn nghỉ phép; trang Dựng form cho quản trị |
+| [D] Dữ liệu | Văn phòng điện tử: Điều hành, Số đo, Phả hệ số liệu, Sơ đồ cảm biến, Sổ kiểm toán, Hồ sơ công việc (nộp lưu sang kho lạnh, phòng đọc); trang Tài liệu API (REST, GraphQL) |
+| [I] Trí tuệ | Văn phòng điện tử: Tìm kiếm toàn văn, Hỏi đáp (tìm theo từ khóa và theo nghĩa), gợi ý ô khi tiếp nhận văn bản đến, gợi ý giao việc |
+
+Chỉ cổng APISIX mở ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó trước khi tới lõi; nhãn trên mũi tên là đường
+dẫn thật. Bên trong máy cũng vậy:
 - container ứng dụng ở mạng Docker riêng `apps` (không ra Internet), nơi dịch vụ lõi duy nhất là APISIX;
 - vì thế phần máy chủ của ứng dụng cũng gọi lõi qua cổng, qua cùng bước kiểm token, giới hạn tốc độ, WAF như trình
   duyệt;
