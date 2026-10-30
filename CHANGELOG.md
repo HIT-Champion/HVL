@@ -8,10 +8,6 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
-### Đã sửa lỗi
-
-- Trợ lý hỏi đáp từ chối câu hỏi kho không có thay vì trả câu trích lạc đề; `make do-hoi-dap` đỏ khi xảy ra lại (#448).
-
 ## [1.3.0] - 2026-10-30
 
 Bản cho vòng trường 01/11. Hai nguồn dữ liệu công khai có bản chụp trong repo, trang Trạng thái báo tuổi dữ liệu:
@@ -64,6 +60,7 @@ Nâng tại chỗ từ `v1.2.1`, rồi nạp nguồn công khai bằng `python3 
 - Tin realtime có đường dẫn là liên kết có tên với trình đọc màn hình, không còn bị axe báo `link-name` (#407).
 - `release.sh` chạy được trên macOS: không có `sha256sum` thì dùng `shasum -a 256`, thiếu cả hai thì dừng sớm (#57).
 - Grafana lên trong vài giây trên đĩa ghi chậm (WSL2), không còn quá hạn healthcheck: CSDL SQLite để trong RAM (#417).
+- Trợ lý hỏi đáp từ chối câu hỏi kho không có thay vì trả câu trích lạc đề; `make do-hoi-dap` đỏ khi xảy ra lại (#448).
 
 ### Bảo mật
 - `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
