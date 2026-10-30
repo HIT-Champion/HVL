@@ -15,7 +15,7 @@
     {
       "goi": "pkg:npm/mdn-data",
       "giay_phep": "CC0-1.0",
-      "ly_do": "Dữ liệu cú pháp CSS của MDN, css-tree đọc lúc nén CSS khi dựng, không nằm trong trang phát hành. CC0 đưa tác phẩm vào phạm vi công cộng (DEPENDENCIES.md, Tầng 2)"
+      "ly_do": "Dữ liệu cú pháp CSS của MDN, css-tree đọc lúc nén CSS khi dựng, không nằm trong trang phát hành. CC0 đưa tác phẩm vào phạm vi công cộng (DEPENDENCIES.md, Trang tài liệu)"
     },
     {
       "goi": "pkg:npm/@speed-highlight/core",

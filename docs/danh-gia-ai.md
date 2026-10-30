@@ -230,8 +230,9 @@ sách cấm của câu, hoặc văn bản hạn chế 53/PA-ĐHM (cấm ở **m�
 bộ định tuyến chọn đúng `route` của câu, câu nối tiếp được ghép (`rewritten`), câu ngoài phạm vi nhận câu cố định
 (`answer.source: fixed`), câu đường dữ liệu nhận câu có số (`answer.source: data`); **đếm đúng** — mọi số và bộ lọc
 trong `data` bằng số đếm thẳng qua GraphQL. recall@3, từ chối đúng chỉ tính trên 19 câu `van_ban`; các loại khác in
-riêng "đường đúng · trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu đi sai
-đường, hoặc một câu `gioi_thieu`, `huong_dan`, `ngoai_pham_vi`, `viec_cua_toi`, `dem_van_ban` trả lời sai: các đường
+riêng "đường đúng · trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu âm
+`van_ban` được trả lời (#448), một câu đi sai đường, hoặc một câu `gioi_thieu`, `huong_dan`, `ngoai_pham_vi`,
+`viec_cua_toi`, `dem_van_ban` trả lời sai: các đường
 này không qua tìm kiếm nên không cần ngưỡng. Câu nối tiếp và câu `cong_khai` tìm trong kho như câu `van_ban`, recall@3
 của chúng chỉ in ra, không làm đỏ.
 
@@ -265,6 +266,11 @@ của chúng chỉ in ra, không làm đỏ.
   các thông tư (`answered`), chỉ q19 (câu quyền) còn `no_evidence`; 0 lượt có nguồn bị cấm. Theo loại: `van_ban` 19 ·
   17 / 19, `cong_khai` 2 · 2 / 2 (c01, c03 nguồn đúng đứng đầu), `noi_tiep` 6 · 6 / 6 (c02 nguồn đúng thứ 2), các loại
   khác như lần trước. svc-files tự đo `extract` p50 20 ms, p95 70 ms. Sửa từ chối: #448.
+- 30/10/2026, CI, không bật `ai`, bộ 54 câu, sau bản sửa #448: câu trích phải chứa ít nhất nửa số cặp từ liền nhau
+  của câu hỏi, tối đa 2 cặp (job "Chạy thử: ai" run 40985654921 của PR #451). recall@3 16 / 16, câu trích có từ khóa
+  15 / 16, từ chối đúng 3 / 3 (1 `no_evidence`, 2 `passages_only`: q17, q18 vẫn ra đoạn của các thông tư nhưng không
+  câu nào đủ khớp để trích), 0 lượt có nguồn bị cấm. Theo loại: `van_ban` 19 · 19 / 19, `cong_khai` 2 · 2 / 2,
+  `noi_tiep` 6 · 6 / 6, các loại khác như lần trước. svc-files tự đo `extract` p50 15 ms, p95 64 ms.
 
 - Lần đo 23/10 chạy trên chính máy B, gọi qua địa chỉ công khai của bản online (`MOC_PUBLIC_URL`), nên thời gian phía
   người gọi gồm cả đường mạng; trước khi đo, chờ svc-files nhúng xong các đoạn tồn (`embed_pending` = 0) để việc nhúng

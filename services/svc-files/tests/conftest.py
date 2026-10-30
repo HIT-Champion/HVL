@@ -982,8 +982,6 @@ class FakeOllama:
         self.requests.append(request)
         if request.url.path == "/api/tags":
             return httpx2.Response(200, json={"models": [{"name": m, "model": m} for m in self.models]})
-        if request.url.path == "/api/ps":       # mô hình đang nạp và phần nằm trong VRAM (MOC_AI_DEVICE)
-            return httpx2.Response(200, json={"models": getattr(self, "loaded", [])})
         if request.url.path == "/api/generate":
             return httpx2.Response(200, json={"model": OLLAMA_MODEL, "done": True})
         reply = self.reply

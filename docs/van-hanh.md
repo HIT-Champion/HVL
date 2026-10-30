@@ -515,8 +515,8 @@ rồi `docker compose up -d` (tạo lại `openbao`, `svc-files`). Đổi khóa 
 
 - **Cái gì rời máy:** chỉ lời gọi viết câu trả lời: câu hỏi và tối đa 4 đoạn văn bản làm căn cứ, **đã che** số điện
   thoại, CCCD, email, số tài khoản (F4.4). Tìm theo nghĩa (mô hình nhúng) và trích yếu văn bản đến vẫn ở Ollama; không
-  bật profile `ai` thì trợ lý tìm theo từ khóa, chỉ bước viết dùng API. Mô hình nguồn mở chạy tại chỗ vẫn là mặc
-  định khuyên dùng: gửi văn bản tới dịch vụ đám mây là quyết định của đơn vị về dữ liệu của mình.
+  bật profile `ai` thì trợ lý tìm theo từ khóa, chỉ bước viết dùng API. Mô hình mở trọng số (Apache-2.0) chạy tại
+  chỗ vẫn là mặc định khuyên dùng: gửi văn bản tới dịch vụ đám mây là quyết định của đơn vị về dữ liệu của mình.
 - **Kiểm như cũ:** đầu ra ép theo JSON Schema (`response_format`), máy chủ Signet vẫn kiểm từng câu với đoạn nguồn và
   con số rồi mới gắn trích dẫn; không đạt thì trả câu trích nguyên văn.
 - **Khóa:** là bí mật của `svc-files` trong két như các khóa khác (mục Két bí mật), không nằm trong biến môi trường của
@@ -555,33 +555,6 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
   địa chỉ IP, vượt thì `429`.
 - Trang chỉ trả lời "đang chạy hay không" ngay lúc này; diễn biến theo thời gian, độ trễ, tỉ lệ lỗi xem ở Grafana (mục
   Giám sát). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
-
-## Chạy mô hình bằng GPU
-
-Mặc định Ollama (profile `ai`) chạy mô hình trên CPU, trong giới hạn `MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`. Máy chủ có
-card NVIDIA thì đặt `MOC_AI_DEVICE=gpu` trong `.env` (#442): Makefile thêm tệp phủ `docker-compose.gpu.yml` vào
-`COMPOSE_FILE` để cấp mọi GPU NVIDIA của máy cho `ollama`; dịch vụ khác, giới hạn RAM và CPU không đổi. Trích yếu văn
-bản đến (F4.1), nhúng và viết câu trả lời của trợ lý (F4.2) cùng chạy trong Ollama nên cùng nhanh lên.
-
-- **Máy chủ cần:**
-  - Driver NVIDIA đủ mới. Theo docs.ollama.com/gpu (đọc ngày 30/10/2026): card compute capability 5.0 trở lên với
-    driver 550 trở lên; card 5.0–6.2 (Maxwell, Pascal; vd. Quadro M4000 là 5.2) cần driver 570 trở lên. Compute
-    capability của từng card: developer.nvidia.com/cuda-gpus.
-  - NVIDIA Container Toolkit, rồi `sudo nvidia-ctk runtime configure --runtime=docker` và khởi động lại Docker để Docker
-    có runtime `nvidia`. Thử: `docker run --rm --gpus all ubuntu nvidia-smi` phải in ra card.
-  - WSL 2: driver NVIDIA chỉ cài bên Windows, không cài driver Linux trong WSL; NVIDIA Container Toolkit cài trong bản
-    phân phối WSL khi chạy Docker Engine trong đó.
-- **Bật:** `./scripts/co-gpu.sh` in `gpu` khi `nvidia-smi` thấy card và Docker có runtime `nvidia`; `make env`,
-  `make install` cũng gọi nó để gợi ý. Đặt `MOC_AI_DEVICE=gpu` trong `.env` rồi `make up-ai`. Bản cài: đặt trong `.env`
-  của bản cài rồi `make install` lại để ghi `COMPOSE_FILE`; máy chưa dùng được GPU thì `make install` cảnh báo. Tắt: đặt
-  lại `MOC_AI_DEVICE=cpu`, làm như trên.
-- **Kiểm:** `GET /api/status`, khối `ai`, trường `device`: `gpu` (mô hình nằm hết trong bộ nhớ GPU), `gpu+cpu` (GPU
-  thiếu bộ nhớ, một phần chạy CPU, vẫn chậm), `cpu`; `null` khi Ollama chưa nạp mô hình nào hay trợ lý tắt. `svc-files`
-  đọc `size_vram` trong `/api/ps` của Ollama mỗi lần dò. Trên máy chủ: `docker compose exec ollama ollama ps`, cột
-  `PROCESSOR`.
-- **Đặt `gpu` mà Docker chưa có runtime `nvidia`:** `ollama` không khởi động (`could not select device driver
-  "nvidia"`), trang trạng thái báo Trợ lý AI *Tắt*; trợ lý vẫn tìm theo từ khóa và trả câu trích. Cài đủ các bước trên
-  hoặc đặt lại `cpu`.
 
 ## Log tập trung
 

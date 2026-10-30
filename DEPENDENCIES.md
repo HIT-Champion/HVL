@@ -18,7 +18,10 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
    bản**. Mọi tùy biến của Signet nằm ở lớp cấu hình, plugin hoặc adapter riêng.
 3. **Ưu tiên thư viện sẵn có của hệ thống** thay vì đóng gói kèm bản riêng.
 4. **Kiểm tra tương thích giấy phép.** Mọi thành phần mới phải có giấy phép được OSI phê duyệt và
-   tương thích với Apache-2.0 của Signet.
+   tương thích với Apache-2.0 của Signet. Ngoại lệ chỉ khi ghi ở mục Kiểm tra tương thích giấy phép, kèm lý do và
+   phạm vi: giấy phép dễ dãi tương đương một giấy phép OSI (PSF-2.0 là phần đầu của Python-2.0; MIT-CMU là một dạng
+   HPND), hoặc dữ liệu, công cụ chỉ chạy lúc dựng (CC-BY-4.0, CC0-1.0). Không thành phần nào, kể cả tùy chọn, được đòi
+   phần mềm nguồn đóng (#452).
 
 ## Cách đọc
 
@@ -91,17 +94,22 @@ phẩm: bản cài của Signet không chạy, không phục vụ trang này. G�
 | [`@easyops-cn/docusaurus-search-local`](https://github.com/easyops-cn/docusaurus-search-local) | 0.55.3 | MIT | Tìm kiếm: chỉ mục dựng sẵn lúc build, tìm ngay trong trình duyệt (lunr, `lunr-languages` có tiếng Việt), không gọi dịch vụ ngoài |
 | [Be Vietnam Pro](https://github.com/bettergui/BeVietnamPro) (`@fontsource/be-vietnam-pro`) | 5.3.0 | OFL-1.1 | Phông của trang, cùng phông giao diện ứng dụng; tự phục vụ, không gọi CDN. Bản dựng kèm `fonts/be-vietnam-pro/OFL.txt` lấy từ gói |
 
-Quét `website/package-lock.json` ngày 27/10/2026: 1304 gói khác nhau. Ngoài danh sách giấy phép được nhận chỉ có ba
-gói, cùng bốn gói tệp khóa không ghi giấy phép; đều có ngoại lệ ghi lý do trong `.github/license-exceptions.json`:
+Quét `website/package-lock.json` ngày 30/10/2026: 1304 gói khác nhau. Ngoài danh sách giấy phép được nhận chỉ có bốn
+gói, cùng bốn gói tệp khóa không ghi giấy phép; đều có ngoại lệ ghi lý do trong `.github/license-exceptions.json`
+(`caniuse-lite` dùng chung với ứng dụng web, ghi ở mục Tầng 2):
 
 | Gói | Giấy phép | Kéo theo bởi | Ghi chú |
 |---|---|---|---|
 | `argparse` | Python-2.0 | js-yaml | Bộ giấy phép dễ dãi của Python, SPDX ghi OSI phê duyệt. Chỉ chạy lúc dựng |
 | `elkjs` | EPL-2.0 | Mermaid | Copyleft yếu theo từng tệp, OSI phê duyệt; dùng nguyên bản, không sửa, nên không lan sang mã của Signet. Nằm trong JS của trang; mã nguồn ở [kieler/elkjs](https://github.com/kieler/elkjs) |
 | `robust-predicates` | Unlicense | d3-delaunay (qua Mermaid) | Đưa mã vào phạm vi công cộng, OSI phê duyệt |
+| `mdn-data` (2.0.28, 2.0.30) | CC0-1.0 | css-tree (qua csso, svgo: nén CSS, SVG lúc dựng) | Dữ liệu cú pháp CSS của MDN. CC0 đưa tác phẩm vào phạm vi công cộng, không thuộc danh sách OSI. Chỉ đọc lúc dựng; ứng dụng web không còn gói này từ #322 |
 | `eval`, `require-like`, `format`, `khroma` | MIT | Docusaurus, Mermaid | `package.json` không khai giấy phép hay khai bằng trường `licenses` kiểu cũ; tệp LICENSE trong gói là MIT |
 
-`lunr-languages` (MPL-1.1, copyleft yếu) dùng nguyên bản cho tìm kiếm tiếng Việt.
+`lunr-languages` (MPL-1.1, copyleft yếu) dùng nguyên bản cho tìm kiếm tiếng Việt. Gói cho chọn giấy phép thì Signet
+dùng theo MIT: `opener` 1.5.2 (webpack-bundle-analyzer) và `path-is-inside` 1.0.2 (serve-handler) là `WTFPL OR MIT`,
+`type-fest` 1.4.0 và 2.19.0 (boxen; chỉ có kiểu TypeScript) là `MIT OR CC0-1.0`; đều chỉ chạy lúc dựng hay xem thử
+trang. WTFPL và CC0 không thuộc danh sách OSI nên lựa chọn này ghi ra đây.
 
 Ba gói kéo theo có lỗ hổng mà gói cha còn ghim dải cũ được ép lên bản vá bằng `overrides` trong `website/package.json`
 (#349); cả ba chỉ chạy lúc dựng hay ở máy chủ phát triển, không có trong trang đăng lên. Gói cha nâng dải thì bỏ mục
@@ -151,15 +159,14 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | [Apache ECharts](https://echarts.apache.org) | 6.1.0 | Apache-2.0 | Biểu đồ dashboard điều hành (F3.11), chỉ nạp biểu đồ cột, vẽ SVG. Kéo theo zrender 6.1.0 (BSD-3-Clause) và tslib 2.3.0 (0BSD), cùng nằm trong bundle | npm | 3 |
 | [Be Vietnam Pro](https://github.com/bettergui/BeVietnamPro) (`@fontsource/be-vietnam-pro`) | 5.3.0 (phông 1.002) | OFL-1.1 | Phông giao diện của nhận diện Liền mạch (#116), đủ dấu tiếng Việt. Bốn độ đậm 400, 500, 600, 700, kiểu thường; gói chia mỗi độ đậm theo bộ ký tự latin, latin-ext, vietnamese (tệp woff2, woff, CSS có `unicode-range`), dùng nguyên như gói phát hành, kèm giấy phép của gói (`OFL.txt`); trình duyệt tải từ chính máy chủ, không gọi Google Fonts. Repo không chứa tệp phông nào (#305) | npm, ghim trong `package-lock.json` của `apps/office` (Vite đưa vào `/_nuxt/`), `apps/ca-nhan` và `platform/keycloak/fonts` (image `keycloak-fonts` chép vào volume `keycloak_fonts`, Keycloak gắn vào `themes/signet/login/resources/fonts/be-vietnam-pro/`) | 3 |
 
-Thư viện gián tiếp (khoảng 700 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
+Thư viện gián tiếp (khoảng 650 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
 giấy phép MIT, ISC, Apache-2.0, BSD-2/3-Clause, BlueOak-1.0.0, MPL-2.0 hoặc 0BSD, đều được OSI phê duyệt. Quét
-`package-lock.json` ngày 23/10/2026, ngoài danh sách đó chỉ có năm gói dưới đây. Không gói nào trong số này nằm
+`package-lock.json` ngày 30/10/2026, ngoài danh sách đó chỉ có bốn gói dưới đây. Không gói nào trong số này nằm
 trong trang phát hành (đã tìm trong thư mục trang tĩnh của image `app-office`).
 
 | Gói | Giấy phép | Kéo theo bởi | Ghi chú |
 |---|---|---|---|
 | `caniuse-lite` | CC-BY-4.0 | browserslist, autoprefixer | Bảng dữ liệu trình duyệt nào hỗ trợ tính năng nào, chỉ đọc lúc dựng CSS. CC-BY-4.0 là giấy phép mở cho dữ liệu, không thuộc danh sách OSI (OSI chỉ duyệt giấy phép phần mềm) |
-| `mdn-data` | CC0-1.0 | css-tree (nén CSS lúc dựng) | Dữ liệu cú pháp CSS của MDN. CC0 đưa tác phẩm vào phạm vi công cộng, không thuộc danh sách OSI |
 | `@speed-highlight/core` | CC0-1.0 | youch (trang báo lỗi của máy chủ phát triển Nuxt) | Chỉ chạy lúc phát triển |
 | `node-forge` | BSD-3-Clause OR GPL-2.0 | listhen (máy chủ phát triển của Nuxt) | Gói cho chọn giấy phép, Signet dùng theo BSD-3-Clause. Chỉ chạy lúc phát triển |
 | `type-fest` | MIT OR CC0-1.0 | dot-prop | Chỉ có kiểu TypeScript, Signet dùng theo MIT |
@@ -314,7 +321,7 @@ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| [Ollama](https://ollama.com) | 0.35.1 | MIT | Chạy mô hình ngôn ngữ cục bộ (profile `ai`, tùy chọn): viết trích yếu khi quy tắc không ra trích yếu tin cậy (F4.1); nhúng đoạn văn bản và câu hỏi (`/api/embed`), viết câu trả lời có trích dẫn cho trợ lý hỏi đáp (F4.2) — giữ cùng lúc mô hình viết và mô hình nhúng (`OLLAMA_MAX_LOADED_MODELS=2`); mạng nội bộ riêng, không mở cổng, tắt tính năng đám mây (`OLLAMA_NO_CLOUD`). Bản ổn định mới nhất trước 06/10/2026, có `think` và `format` theo JSON Schema | `ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c` (image 02/10/2026) | 4 |
+| [Ollama](https://ollama.com) | 0.35.1 | MIT | Chạy mô hình ngôn ngữ cục bộ (profile `ai`, tùy chọn): viết trích yếu khi quy tắc không ra trích yếu tin cậy (F4.1); nhúng đoạn văn bản và câu hỏi (`/api/embed`), viết câu trả lời có trích dẫn cho trợ lý hỏi đáp (F4.2) — giữ cùng lúc mô hình viết và mô hình nhúng (`OLLAMA_MAX_LOADED_MODELS=2`); mạng nội bộ riêng, không mở cổng, tắt tính năng đám mây (`OLLAMA_NO_CLOUD`). Bản ổn định mới nhất trước 06/10/2026, có `think` và `format` theo JSON Schema. Chỉ chạy CPU: image chính thức kèm thư viện CUDA của NVIDIA (cuBLAS, cudart; giấy phép riêng của NVIDIA, không phải nguồn mở) cho máy có GPU, Signet không cấp GPU cho `ollama` nên không dùng chúng (#452) | `ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c` (image 02/10/2026) | 4 |
 | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) | `qwen3:1.7b` (Q4_K_M, khoảng 1,36 GB) | Apache-2.0 (đã kiểm model card và tệp LICENSE trên Hugging Face của đúng cỡ 1.7B; cỡ 4B cũng Apache-2.0) | Trọng số mô hình viết trích yếu (F4.1) và câu trả lời có trích dẫn của trợ lý hỏi đáp (F4.2, chỉ từ các đoạn đã lọc theo quyền người hỏi; `svc-files` kiểm trích dẫn, con số trước khi trả). Phát hành 04/2025. Máy đủ nhanh thì đổi `MOC_AI_MODEL=qwen3:4b` hoặc chỉ riêng trợ lý `MOC_ASK_MODEL=qwen3:4b` | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7` — so với `ollama list` | 4 |
 | [Qwen3-Embedding-0.6B](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) | `qwen3-embedding:0.6b` (Q8_0, 639 MB, 1024 chiều, ngữ cảnh 32K) | Apache-2.0 (khai trong model card `Qwen/Qwen3-Embedding-0.6B` và bản GGUF chính thức trên Hugging Face; kho không kèm tệp LICENSE, bản kê Ollama không có lớp giấy phép) | Mô hình nhúng đoạn văn bản và câu hỏi cho tìm theo nghĩa của trợ lý hỏi đáp (F4.2, `MOC_AI_EMBED_MODEL`; câu hỏi mang tiền tố `Instruct: …\nQuery: …`). Phát hành 05/06/2025 (bài báo arXiv 2506.05176); có trong thư viện Ollama từ 23/09/2025, Ollama hỗ trợ từ 0.12.1. MMTEB đa ngữ: trung bình 64,33, truy xuất 64,64 (bge-m3: 59,56 / 54,60 — bảng trong model card). Đổi `MOC_AI_EMBED_MODEL=bge-m3` được, cùng 1024 chiều, `svc-files` tự nhúng lại | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d` — so với `ollama list` | 4 |
 | [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) (+ dữ liệu `vie`) | 5.5.0 (gói Debian trixie `tesseract-ocr` 5.5.0-1+b1, `tesseract-ocr-vie` 1:4.1.0-2) | Apache-2.0 | Nhận dạng chữ trên công văn scan, ảnh chụp khi tiếp nhận (F4.1, `svc-files`). Dữ liệu `vie` là bản tessdata_fast 4.1.0 (mô hình LSTM nhanh). Phiên bản gói lấy từ kho Debian theo image gốc — kiểm lại bằng `dpkg-query -W 'tesseract-ocr*'` trong image `svc-files` sau khi dựng | Gói hệ thống (apt) | 4 |
@@ -329,6 +336,10 @@ Qwen3-Embedding-0.6B: model card (`license: apache-2.0`) của `Qwen/Qwen3-Embed
 trọng số (bản kê và lớp cấu hình `Q8_0`, họ `qwen3`, 595,78M tham số đã đối chiếu với registry của Ollama). Trợ lý hỏi
 đáp không thêm image, không thêm gói Python: đường ống truy xuất, lọc quyền, trích dẫn, kiểm câu trả lời tự viết
 trong `svc-files` (httpx2 sẵn có), kho véc-tơ là Meilisearch đã chạy.
+
+**Mở trọng số, chưa phải AI nguồn mở.** Qwen3 công bố trọng số theo Apache-2.0 nhưng không công bố mã huấn luyện và
+thông tin đủ chi tiết về dữ liệu huấn luyện, nên theo Định nghĩa AI nguồn mở của OSI (OSAID 1.0) đây là mô hình mở
+trọng số. Tài liệu của Signet gọi là "mô hình mở trọng số (Apache-2.0)", không gọi là "AI nguồn mở".
 
 **F4.3 không thêm phụ thuộc** — không gói Python, gói npm, image hay route gateway nào. Tác tử gợi ý giao việc
 `moc-assigner` (`svc-workflow`) dùng lại: phần truy xuất của trợ lý hỏi đáp trong `svc-files` (chỉ mục đoạn `chunks`
@@ -348,7 +359,8 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 | Thành phần | Lý do | Thay bằng |
 |---|---|---|
 | HashiCorp Vault | BUSL-1.1 từ v1.15 (08/2023) — không phải OSI | OpenBao |
-| n8n | Sustainable Use License — không phải OSI | Vòng nền trong `svc-files` |
+| Chạy mô hình bằng GPU NVIDIA (CUDA) | Bắt buộc driver NVIDIA và thư viện CUDA (cuBLAS, cudart), đều là phần mềm đóng; với card NVIDIA không có đường GPU nào hoàn toàn nguồn mở. Đã thêm ở #443, gỡ ở #452 (30/10/2026) | Ollama chạy trên CPU |
+| n8n | Sustainable Use License — không phải OSI | Vòng nền trong `svc-files` cho việc chạy định kỳ; Node-RED cho tự động hóa (#366, dòng cuối bảng) |
 | Redpanda | BSL-1.1 — không phải OSI | Chưa thay: sự kiện ghi vào bảng PostgreSQL trong cùng giao dịch (`office.document_events`, `core.lineage_events`, hộp thư đi `core.notification_deliveries`), Centrifugo đẩy tới trình duyệt; trục sự kiện dự kiến dùng Hasura Event Triggers, chưa khai ([`ROADMAP.md`](ROADMAP.md)) |
 | MongoDB | SSPL-1.0 — không phải OSI | PostgreSQL |
 | immudb | BUSL-1.1 từ 12/2023 — không phải OSI | Sổ kiểm toán chuỗi băm trong PostgreSQL |
@@ -380,8 +392,9 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.0 ở vai trò dịch vụ độc lập):
 
 - ✅ Apache-2.0, MIT, MIT-0, BSD-2/3-Clause, 0BSD, ISC, BlueOak-1.0.0, PostgreSQL License, MPL-2.0 (giấy phép dễ dãi
-  được OSI phê duyệt) và PSF-2.0 (giấy phép dễ dãi của chính Python và image `python`; F4.5: aiohappyeyeballs). SPDX
-  đánh dấu OSI phê duyệt cho Python-2.0, bộ giấy phép của Python mở đầu bằng PSF-2.0, chứ không cho riêng PSF-2.0.
+  được OSI phê duyệt) và PSF-2.0 (giấy phép dễ dãi của chính Python và image `python`; aiohappyeyeballs qua aiohttp
+  của pyHanko ở F4.5, typing-extensions qua Pydantic, FastAPI). SPDX đánh dấu OSI phê duyệt cho Python-2.0, bộ giấy
+  phép của Python mở đầu bằng PSF-2.0, chứ không cho riêng PSF-2.0.
 - ✅ MIT-CMU chỉ cho Pillow (ngoại lệ có lý do): một dạng HPND, dễ dãi, chỉ đòi giữ thông báo bản quyền; SPDX đánh dấu
   OSI phê duyệt cho HPND nhưng chưa cho riêng MIT-CMU.
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
@@ -391,13 +404,16 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
 - ✅ Python-2.0, Unlicense (OSI phê duyệt) và EPL-2.0 (copyleft yếu, dùng nguyên bản) chỉ cho gói của trang tài liệu
   `website/`, qua ngoại lệ có lý do: `argparse`, `robust-predicates`, `elkjs` (mục Trang tài liệu).
 - ✅ CC-BY-4.0, CC0-1.0 chỉ cho dữ liệu và công cụ chạy lúc dựng, lúc phát triển, không vào sản phẩm: `caniuse-lite`,
-  `mdn-data`, `@speed-highlight/core` (mục Tầng 2). Gói cho chọn giấy phép thì chọn giấy phép OSI: `node-forge`
-  theo BSD-3-Clause, `type-fest` theo MIT.
+  `@speed-highlight/core` (mục Tầng 2), `mdn-data` (mục Trang tài liệu). Gói cho chọn giấy phép thì chọn giấy phép
+  OSI: `node-forge` theo BSD-3-Clause; `type-fest`, `opener`, `path-is-inside` theo MIT.
 - ⚠️ GPL-2.0/3.0, AGPL-3.0 — chấp nhận được khi chạy như **dịch vụ độc lập** giao tiếp qua mạng,
   không liên kết mã. Hiện gồm: ClamAV, PostGIS, DokuWiki cùng hai plugin oauth, oauthgeneric (GPL-2.0), Grafana và
   Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic
-  License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào.
+  License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào, kể cả thành phần tùy chọn (#452).
+- Dữ liệu công khai trong `seed/du-lieu-mo/` (nguồn A #424, nguồn B #427) không mang giấy phép nguồn mở: đó là văn bản
+  nhà nước và tin thời sự thuần túy, không thuộc phạm vi bảo hộ quyền tác giả theo Điều 15 Luật Sở hữu trí tuệ.
+  `REUSE.toml` khai là `LicenseRef-VN-SHTT-Dieu-15`; nguồn và căn cứ dùng lại từng tệp ở `manifest.json` cùng thư mục.
 - Logo các dự án trong sơ đồ kiến trúc (`docs/anh/logo/`, ảnh `docs/anh/kien-truc-tong-the*.gif`) không phải thành phần
   phần mềm: là nhãn hiệu của chủ sở hữu, chỉ dùng để nhận diện phần mềm nguồn mở mà Signet sử dụng hoặc gửi thông báo
   tới, không thuộc giấy phép Apache-2.0 của Signet; khai riêng trong `REUSE.toml` (`LicenseRef-Logos`), nguồn ghi ở
@@ -414,8 +430,27 @@ ngoại lệ hết tác dụng); ngoại lệ cho gói SBOM không rõ giấy ph
 SBOM `signet-X.Y.Z.cdx.json`.
 Syft không đọc `Dockerfile`, `docker-compose.yml`: image thượng nguồn và giấy phép của chúng là các bảng ở trên.
 
-Lần quét 23/10/2026 (Syft 1.54.1): 769 gói khác nhau — npm 690, Python 73, action CI 6 — đều đạt; 22 gói qua nhờ ngoại
-lệ: 4 gói npm dữ liệu và công cụ dựng mang CC-BY-4.0, CC0-1.0 (mục Tầng 2, `mdn-data` có hai bản), Pillow (MIT-CMU), 11
-gói Python mà PyPI chỉ khai giấy phép bằng classifier hay chữ tự do (WeasyPrint và các gói nó kéo theo, segno, DuckDB,
-python-dateutil, colorama — giấy phép đọc từ tệp LICENSE trong wheel) và 6 action CI (giấy phép đọc ở đúng thẻ đã
-ghim). Copyleft yếu: Pyphen (chọn MPL-1.1).
+Lần quét 30/10/2026 trên `develop` (7e2bbdb, CI run 40992435806, Syft 1.54.1): 1899 gói khác nhau — npm 1799, Python
+92, action CI 8 — đều đạt. Số gói npm tăng từ 690 (lần quét 23/10) chủ yếu vì từ 27/10 quét cả trang tài liệu
+`website/` (1304 gói, chỉ dùng lúc dựng). 32 gói qua nhờ ngoại lệ: 4 gói npm dữ liệu và công cụ dựng mang CC-BY-4.0,
+CC0-1.0 (`mdn-data` có hai bản), 7 gói npm của trang tài liệu (mục Trang tài liệu), Pillow (MIT-CMU), 12 gói Python mà
+PyPI chỉ khai giấy phép bằng classifier hay chữ tự do (WeasyPrint và các gói nó kéo theo, segno, DuckDB, protobuf,
+python-dateutil, colorama — giấy phép đọc từ tệp LICENSE trong wheel) và 8 action CI (giấy phép đọc ở đúng thẻ đã
+ghim). Hai gói PSF-2.0 (aiohappyeyeballs, typing-extensions) nằm trong danh sách được nhận nên không cần ngoại lệ.
+Copyleft yếu: Pyphen (chọn MPL-1.1), `lunr-languages` (MPL-1.1), phông Be Vietnam Pro (OFL-1.1).
+
+### Dịch vụ quanh dự án, không phải phụ thuộc lúc chạy
+
+Cài và chạy Signet trên một máy (`make up`) không cần dịch vụ nào dưới đây. Chúng phục vụ việc phát triển, đăng bản
+demo của đội, hoặc là lựa chọn của đơn vị cài đặt:
+
+- **Cloudflare Tunnel:** chỉ để đưa bản online của đội ra Internet. Phần chạy trên máy là `cloudflared` (Apache-2.0,
+  profile `tunnel`, tắt mặc định); máy có IP công khai thì dùng Caddy hay một reverse proxy khác thay thế.
+- **GitHub (kho mã, Actions, Pages):** nơi lưu mã, chạy CI và đăng trang tài liệu, không thuộc sản phẩm. CI chỉ gọi lại
+  lệnh `make` và script trong repo, chạy được trên máy riêng; trang tài liệu dựng tại chỗ bằng `npm run build` trong
+  `website/`.
+- **API viết câu trả lời chuẩn OpenAI (#430):** tắt mặc định. Giao thức mở, đích có thể là máy chủ nguồn mở của đơn vị
+  (vLLM Apache-2.0, llama.cpp MIT); gửi tới dịch vụ đám mây là quyết định của đơn vị, và chỉ câu hỏi cùng các đoạn căn
+  cứ đã che thông tin cá nhân rời máy ([`docs/van-hanh.md`](docs/van-hanh.md), mục Trợ lý hỏi đáp qua API ngoài).
+- **Nơi tải về:** image từ Docker Hub, Quay.io; trọng số mô hình từ thư viện của Ollama, nguồn gốc là Hugging Face (mục
+  Trí tuệ nhân tạo).

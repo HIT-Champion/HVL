@@ -21,6 +21,8 @@
   ``200.000``) và số ký hiệu (``88/CTSV``, ``131/ĐT-ĐH``) thành một token.
 - ``terms``: token bỏ từ dừng, khử trùng, so khớp trên dạng bỏ dấu (``vntext.fold``). Từ dừng so trên token
   chữ thường **còn dấu**: bỏ dấu trước thì "có" trùng "cơ" của "cơ quan", "thì" trùng "thi" của "kỳ thi".
+- ``term_bigrams``: cặp term đứng liền nhau, gần với từ hai âm tiết ("hộ chiếu") — câu trích dùng để không nhận câu
+  chỉ khớp âm tiết lẻ ("cấp" của "cung cấp").
 - ``keyword_query``: tối đa 10 term (Meilisearch chỉ xét 10 từ đầu của câu tìm), viết lại bằng chữ gốc.
 - ``sentences``: khoảng ``[đầu, cuối)`` của từng câu, để trích nguyên văn.
 """
@@ -103,6 +105,12 @@ def terms(s: str) -> list[str]:
 def term_key(token: str) -> str:
     """Dạng so khớp của một token đã tách (``TOKEN_RE``): chữ thường, bỏ dấu."""
     return fold(token.lower())
+
+
+def term_bigrams(s: str) -> set[tuple[str, str]]:
+    """Cặp term đứng liền nhau (dạng bỏ dấu) của chuỗi: "hộ chiếu", "xanh lam". Từ dừng ở giữa thì không thành cặp."""
+    keys = [fold(t) if _is_term(t) else None for t in tokens(s)]
+    return {(a, b) for a, b in zip(keys, keys[1:], strict=False) if a and b}
 
 
 def keyword_query(s: str) -> str:

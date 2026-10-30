@@ -3149,23 +3149,6 @@
             "type": "boolean",
             "title": "Semantic",
             "description": "Tìm theo nghĩa được (mô hình nhúng sẵn sàng)"
-          },
-          "device": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "gpu",
-                  "cpu",
-                  "gpu+cpu"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Device",
-            "description": "Mô hình của Ollama đang nằm trên GPU, CPU hay chia hai (MOC_AI_DEVICE, /api/ps); null khi chưa nạp mô hình nào hay trợ lý tắt"
           }
         },
         "type": "object",
