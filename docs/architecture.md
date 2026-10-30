@@ -11,8 +11,10 @@
 >
 > 1. **Gồm gì.** Lõi Tầng 1 không giao diện: phần mềm nguồn mở dùng nguyên bản (Keycloak, APISIX, Hasura, PostgreSQL,
 >    Flowable, SeaweedFS, Meilisearch, ClamAV, OpenBao, Centrifugo) cộng hai dịch vụ Python của đội, `svc-files` và
->    `svc-workflow`. Tầng 2 là các ứng dụng: Văn phòng điện tử, Không gian cá nhân P.A.R.A (hai trang tĩnh), trang tài
->    liệu API, và Bảng tin đơn vị, Nghỉ phép (cắm bằng `moc app install`).
+>    `svc-workflow`. Tầng 2 là bốn không gian H-P-D-I có giao diện, mỗi màn hình thuộc một không gian (bảng ở
+>    [`README.md`](../README.md) mục "Kiến trúc"; thành phần theo không gian ở §3): Văn phòng điện tử (một ứng dụng có
+>    màn ở cả bốn không gian), Không gian cá nhân P.A.R.A (hai trang tĩnh), trang tài liệu API, và Bảng tin đơn vị, Nghỉ
+>    phép (cắm bằng `moc app install`). Tầng 3, ứng dụng ngành, đề không bắt buộc và Signet chưa làm.
 > 2. **Chạy thế nào.** Mọi yêu cầu vào qua một cổng APISIX có kiểm token. Dữ liệu có cấu trúc đi qua Hasura, quyền tới
 >    từng dòng; tệp đi qua `svc-files`, quét ClamAV trước khi lưu; bước quy trình do Flowable giữ.
 > 3. **Vì sao chọn vậy.** Không viết lại phần mềm đã có, chạy trên một máy 8 GB, không dịch vụ trả phí (§1); từng lựa
