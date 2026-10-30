@@ -67,8 +67,8 @@ Signet theo khung ba tầng của đề DX-OS:
 |---|---|
 | [H] Con người | Không gian cá nhân P.A.R.A (tệp của từng người), Bảng tin đơn vị, trang Ứng dụng của Văn phòng; wiki DokuWiki (profile `wiki`). Đăng nhập một lần, vai trò, đơn vị lấy từ Keycloak ở Tầng 1 |
 | [P] Quy trình | Văn phòng điện tử: tiếp nhận, văn bản đến, văn bản đi, hộp việc và Lịch hạn, sổ đăng ký; Đơn nghỉ phép; trang Dựng form cho quản trị |
-| [D] Dữ liệu | Văn phòng điện tử: Điều hành, Số đo, Phả hệ số liệu, Sơ đồ cảm biến, Sổ kiểm toán; trang Tài liệu API (REST, GraphQL) |
-| [I] Trí tuệ | Văn phòng điện tử: Tìm kiếm, Hỏi đáp, gợi ý ô khi tiếp nhận văn bản đến, gợi ý giao việc |
+| [D] Dữ liệu | Văn phòng điện tử: Điều hành, Số đo, Phả hệ số liệu, Sơ đồ cảm biến, Sổ kiểm toán, Hồ sơ công việc (nộp lưu sang kho lạnh, phòng đọc); trang Tài liệu API (REST, GraphQL) |
+| [I] Trí tuệ | Văn phòng điện tử: Tìm kiếm (toàn văn và theo nghĩa), Hỏi đáp, gợi ý ô khi tiếp nhận văn bản đến, gợi ý giao việc |
 
 Chỉ cổng APISIX mở ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó trước khi tới lõi; nhãn trên mũi tên là đường
 dẫn thật. Bên trong máy cũng vậy:

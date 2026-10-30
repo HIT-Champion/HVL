@@ -73,8 +73,8 @@ Signet follows the three tiers of the DX-OS brief:
 |---|---|
 | [H] Human | P.A.R.A personal space (each person's files), unit news board, the e-Office Apps page; DokuWiki wiki (`wiki` profile). Single sign-on, roles and units come from Keycloak in Tier 1 |
 | [P] Process | e-Office: intake, incoming and outgoing documents, task inbox and deadline calendar, registers; leave requests; the form builder for administrators |
-| [D] Data | e-Office: executive dashboard, metrics, data lineage, sensor map, audit log; the API docs page (REST, GraphQL) |
-| [I] Intelligence | e-Office: search, Q&A, field suggestions when taking in an incoming document, assignment suggestions |
+| [D] Data | e-Office: executive dashboard, metrics, data lineage, sensor map, audit log, case files (archiving to cold storage, reading room); the API docs page (REST, GraphQL) |
+| [I] Intelligence | e-Office: search (full text and semantic), Q&A, field suggestions when taking in an incoming document, assignment suggestions |
 
 Only the APISIX gateway is exposed, and every request passes its web application firewall before it reaches the core;
 the labels on its arrows are the real paths. The same holds inside the machine:
