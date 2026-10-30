@@ -581,8 +581,8 @@ then `docker compose up -d` (recreates `openbao`, `svc-files`). To change the ke
 - **What leaves the machine:** only the answer-writing call: the question and at most 4 source passages, **masked**
   first (phone numbers, citizen ID numbers, email addresses, bank account numbers; F4.4). Semantic search (the
   embedding model) and incoming-document summaries stay in Ollama; without the `ai` profile the assistant searches by
-  keyword and only the writing step uses the API. An open model running locally remains the recommended default:
-  sending documents to a cloud service is the unit's own decision about its data.
+  keyword and only the writing step uses the API. An open-weight model (Apache-2.0) running locally remains the
+  recommended default: sending documents to a cloud service is the unit's own decision about its data.
 - **Same checks:** the output is forced to a JSON Schema (`response_format`), and Signet still checks every sentence
   against the source passages and numbers before adding citations; otherwise it returns the verbatim quote.
 - **Key:** a `svc-files` secret in the vault like the other keys (section Secrets vault), not in the `svc-files`

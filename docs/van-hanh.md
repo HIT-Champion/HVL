@@ -515,8 +515,8 @@ rồi `docker compose up -d` (tạo lại `openbao`, `svc-files`). Đổi khóa 
 
 - **Cái gì rời máy:** chỉ lời gọi viết câu trả lời: câu hỏi và tối đa 4 đoạn văn bản làm căn cứ, **đã che** số điện
   thoại, CCCD, email, số tài khoản (F4.4). Tìm theo nghĩa (mô hình nhúng) và trích yếu văn bản đến vẫn ở Ollama; không
-  bật profile `ai` thì trợ lý tìm theo từ khóa, chỉ bước viết dùng API. Mô hình nguồn mở chạy tại chỗ vẫn là mặc
-  định khuyên dùng: gửi văn bản tới dịch vụ đám mây là quyết định của đơn vị về dữ liệu của mình.
+  bật profile `ai` thì trợ lý tìm theo từ khóa, chỉ bước viết dùng API. Mô hình mở trọng số (Apache-2.0) chạy tại
+  chỗ vẫn là mặc định khuyên dùng: gửi văn bản tới dịch vụ đám mây là quyết định của đơn vị về dữ liệu của mình.
 - **Kiểm như cũ:** đầu ra ép theo JSON Schema (`response_format`), máy chủ Signet vẫn kiểm từng câu với đoạn nguồn và
   con số rồi mới gắn trích dẫn; không đạt thì trả câu trích nguyên văn.
 - **Khóa:** là bí mật của `svc-files` trong két như các khóa khác (mục Két bí mật), không nằm trong biến môi trường của
