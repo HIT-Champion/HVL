@@ -17,11 +17,11 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 Bản cho vòng trường 01/11. Hai nguồn dữ liệu công khai có bản chụp trong repo, trang Trạng thái báo tuổi dữ liệu:
 thông tư của Bộ GD&ĐT về giáo dục đại học từ Công báo (nạp thành văn bản đến) và lịch nghỉ lễ, Tết chính thức cho hạn
 gợi ý giao việc. Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn sử dụng, từ chối câu ngoài phạm vi, hiểu câu
-nối tiếp, đếm việc và văn bản của chính người hỏi; tùy chọn viết câu trả lời qua API ngoài chuẩn OpenAI.
-Thêm cảnh báo vận hành qua Alertmanager vào chuông của quản trị đơn vị, tự động hóa Node-RED và wiki
-nội bộ DokuWiki (đăng nhập Keycloak, tắt mặc định), truy vết phân tán Jaeger (profile `trace`), kênh SMS, Zalo; tiếng
-Anh cho sổ đăng ký, văn bản đi và Đơn nghỉ phép; trang Dựng form cho quản trị; hướng dẫn vận hành tiếng Anh. Log tập
-trung thu cả Meilisearch; bộ che thông tin cá nhân bắt cả số di động viết liền sau `ĐT`, `SĐT`.
+nối tiếp, đếm việc và văn bản của chính người hỏi; tùy chọn viết câu trả lời qua API ngoài chuẩn OpenAI. Thêm cảnh báo
+vận hành qua Alertmanager vào chuông của quản trị đơn vị, tự động hóa Node-RED và wiki nội bộ DokuWiki (đăng nhập
+Keycloak, tắt mặc định), truy vết phân tán Jaeger (profile `trace`), kênh SMS, Zalo; tiếng Anh cho sổ đăng ký, văn bản
+đi và Đơn nghỉ phép; trang Dựng form cho quản trị; hướng dẫn vận hành tiếng Anh. Log tập trung thu cả Meilisearch; bộ
+che thông tin cá nhân bắt cả số di động viết liền sau `ĐT`, `SĐT`.
 Nâng tại chỗ từ `v1.2.1`, rồi nạp nguồn công khai bằng `python3 scripts/moc.py du-lieu-mo nap`; bản cài cũ còn đặt
 `MOC_TRUSTED_PROXY` là một dải cố định thì đổi tay sang `auto` (#211).
 
