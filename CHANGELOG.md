@@ -17,8 +17,8 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 Bản cho vòng trường 01/11. Hai nguồn dữ liệu công khai có bản chụp trong repo, trang Trạng thái báo tuổi dữ liệu:
 thông tư của Bộ GD&ĐT về giáo dục đại học từ Công báo (nạp thành văn bản đến) và lịch nghỉ lễ, Tết chính thức cho hạn
 gợi ý giao việc. Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn sử dụng, từ chối câu ngoài phạm vi, hiểu câu
-nối tiếp, đếm việc và văn bản của chính người hỏi; tùy chọn viết câu trả lời qua API ngoài chuẩn OpenAI và chạy mô hình
-trên GPU NVIDIA. Thêm cảnh báo vận hành qua Alertmanager vào chuông của quản trị đơn vị, tự động hóa Node-RED và wiki
+nối tiếp, đếm việc và văn bản của chính người hỏi; tùy chọn viết câu trả lời qua API ngoài chuẩn OpenAI.
+Thêm cảnh báo vận hành qua Alertmanager vào chuông của quản trị đơn vị, tự động hóa Node-RED và wiki
 nội bộ DokuWiki (đăng nhập Keycloak, tắt mặc định), truy vết phân tán Jaeger (profile `trace`), kênh SMS, Zalo; tiếng
 Anh cho sổ đăng ký, văn bản đi và Đơn nghỉ phép; trang Dựng form cho quản trị; hướng dẫn vận hành tiếng Anh. Log tập
 trung thu cả Meilisearch; bộ che thông tin cá nhân bắt cả số di động viết liền sau `ĐT`, `SĐT`.
@@ -41,7 +41,6 @@ Nâng tại chỗ từ `v1.2.1`, rồi nạp nguồn công khai bằng `python3 
 - Nhãn "Nguồn công khai" trên trang văn bản nạp từ nguồn mở; trang Trạng thái liệt kê nguồn và tuổi dữ liệu (#426).
 - Trang Hỏi đáp: gợi ý theo loại câu, câu nối tiếp, dòng "Đã hiểu là…", nói rõ trợ lý trả lời được gì (#422).
 - Trợ lý hỏi đáp viết câu trả lời qua API ngoài chuẩn OpenAI (`MOC_ASK_API=openai`, tắt mặc định), khóa qua két (#430).
-- Tùy chọn chạy mô hình bằng GPU NVIDIA (`MOC_AI_DEVICE=gpu`); `/api/status` báo mô hình nằm ở GPU hay CPU (#442).
 - Nguồn công khai B: lịch nghỉ lễ, Tết, nghỉ bù chính thức 2026–2027 cho hạn gợi ý giao việc, có bản chụp (#427).
 - Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn, từ chối câu ngoài phạm vi, ghép câu nối tiếp (#423).
 - Trợ lý hỏi đáp đếm việc trong Hộp việc và số văn bản bằng quyền người hỏi, không qua mô hình (#441).

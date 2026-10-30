@@ -35,19 +35,13 @@ COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXT
 # đi cùng mọi COMPOSE_FILE mà Makefile tự đặt (log tập trung); không đặt thì compose đọc COMPOSE_FILE trong .env
 APPS_COMPOSE_FILE := $(wildcard .moc-apps/docker-compose.apps.yml)
 APPS_SUFFIX := $(if $(APPS_COMPOSE_FILE),:$(APPS_COMPOSE_FILE))
-# Mô hình chạy trên GPU NVIDIA (MOC_AI_DEVICE=gpu, docs/van-hanh.md mục Chạy mô hình bằng GPU): tệp phủ cấp GPU cho
-# ollama, đi cùng mọi COMPOSE_FILE mà Makefile đặt. cpu (mặc định) thì compose chỉ đọc docker-compose.yml như cũ
-AI_DEVICE := $(shell sed -n 's/^MOC_AI_DEVICE=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr -d ' ')
-GPU_SUFFIX := $(if $(filter gpu,$(AI_DEVICE)),:docker-compose.gpu.yml)
-BASE_COMPOSE_FILE := docker-compose.yml$(GPU_SUFFIX)$(APPS_SUFFIX)
-LOGS_COMPOSE_FILE := docker-compose.yml$(GPU_SUFFIX):platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
+BASE_COMPOSE_FILE := docker-compose.yml$(APPS_SUFFIX)
+LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
 LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow hasura keycloak postgres meilisearch
 # Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
 LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
 ifneq ($(LOGS_ON),)
 export COMPOSE_FILE := $(LOGS_COMPOSE_FILE)
-else ifneq ($(GPU_SUFFIX),)
-export COMPOSE_FILE := $(BASE_COMPOSE_FILE)
 endif
 # Wiki nội bộ (#367, profile wiki; docs/van-hanh.md mục Wiki nội bộ). Bật lâu dài (wiki trong MOC_EXTRA_PROFILES): make
 # up cũng thêm bí mật client vào .env cũ (wiki-env) và đồng bộ client Keycloak, quyền theo đơn vị (moc wiki sync)
@@ -86,8 +80,6 @@ env: ## Sinh .env từ .env.example, thay mọi change_me bằng chuỗi ngẫu 
 	  || { rm -f $(ENV_FILE).tmp; exit 1; }
 	@chmod 600 $(ENV_FILE)
 	@echo "Đã tạo $(ENV_FILE). Mật khẩu của các tài khoản mẫu là giá trị MOC_DEMO_PASSWORD trong tệp này."
-	@[ "$$(./scripts/co-gpu.sh)" != gpu ] || echo "Máy có GPU NVIDIA và Docker có runtime nvidia: đặt MOC_AI_DEVICE=gpu \
-	trong $(ENV_FILE) để Ollama chạy mô hình trên GPU (docs/van-hanh.md, mục Chạy mô hình bằng GPU)."
 
 # .env chép tay từ .env.example mà quên sửa: mật khẩu, khóa (cả khóa quản trị Hasura) ai đọc mã nguồn cũng biết
 env-ready: $(ENV_FILE)
