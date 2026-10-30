@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Đã sửa đổi
+- Thêm banner nhận diện Signet vào README tiếng Việt và tiếng Anh (#459).
+
 ## [1.3.0] - 2026-10-30
 
 Bản cho vòng trường 01/11. Hai nguồn dữ liệu công khai có bản chụp trong repo, trang Trạng thái báo tuổi dữ liệu:

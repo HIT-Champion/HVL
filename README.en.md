@@ -1,5 +1,7 @@
 # Signet
 
+![Signet — Open-source e-Office, self-hosted with control over your data](docs/anh/signet-banner.png)
+
 **Tiếng Việt:** [README.md](README.md)
 
 > **A self-hosted, open-source core platform that puts a seal of trust on everything that passes through it** — with

@@ -1,5 +1,7 @@
 # Signet
 
+![Signet — Văn phòng điện tử nguồn mở](docs/anh/signet-banner.png)
+
 **English:** [README.en.md](README.en.md)
 
 > **Lõi nền tảng nguồn mở, tự cài, đóng dấu tin cậy lên mọi thứ đi qua nó** — kèm ứng dụng đầu tiên chạy trên lõi:
