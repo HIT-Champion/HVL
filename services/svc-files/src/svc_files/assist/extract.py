@@ -18,7 +18,10 @@
 
 Mỗi câu của mỗi đoạn được chấm ``|term(câu hỏi) ∩ term(câu)| / |term(câu hỏi)|``. Hòa điểm thì câu chỉ nhắc lại trích
 yếu, số ký hiệu, cơ quan ban hành (dòng "V/v …", tiêu đề — người dùng đã thấy ở nguồn) xếp sau, rồi câu đứng trước.
-Mỗi đoạn lấy câu tốt nhất; giữ câu đạt ``THRESHOLD`` và chung ít nhất ``min(2, |term|)`` term; tối đa 3 câu, ưu tiên
+Câu đạt khi chạm ``THRESHOLD``, chung ít nhất ``min(2, |term|)`` term và chứa ít nhất ``min(2, ⌈số cặp / 2⌉)`` cặp
+term đứng liền nhau của câu hỏi (``vi.term_bigrams``, #448): term là âm tiết, nên "Thủ tục cấp hộ chiếu công vụ" đạt
+3/7 với câu có "cung cấp", "công nghệ", "dịch vụ" mà không chung cặp nào. Mỗi đoạn lấy câu tốt nhất trong các câu
+đạt (không câu nào đạt thì câu điểm cao nhất, chỉ để làm đoạn trích); tối đa 3 câu, ưu tiên
 câu của các văn bản khác nhau; trùng chữ (đoạn chồng nhau) thì bỏ. Văn bản trả lời: mỗi dòng ``“<câu>” [n]``, ``n`` là
 số thứ tự của đoạn trong danh sách nguồn. Dạng ``[2]``, ``[1, 3]`` có sẵn trong câu được đổi thành ``(2)``, ``(1, 3)``
 (``unmark``): chỉ dấu trích dẫn do máy chủ thêm mới có dạng ``[n]``, giao diện không dựng nhầm thành liên kết nguồn.
@@ -36,6 +39,7 @@ from .retrieve import Passage
 
 THRESHOLD = 0.34            # tỷ lệ term của câu hỏi có trong câu
 MIN_COMMON = 2              # số term chung tối thiểu (câu hỏi ít term hơn thì bằng số term)
+MIN_PAIRS = 2               # số cặp term liền nhau chung tối thiểu (câu hỏi ít cặp thì nửa số cặp, làm tròn lên)
 MAX_SENTENCES = 3
 SENTENCE_CHARS = 320        # câu dài hơn thì cắt quanh chỗ khớp
 EXCERPT_CHARS = 600         # đoạn trích hiện ở danh sách nguồn
@@ -112,35 +116,41 @@ def excerpt(text: str, span: tuple[int, int] | None, limit: int = EXCERPT_CHARS)
     return " ".join(_window(text, lo, hi, limit).split())
 
 
-def _best(question: set[str], passage: Passage) -> tuple[tuple[int, int], float, int] | None:
-    """Câu tốt nhất của đoạn: (khoảng, điểm, số term chung)."""
+def _best(question: set[str], pairs: set[tuple[str, str]],
+          passage: Passage) -> tuple[tuple[int, int], float, bool] | None:
+    """Câu tốt nhất của đoạn: (khoảng, điểm, đạt) — câu đạt đứng trước, rồi điểm."""
     spans = vi.sentences(passage.text)
     if not spans:
         return None
+    need = min(MIN_COMMON, len(question))
+    need_pairs = min(MIN_PAIRS, (len(pairs) + 1) // 2)
     shown = _doc_terms(passage.doc) if passage.kind == "page" else set()
     ranked = []
     for a, b in spans:
-        got = set(vi.terms(passage.text[a:b]))
+        sentence = passage.text[a:b]
+        got = set(vi.terms(sentence))
         common = len(question & got)
         score = common / len(question) if question else 0.0
+        ok = (bool(question) and score >= THRESHOLD and common >= need
+              and len(pairs & vi.term_bigrams(sentence)) >= need_pairs)
         restates = bool(shown) and bool(got) and got <= shown
-        ranked.append((-score, restates, a, b, common))
-    neg, _, a, b, common = min(ranked)
-    return (a, b), -neg, common
+        ranked.append((not ok, -score, restates, a, b))
+    failed, neg, _, a, b = min(ranked)
+    return (a, b), -neg, not failed
 
 
 def answer(question: str, passages: Sequence[Passage]) -> Extract:
     wanted = set(vi.terms(question))
-    need = min(MIN_COMMON, len(wanted))
+    pairs = vi.term_bigrams(question)
     best: dict[str, tuple[int, int]] = {}
     picks: list[_Pick] = []
     for i, passage in enumerate(passages):
-        got = _best(wanted, passage)
+        got = _best(wanted, pairs, passage)
         if got is None:
             continue
-        (a, b), score, common = got
+        (a, b), score, ok = got
         best[passage.chunk_id] = (a, b)
-        if wanted and score >= THRESHOLD and common >= need:
+        if ok:
             picks.append(_Pick(i + 1, passage.document_id, score, _clip(unmark(passage.text[a:b]), wanted)))
     picks.sort(key=lambda p: (-p.score, p.n))
     chosen: list[_Pick] = []

@@ -230,8 +230,9 @@ sách cấm của câu, hoặc văn bản hạn chế 53/PA-ĐHM (cấm ở **m�
 bộ định tuyến chọn đúng `route` của câu, câu nối tiếp được ghép (`rewritten`), câu ngoài phạm vi nhận câu cố định
 (`answer.source: fixed`), câu đường dữ liệu nhận câu có số (`answer.source: data`); **đếm đúng** — mọi số và bộ lọc
 trong `data` bằng số đếm thẳng qua GraphQL. recall@3, từ chối đúng chỉ tính trên 19 câu `van_ban`; các loại khác in
-riêng "đường đúng · trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu đi sai
-đường, hoặc một câu `gioi_thieu`, `huong_dan`, `ngoai_pham_vi`, `viec_cua_toi`, `dem_van_ban` trả lời sai: các đường
+riêng "đường đúng · trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu âm
+`van_ban` được trả lời (#448), một câu đi sai đường, hoặc một câu `gioi_thieu`, `huong_dan`, `ngoai_pham_vi`,
+`viec_cua_toi`, `dem_van_ban` trả lời sai: các đường
 này không qua tìm kiếm nên không cần ngưỡng. Câu nối tiếp và câu `cong_khai` tìm trong kho như câu `van_ban`, recall@3
 của chúng chỉ in ra, không làm đỏ.
 

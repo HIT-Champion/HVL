@@ -1844,7 +1844,8 @@ def summarize(rows: list[dict]) -> dict[str, Any]:
                            "correct": sum(r["correct"] for r in rows if r["loai"] == loai)}
                     for loai in dict.fromkeys(r["loai"] for r in rows)},
         "route_errors": [f"{r['id']} ({r['loai']}): {r['route']}" for r in rows if not r["route_ok"]],
-        "type_errors": [r["id"] for r in rows if r["loai"] in FIXED_TYPES and r["route_ok"] and not r["correct"]]}
+        "type_errors": [r["id"] for r in rows if r["loai"] in FIXED_TYPES and r["route_ok"] and not r["correct"]],
+        "answered_negatives": [f"{r['id']} ({r['status']})" for r in neg if not r["correct"]]}
     if gen:
         out["model"] = {
             "asked": len(gen), "by_model": sum(r["model"]["by_model"] for r in gen), "positives": len(gen_pos),
@@ -1860,11 +1861,14 @@ def summarize(rows: list[dict]) -> dict[str, Any]:
 
 def verdict(summary: dict[str, Any]) -> list[str]:
     """Lý do thoát 1 (rỗng: đạt): mọi nguồn bị cấm; recall@3 câu dương dưới RECALL_MIN; bộ định tuyến chọn sai đường
-    hay không ghép câu nối tiếp; câu giới thiệu, hướng dẫn, ngoài phạm vi trả lời sai (các đường này tất định)."""
+    hay không ghép câu nối tiếp; câu giới thiệu, hướng dẫn, ngoài phạm vi trả lời sai (các đường này tất định); câu âm
+    ``van_ban`` được trả lời (#448: câu trích lạc đề lọt qua mà CI vẫn xanh)."""
     problems = [f"nguồn bị cấm — {v}" for v in summary["violations"]]
     problems += [f"đường sai — {e}" for e in summary.get("route_errors", [])]
     if summary.get("type_errors"):
         problems.append(f"sai câu trả lời tất định — {', '.join(summary['type_errors'])}")
+    if summary.get("answered_negatives"):
+        problems.append(f"câu âm được trả lời — {', '.join(summary['answered_negatives'])}")
     if summary["positives"] and summary["recall"] < RECALL_MIN * summary["positives"]:
         problems.append(f"recall@3 {summary['recall']}/{summary['positives']} dưới ngưỡng {RECALL_MIN:.0%}")
     return problems
