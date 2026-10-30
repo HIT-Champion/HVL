@@ -355,39 +355,6 @@ def test_right_dimensions_are_checked_once():
     assert embed(ai, ["x"]) is None and ai.embed_error == "bad_output" and ai.embed_available
 
 
-@pytest.mark.parametrize(("loaded", "device"), [
-    ([{"name": CHAT_MODEL, "size": 2_000, "size_vram": 2_000}], "gpu"),
-    ([{"name": CHAT_MODEL, "size": 2_000, "size_vram": 0}], "cpu"),
-    ([{"name": CHAT_MODEL, "size": 2_000, "size_vram": 2_000}, {"name": EMBED_MODEL, "size": 1_000, "size_vram": 0}],
-     "gpu+cpu"),
-])
-def test_device_follows_where_ollama_loaded_the_models(loaded, device):
-    # MOC_AI_DEVICE (docker-compose.gpu.yml): /api/ps cho biết phần nào của mô hình nằm trong VRAM
-    fake = FakeOllama()
-    fake.loaded = loaded
-    assert ollama(fake).device == device
-
-
-def test_device_unknown_until_a_model_is_loaded_then_kept():
-    fake = FakeOllama()
-    ai = ollama(fake)
-    assert ai.device is None and NullAi().device is None
-    fake.loaded = [{"name": CHAT_MODEL, "size": 2_000, "size_vram": 2_000}]
-    asyncio.run(ai.probe())
-    assert ai.device == "gpu"
-    fake.loaded = [{"name": CHAT_MODEL, "size": True, "size_vram": "2000"}]      # sai dạng: bỏ qua
-    asyncio.run(ai.probe())
-    fake.loaded = []                                                            # hết keep_alive: giữ lần trước
-    asyncio.run(ai.probe())
-    assert ai.device == "gpu"
-
-
-def test_no_ps_call_before_any_model_is_ready():
-    fake = FakeOllama(models=())
-    ollama(fake)
-    assert fake.calls("/api/ps") == []
-
-
 # --- API ngoài chuẩn OpenAI (#430) -------------------------------------------------------------------------------
 
 API_URL = "https://mo-hinh.example/v1"
@@ -525,16 +492,6 @@ def test_split_ai_embeds_locally_and_writes_externally():
     assert chat(ai) == ChatResult(good_answer(), None)
     assert len(local.calls("/api/embed")) >= 1 and local.calls("/api/chat") == []
     assert len(remote.calls("/v1/chat/completions")) == 1
-    run(ai.aclose())
-
-
-def test_split_ai_device_follows_the_local_embedder():
-    # #442: bước viết ở máy chủ ngoài; /api/status báo nơi Ollama tại chỗ đặt mô hình nhúng
-    local = FakeOllama()
-    local.loaded = [{"name": EMBED_MODEL, "size": 1_000, "size_vram": 1_000}]
-    ai = SplitAi(ollama(local, chat=None), external(FakeOpenAi()))
-    assert ai.device == "gpu" and ai.writer.device is None
-    assert SplitAi(NullAi(), external(FakeOpenAi())).device is None
     run(ai.aclose())
 
 

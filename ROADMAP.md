@@ -8,7 +8,7 @@ Trạng thái ghi ngày 30/10/2026, trên nhánh `develop`, đúng nội dung b�
 phụ thuộc, không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ
 25/10 tới 27/10 đã ra ở `v1.2.0` (27/10), giao diện Lịch hạn ở bản vá `v1.2.1` (28/10), việc làm 28/10 (cảnh báo qua
 Alertmanager, Node-RED, DokuWiki, tiếng Anh, truy vết phân tán) và đêm 29–30/10 (hai nguồn dữ liệu công khai, trợ lý
-hỏi đáp chọn đường trả lời và đếm việc, văn bản của người hỏi, tùy chọn API mô hình ngoài và GPU) ở `v1.3.0` (30/10,
+hỏi đáp chọn đường trả lời và đếm việc, văn bản của người hỏi, tùy chọn API mô hình ngoài) ở `v1.3.0` (30/10,
 bản cho vòng trường, mục [1.3.0] của [`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ
 ra ở `v1.4.0` (03/12, bản nộp chấm).
 Mã tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và
