@@ -300,6 +300,16 @@ class SummaryTest(unittest.TestCase):
         self.assertEqual(s["violations"], ["q19 (giangvienktpm): 88/CTSV · tr. 1"])
         self.assertTrue(demo.verdict(s)[0].startswith("nguồn bị cấm"))
 
+    def test_answered_negative_fails_without_a_forbidden_source(self) -> None:
+        # #448: câu âm nhận câu trích lạc đề từ văn bản được xem — không lộ gì nhưng vẫn là lỗi
+        rows = self.rows(10, 0)
+        loose = result("answered", [src("49/2026/TT-BGDĐT", 9)], "“… thủ tục …” [1]")
+        rows.append(demo.score({"id": "q17", "user": "vanthu", "question": "Thủ tục cấp hộ chiếu công vụ?",
+                                "expect": "none"}, loose, 0.5, restricted=[]))
+        s = demo.summarize(rows)
+        self.assertEqual((s["negatives"], s["refused"], s["violations"]), (2, 1, []))
+        self.assertEqual(demo.verdict(s), ["câu âm được trả lời — q17 (answered)"])
+
     def test_types_and_route_errors(self) -> None:
         rows = self.rows(10, 0)
         good = routed("answered", [guide_src(INTRO_PATH)], "“Tôi …” [1]", route="gioi_thieu")

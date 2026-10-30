@@ -82,6 +82,23 @@ def test_nothing_good_enough_is_none():
     assert extract.answer(QUESTION, []).text is None
 
 
+def test_scattered_syllables_are_not_quoted():
+    # #448: term là âm tiết — câu đạt 5/7 term qua "thủ tục", "cung cấp", "công nghệ", "dịch vụ" nhưng chỉ chung
+    # một cặp term liền nhau ("thủ tục") trên sáu
+    p = passage("Ứng dụng công nghệ trong cung cấp dịch vụ số, gồm thủ tục hành chính trên môi trường số.")
+    got = extract.answer("Thủ tục cấp hộ chiếu công vụ?", [p])
+    assert got.text is None and p.chunk_id in got.best
+    risk = passage("Phương án xử lý rủi ro khi triển khai công tác tuyển sinh.")
+    assert extract.answer("Phương án XANH LAM là gì?", [risk]).text is None
+
+
+def test_sentence_with_the_words_together_beats_a_higher_scattered_score():
+    p = passage("Tiền nghỉ, tiền thuê bao, phòng tối và đa năng. "
+                "Tiền thuê phòng nghỉ được thanh toán tối đa 1.200.000 đồng.")
+    got = extract.answer("Tiền thuê phòng nghỉ tối đa bao nhiêu?", [p])
+    assert got.text == "“Tiền thuê phòng nghỉ được thanh toán tối đa 1.200.000 đồng.” [1]"
+
+
 def test_at_most_three_sentences_preferring_different_documents_and_no_duplicates():
     same = "Sinh viên xét học bổng khuyến khích học tập cần điểm từ 3,2 trở lên."
     ps = [passage(same, document_id="a", seq=1), passage(same, document_id="a", seq=2),     # đoạn chồng nhau

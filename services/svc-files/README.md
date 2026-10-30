@@ -460,7 +460,9 @@ người hỏi không được đọc.
 - `extract` (mặc định, tất định, không cần mô hình — đường của CI): câu tìm là tối đa 10 từ của câu hỏi đã bỏ từ dừng
   (Meilisearch chỉ xét 10 từ đầu). Mỗi đoạn lấy câu có nhiều từ của câu hỏi nhất (so trên chữ bỏ dấu; bằng điểm thì câu
   chỉ nhắc lại trích yếu, số ký hiệu xếp sau câu nội dung); giữ câu chung ≥ 34 % và ≥ 2 từ với câu hỏi; tối đa 3 câu, ưu tiên khác
-  văn bản, mỗi câu ≤ 320 ký tự. Mỗi dòng `“<câu nguyên văn>” [n]`, `n` là số thứ tự nguồn. Tách câu theo lớp chữ PDF:
+  văn bản, mỗi câu ≤ 320 ký tự. Câu còn phải chứa ít nhất nửa số cặp từ liền nhau của câu hỏi, tối đa 2 cặp (#448):
+  "Thủ tục cấp hộ chiếu công vụ?" không nhận câu có "cung cấp", "công nghệ", "dịch vụ" rải rác. Mỗi dòng
+  `“<câu nguyên văn>” [n]`, `n` là số thứ tự nguồn. Tách câu theo lớp chữ PDF:
   dòng bị ngắt do dàn trang (dòng sau bắt đầu bằng chữ thường) nối lại; không tách ở `TP.`, `ThS.`, `PGS.`…, số thập
   phân, số ký hiệu, số thứ tự đầu dòng.
 - `generate`: thêm câu trả lời do mô hình viết (`MOC_ASK_MODEL`, mặc định bằng `MOC_AI_MODEL`), chỉ khi mô hình sẵn

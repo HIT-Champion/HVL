@@ -67,6 +67,15 @@ def test_terms_drop_single_letters_keep_single_digits_and_dedupe_on_folded_form(
     assert vi.terms("Học kỳ I, học KỲ 2 — hoc ky") == ["hoc", "ky", "2"]
 
 
+def test_term_bigrams_pair_adjacent_terms_only():
+    assert vi.term_bigrams("Thủ tục cấp hộ chiếu công vụ?") == {
+        ("thu", "tuc"), ("tuc", "cap"), ("cap", "ho"), ("ho", "chieu"), ("chieu", "cong"), ("cong", "vu")}
+    # từ dừng ("là", "gì", "của") cắt cặp; một term thì không có cặp
+    assert vi.term_bigrams("Phương án XANH LAM là gì?") == {("phuong", "an"), ("an", "xanh"), ("xanh", "lam")}
+    assert vi.term_bigrams("Học phí của trường") == {("hoc", "phi")}
+    assert vi.term_bigrams("Hạn?") == set()
+
+
 def test_question_terms_and_keyword_query():
     assert vi.terms(QUESTION) == ["dieu", "kien", "xet", "hoc", "bong", "khuyen", "khich", "tap"]
     assert vi.keyword_query(QUESTION) == "Điều kiện xét học bổng khuyến khích tập"
