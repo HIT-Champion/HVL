@@ -9,8 +9,8 @@ phụ thuộc, không phải lịch: phần lớn việc của cả bốn không
 25/10 tới 27/10 đã ra ở `v1.2.0` (27/10), giao diện Lịch hạn ở bản vá `v1.2.1` (28/10), việc làm 28/10 (cảnh báo qua
 Alertmanager, Node-RED, DokuWiki, tiếng Anh, truy vết phân tán) và đêm 29–30/10 (hai nguồn dữ liệu công khai, trợ lý
 hỏi đáp chọn đường trả lời và đếm việc, văn bản của người hỏi, tùy chọn API mô hình ngoài) ở `v1.3.0` (30/10,
-bản cho vòng trường, mục [1.3.0] của [`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ
-ra ở `v1.5.0` (03/12, bản nộp chấm).
+bản cho vòng trường, mục [1.3.0] của [`CHANGELOG.md`](CHANGELOG.md)), bản online tự nâng theo bản phát hành ở `v1.4.0`
+(31/10); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ ra ở `v1.5.0` (03/12, bản nộp chấm).
 Mã tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và
 hạn chế đã biết của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
 

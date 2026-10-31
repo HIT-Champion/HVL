@@ -36,11 +36,12 @@ trị (`/console`, `/v1/metadata`, `/admin`…) trả 404. Ứng dụng nào cũ
 GraphQL cho dữ liệu, REST cho tệp, tìm kiếm, WebSocket cho thông báo; riêng cổng xác thực văn bản không cần token — và
 đơn vị, vai trò luôn lấy từ token. Dữ liệu dùng chung nằm ở schema `core` (đơn vị, tệp, sổ kiểm toán, thông báo); Văn
 phòng điện tử có schema `office` riêng, ứng dụng mới thêm schema của nó và một client Keycloak theo mẫu `app-office`,
-không sửa `core`. Có ba ứng dụng Tầng 2: Văn phòng điện tử (`app-office`, gồm cả cổng xác thực công khai `/xac-thuc`),
-Không gian cá nhân P.A.R.A (`app-ca-nhan`, `/ca-nhan/`) và Bảng tin đơn vị (`/bang-tin/`). Ứng dụng thứ hai làm tay:
+không sửa `core`. Có bốn ứng dụng Tầng 2: Văn phòng điện tử (`app-office`, gồm cả cổng xác thực công khai `/xac-thuc`),
+Không gian cá nhân P.A.R.A (`app-ca-nhan`, `/ca-nhan/`), Bảng tin đơn vị (`/bang-tin/`) và Đơn nghỉ phép
+(`/nghi-phep/`). Ứng dụng thứ hai làm tay:
 thêm schema `personal`, và thêm client `app-ca-nhan`, một route, một service vào chính các tệp cấu hình của lõi (realm,
 `apisix.yaml`, `docker-compose.yml`); không sửa dòng nào trong `services/`, và dùng chung phiên đăng nhập, sổ kiểm toán,
-quét mã độc của lõi. Ứng dụng thứ ba cắm bằng một lệnh: `moc app install apps/bang-tin/app.yaml` đọc manifest rồi tạo
+quét mã độc của lõi. Hai ứng dụng sau cắm bằng một lệnh: `moc app install apps/bang-tin/app.yaml` đọc manifest rồi tạo
 client Keycloak, route APISIX, container, schema và migration chạy bằng vai trò CSDL riêng của ứng dụng (không có quyền
 gì trên lõi), quyền Hasura và Event Trigger nhận sự kiện văn bản của lõi; các tệp lõi không đổi (`git diff` trống), gỡ
 thì giữ dữ liệu. `smoke.py` và các màn demo thao tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Ứng
@@ -48,8 +49,8 @@ dụng còn mang được quy trình duyệt của riêng nó lên động cơ q
 
 Chỗ lõi chưa sạch, đội nói thẳng: Văn phòng điện tử vẫn nằm trong lõi ở cả ba lớp. Mã: phần nghiệp vụ văn phòng phía máy
 chủ (Actions vào sổ, phát hành, dựng PDF văn bản đi, vòng nộp lưu) chạy chung tiến trình với lõi, trong thư mục
-`office/` của `svc-files` và `svc-workflow`. CSDL: 29 trên 45 bảng Hasura theo dõi thuộc schema `office` (15 `core`, 1
-`personal`); 31 trên 36 migration đụng `office`, 26 trong số đó nhắc tới cả `core` lẫn `office` trong cùng một tệp, nên
+`office/` của `svc-files` và `svc-workflow`. CSDL: 29 trên 46 bảng Hasura theo dõi thuộc schema `office` (16 `core`, 1
+`personal`); 35 trên 41 migration đụng `office`, 28 trong số đó nhắc tới cả `core` lẫn `office` trong cùng một tệp, nên
 muốn dựng CSDL lõi không có Văn phòng thì phải tách lại các tệp đó. Cổng: route của `svc-files` trong
 `platform/apisix/apisix.yaml` mang luôn `/api/documents/*`, `/api/registers/*`, `/api/case-files/*`. Phần đã làm là bước
 1–2 của `docs/architecture.md` §4.7 (#302): mã Văn phòng tách thành router riêng sau cờ `MOC_OFFICE_ENABLED`; tắt cờ thì
@@ -137,7 +138,10 @@ i5-12500H, Ollama 0.35.1 dùng 8 lõi CPU, `python3 scripts/demo.py do-hoi-dap`,
 mẫu nhỏ, câu hỏi do đội viết: đây là mức trần, chưa phải số trên văn bản thật. CI không bật profile `ai`: phần `ai` của
 CI chạy đường không mô hình (tìm theo từ khóa, trả lời bằng câu trích) và giữ phần quyền — câu về quyền hay văn bản hạn
 chế mà ra nguồn bị cấm thì CI đỏ. Đường có mô hình (Ollama, Qwen3) chỉ được kiểm bằng test đơn vị với mô hình giả và lần
-đo tay ở trên; chưa có bước CI nào gọi mô hình thật.
+đo tay ở trên; chưa có bước CI nào gọi mô hình thật. Tùy chọn, tắt mặc định (#430): `MOC_ASK_API=openai` cho riêng bước
+viết câu trả lời đi tới một máy chủ nói chuẩn OpenAI (vLLM, llama.cpp tự chạy, hoặc dịch vụ đám mây). Khi đó câu hỏi
+và tối đa 4 đoạn căn cứ, đã che như trên, rời máy chủ tới nơi đặt API; tìm theo nghĩa vẫn ở Ollama, `svc-files` vẫn
+kiểm từng câu với đoạn nguồn ([`van-hanh.md`](../van-hanh.md) mục Trợ lý hỏi đáp qua API ngoài).
 
 **Bằng chứng:** `make demo-hoi-dap`, `make do-hoi-dap` (thoát 1 khi có nguồn bị cấm), `make demo-che-pii`,
 `make do-che-pii`; `services/svc-files/README.md` (bảng số đo); [`docs/danh-gia-ai.md`](../danh-gia-ai.md) (CI không bật
@@ -256,15 +260,14 @@ cho một máy. Ứng dụng cắm bằng `moc app install` nhận ba loại s�
 `core.app_events`): gửi lại khi lỗi, nhưng không đọc lại từ một vị trí, không bảo đảm thứ tự. Chưa có thực thi kịch
 bản serverless (cụm ⑤). Low-code mới ở mức khai báo: ứng dụng cắm thêm khai form bằng JSON Schema và trang dựng form từ
 chính tệp đó, không viết mã giao diện (`apps/nghi-phep/public/schema-form.js`), khai quy trình bằng BPMN XML; form
-của Văn phòng điện tử vẫn viết trong mã (#303), chưa có trình thiết kế quy trình hay form trên giao diện (bpmn-js bị
-loại vì giấy phép). Quy trình của ứng dụng cắm thêm mới là quy trình duyệt: chưa có timer, bước tự động, gọi API ra
-ngoài; form chưa có tệp đính kèm (#325). Thông báo gửi trong ứng dụng qua
-WebSocket (Centrifugo) và, khi cấu hình, qua email, webhook chat, SMS, Zalo; SMS, Zalo do từng người tự bật, email
-chưa cho từng người tắt, SMS và Zalo chưa thử với tài khoản thật.
-Một máy, không chịu lỗi nhiều nút, chưa đo tải; bản online chạy trên một máy Windows qua WSL2 và Cloudflare Tunnel,
-chưa lên VPS thật.
-Ký số chỉ minh họa bằng CA nội bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên
-kho văn bản giả lập, chưa có đơn vị dùng thật.
+của Văn phòng điện tử vẫn viết trong mã (#303). Form của ứng dụng cắm thêm có trang Dựng form cho quản trị đơn vị
+(`/ung-dung/dung-form`, #403): khai trường, xem trước, tải tệp JSON Schema để đặt vào gói ứng dụng. Chưa có trình
+thiết kế quy trình trên giao diện (bpmn-js bị loại vì giấy phép). Quy trình của ứng dụng cắm thêm mới là quy trình
+duyệt: chưa có timer, bước tự động, gọi API ra ngoài; form chưa có tệp đính kèm (#325). Thông báo gửi trong ứng dụng qua
+WebSocket (Centrifugo) và, khi cấu hình, qua email, webhook chat, SMS, Zalo; SMS, Zalo do từng người tự bật, email chưa
+cho từng người tắt, SMS và Zalo chưa thử với tài khoản thật. Một máy, không chịu lỗi nhiều nút, chưa đo tải; bản online
+chạy trên một máy Windows qua WSL2 và Cloudflare Tunnel, chưa lên VPS thật. Ký số chỉ minh họa bằng CA nội bộ, chưa liên
+thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên kho văn bản giả lập, chưa có đơn vị dùng thật.
 
 **Bằng chứng:** [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §6 "Không làm — và lý do";
 [`docs/dac-ta-san-pham.md`](../dac-ta-san-pham.md) §4.4; [`docs/trien-khai.md`](../trien-khai.md) §8; các mục "Còn gì

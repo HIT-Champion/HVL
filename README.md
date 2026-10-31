@@ -141,7 +141,7 @@ từng tác tử: [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 ### Ảnh chụp màn hình
 
 Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu. Giao diện mặc định tiếng Việt; trang nào của Văn
-phòng điện tử, Không gian cá nhân và Bảng tin cũng có bản tiếng Anh.
+phòng điện tử, Không gian cá nhân, Bảng tin và Đơn nghỉ phép cũng có bản tiếng Anh.
 
 | Văn thư tải công văn lên, tác tử điền sẵn các ô | Lãnh đạo xem việc nghẽn ở đâu | Người nhận tự kiểm văn bản, không cần đăng nhập |
 |---|---|---|
@@ -180,8 +180,10 @@ Bảng đầy đủ (phiên bản, giấy phép, trang chủ): [`COPYRIGHT.txt`]
 | Cổng | Apache APISIX | 3.18.0 | Apache-2.0 | Cổng duy nhất mở ra ngoài: kiểm JWT ở biên, danh sách trắng đường dẫn, giới hạn tốc độ |
 | Cổng | Coraza, OWASP CRS (coraza-proxy-wasm) | 3.3.3, 4.14.0 (0.6.0) | Apache-2.0 | Tường lửa ứng dụng web chạy trong APISIX: soi mọi yêu cầu trước khi kiểm token, tải tấn công nhận 403 |
 | [H] | Keycloak | 26.7.5 | Apache-2.0 | Đăng nhập một lần, TOTP; vai trò, đơn vị, phòng đưa vào token |
+| [H] | DokuWiki | 2026-07-14c | GPL-2.0 | Wiki nội bộ, mỗi đơn vị một không gian, đăng nhập qua Keycloak, tùy chọn (profile `wiki`) |
 | [P] | Flowable | 8.0.0 | Apache-2.0 | Quy trình BPMN văn bản đến, văn bản đi |
 | [P] | Centrifugo | 6.9.7 | Apache-2.0 | Thông báo tức thời qua WebSocket, kênh riêng từng người |
+| [P] | Node-RED | 5.0.8 | Apache-2.0 | Tự động hóa bằng flow, gọi lõi qua robot của đơn vị, tùy chọn (profile `tu-dong`) |
 | [D] | PostgreSQL | 16 | PostgreSQL | CSDL chính, sổ kiểm toán chuỗi băm |
 | [D] | Hasura GraphQL Engine CE | 2.51.0 | Apache-2.0 | GraphQL tự sinh, quyền theo vai trò và đơn vị đến từng dòng |
 | [D] | SeaweedFS | 4.48 | Apache-2.0 | Kho tệp chuẩn S3, kho lạnh khóa ghi cho hồ sơ nộp lưu |
@@ -193,11 +195,12 @@ Bảng đầy đủ (phiên bản, giấy phép, trang chủ): [`COPYRIGHT.txt`]
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | Bản sao số của cảm biến theo NGSI-LD (profile `iot`) |
 | Vận hành | Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Apache-2.0, AGPL-3.0 | Giám sát cổng API và trạng thái từng thành phần, chỉ trong mạng nội bộ; cảnh báo tới chuông của quản trị đơn vị |
 | Vận hành | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Log tập trung đã che thông tin cá nhân, tùy chọn (profile `logs`) |
+| Vận hành | Jaeger | 2.22.0 | Apache-2.0 | Truy vết phân tán qua APISIX, `svc-files`, `svc-workflow`, tùy chọn (profile `trace`) |
 | Vận hành | restic | 0.19.1 | BSD-2-Clause | Sao lưu mã hóa CSDL, tệp, két |
 
-Mọi giấy phép đều được OSI phê duyệt. Thành phần GPL, AGPL (ClamAV, PostGIS, Grafana, Parseable) chạy thành dịch vụ
-độc lập, giao tiếp qua mạng, không liên kết mã nên không xung đột với Apache-2.0. Giấy phép mọi gói, kể cả gói gián
-tiếp, được kiểm tự động bằng `make license-audit`.
+Mọi giấy phép đều được OSI phê duyệt. Thành phần GPL, AGPL (ClamAV, PostGIS, Grafana, Parseable, DokuWiki) chạy thành
+dịch vụ độc lập, giao tiếp qua mạng, không liên kết mã nên không xung đột với Apache-2.0. Giấy phép mọi gói, kể cả gói
+gián tiếp, được kiểm tự động bằng `make license-audit`.
 
 ## Cài đặt từ mã nguồn (Building From Source)
 

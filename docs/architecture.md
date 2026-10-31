@@ -71,13 +71,13 @@ chạy, chuỗi đó đi như sau: danh tính Keycloak [H] đi trong token tới
 văn bản, giao việc và sự kiện đó qua Hasura, đúng quyền người xem; tác tử [I] có danh tính riêng (vai trò Hasura
 `agent`), việc của nó vào sổ kiểm toán, và nó chỉ gợi ý — người quyết.
 
-Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (15 dịch vụ, trong đó
+Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (16 dịch vụ, trong đó
 `keycloak-fonts` chạy một lần rồi thoát), `app` là Tầng 2 (`app-office`, `app-ca-nhan`, `app-tai-lieu-api`); `make up`
 bật cả hai. Phần tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio, PostGIS), `logs` (Vector, Parseable), `trace`
-(Jaeger), `mail` (Mailpit), `tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng khi gọi `make ai-model`,
-`make demo-it-ot`, `make backup` hay `make restore`. Kế hoạch dời việc đổi profile sang Phase 1, dự kiến
-`core / app / ops / ai` ([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0); hiện là `core`, `app`
-cộng các phần tùy chọn ở trên, không có profile `ops`.
+(Jaeger), `wiki` (DokuWiki), `tu-dong` (Node-RED), `mail` (Mailpit), `tunnel` (cloudflared); `ai-pull`, `iot-sim`,
+`backup` chỉ dùng khi gọi `make ai-model`, `make demo-it-ot`, `make backup` hay `make restore`. Kế hoạch dời việc đổi
+profile sang Phase 1, dự kiến `core / app / ops / ai` ([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối
+Phase 0); hiện là `core`, `app` cộng các phần tùy chọn ở trên, không có profile `ops`.
 
 ### 1.3. Ràng buộc tài nguyên
 
@@ -342,7 +342,7 @@ F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đ�
 | [H] Quản trị tri thức (wiki) | Tùy chọn (profile `wiki`, tắt mặc định) | DokuWiki ở `/wiki/`: mỗi đơn vị một không gian riêng, đăng nhập Keycloak (#367); trợ lý hỏi đáp trên kho văn bản của Văn phòng điện tử (F4.2). Chưa có không gian chung cả trường, trang wiki không vào tìm kiếm của Văn phòng | `docs/van-hanh.md` mục Wiki nội bộ; `ROADMAP.md` giai đoạn 1, 4 |
 | [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email, webhook tới Mattermost, Slack, ntfy, SMS, Zalo — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
 | [H] Cổng nội bộ | Một phần | Các ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; trang Ứng dụng (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng riêng | `ROADMAP.md` giai đoạn 1 |
-| [P] Biểu mẫu low-code | Một phần | Form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py`; chưa có trình dựng form (#303) | `ROADMAP.md` giai đoạn 2 |
+| [P] Biểu mẫu low-code | Một phần | Form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py`; trang Dựng form (`/ung-dung/dung-form`, #403) cho quản trị đơn vị khai trường, xem trước, tải tệp JSON Schema cho ứng dụng cắm | `ROADMAP.md` giai đoạn 2 |
 | [P] Tự động hóa, kịch bản serverless (⑤) | Một phần (profile `tu-dong`, tắt mặc định) | Node-RED ở `/tu-dong/` cho người vận hành nền tảng: đăng nhập Keycloak, chỉ vai trò `operator`, flow tới lõi qua APISIX bằng robot của đơn vị, hai flow mẫu (#366); chưa có webhook, bước BPMN gọi flow; vòng nền của lõi vẫn viết cứng trong `svc-files`, `svc-workflow` | `muc-hoan-thien.md` §3; `van-hanh.md` mục Tự động hóa bằng Node-RED |
 | [P] Trục streaming sự kiện (⑥) | Một phần | Luồng `core.app_events` (đến, vào sổ, phát hành; không văn bản hạn chế) qua Hasura Event Triggers tới ứng dụng cài bằng `moc app install`; chưa phải broker: không phát lại, không bảo đảm thứ tự. Bảng sự kiện, hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3, [`them-ung-dung.md`](them-ung-dung.md) mục 1 |
 | [D] Thu thập, làm sạch, đồng bộ sang kho phân tích | **Chưa có** | Chặn dữ liệu bẩn ngay ở điểm nhập (Poka-yoke ba lớp); dashboard đọc thẳng view trên CSDL nghiệp vụ | `ROADMAP.md` giai đoạn 3 |

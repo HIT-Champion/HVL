@@ -99,11 +99,11 @@ yếu: `Signet: <như chuông>` kèm liên kết.
   vào hàng gửi của điện thoại. Số lấy từ `core.users.phone`, đồng bộ từ thuộc tính `phone_number` của Keycloak
   (quản trị nhập; người dùng chỉ xem, không tự sửa), chuẩn hóa về `+84…` (`directory.py`). Giao diện chỉ thấy số đã
   che (`+84••••••678`).
-- Zalo: bot của đơn vị trên Zalo Bot Platform (`MOC_ZALO_BOT_TOKEN`). Bật Zalo sinh mã 8 ký tự hạn 15 phút; người
-  dùng nhắn mã cho bot, vòng nền đọc tin bằng `getUpdates` (long polling 30 giây, lùi dần tới 5 phút khi lỗi — bot
-  không được đặt webhook), ghi `zalo_chat_id` rồi trả lời trong Zalo. Chỉ nhận chat ghi rõ là riêng
-  (`chat_type: PRIVATE`); mã sai, hết hạn thì bot báo lại; tin không phải mã nhận lời nhắc cách dùng, mỗi chat tối đa
-  một lần trong 10 phút. Tắt Zalo xóa chat_id, bật lại phải liên kết lại.
+- Zalo: một bot cho cả bản cài, trên Zalo Bot Platform (`MOC_ZALO_BOT_TOKEN`). Bật Zalo sinh mã 8 ký tự hạn 15 phút;
+  người dùng nhắn mã cho bot, vòng nền đọc tin bằng `getUpdates` (long polling 30 giây, lùi dần tới 5 phút khi lỗi — bot
+  không được đặt webhook), ghi `zalo_chat_id` rồi trả lời trong Zalo. Chỉ nhận chat ghi rõ là riêng (`chat_type:
+  PRIVATE`); mã sai, hết hạn thì bot báo lại; tin không phải mã nhận lời nhắc cách dùng, mỗi chat tối đa một lần trong
+  10 phút. Tắt Zalo xóa chat_id, bật lại phải liên kết lại.
 
 Thử lại, `failed`, `skipped` như email; lỗi Zalo ghi mã lỗi của API (`Zalo <mã>`), 429 và lỗi tạm thử lại. Nhật ký
 không có số điện thoại, chat_id, mã liên kết hay nội dung tin.
@@ -303,7 +303,7 @@ khoảng 7,5 phút đó thì thư đang chờ vẫn đi; quá thời gian đó t
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 461 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
+.venv/bin/python -m pytest        # 1 215 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa

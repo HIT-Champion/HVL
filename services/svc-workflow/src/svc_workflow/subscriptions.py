@@ -20,8 +20,8 @@
   mình; chỉ kênh bản cài đã cấu hình (``Router.personal``) mới hiện — chưa cấu hình kênh nào thì danh sách rỗng, giao
   diện không hiện mục Kênh thông báo. SMS bật được khi danh bạ có số điện thoại (thuộc
   tính ``phone_number`` của Keycloak do quản trị nhập, directory.py).
-- Zalo phải liên kết trước: bật Zalo sinh một mã 8 ký tự hạn ``LINK_TTL``, người dùng nhắn mã đó cho bot Zalo của đơn
-  vị; vòng ``listen`` đọc tin của bot (``getUpdates``, long polling — bot không được đặt webhook), tìm mã trên mọi
+- Zalo phải liên kết trước: bật Zalo sinh một mã 8 ký tự hạn ``LINK_TTL``, người dùng nhắn mã đó cho bot Zalo của bản
+  cài; vòng ``listen`` đọc tin của bot (``getUpdates``, long polling — bot không được đặt webhook), tìm mã trên mọi
   đơn vị, ghi ``zalo_chat_id`` rồi trả lời trong Zalo. Tắt Zalo thì xóa chat_id: muốn bật lại phải liên kết lại.
 
 Nhật ký không có số điện thoại, chat_id, mã liên kết hay nội dung tin nhắn (F4.4).
