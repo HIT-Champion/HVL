@@ -173,8 +173,10 @@ def _guard(repo: pathlib.Path) -> Iterator[None]:
             raise BackupError(f"một lệnh sao lưu hoặc khôi phục khác đang chạy trên kho {repo}") from None
         # F3.3: khóa chung với reconciler (scripts/reconcile.py) trên thư mục chạy Signet — reconciler không dựng lại
         # dịch vụ giữa lúc khôi phục. Reconciler đang áp cấu hình mới thì đợi nó xong (tối đa 30 phút).
+        # MOC_OPS_LOCKED=1: chính reconciler gọi qua nang_cap.sh (MOC_GITOPS_MODE=nang-cap) khi đang giữ khóa này,
+        # như install.sh — không đợi
         deadline = time.monotonic() + 1800
-        while True:
+        while os.environ.get("MOC_OPS_LOCKED") != "1":
             try:
                 fcntl.flock(ops, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break

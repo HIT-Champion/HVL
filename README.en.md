@@ -1,6 +1,8 @@
 # Signet
 
-**Tiếng Việt:** [README.md](README.md)
+![Signet — Open-source e-Office, self-hosted, your data, your control](docs/anh/signet-banner.en.png)
+
+🇻🇳 [Tiếng Việt](README.md) | 🇬🇧 **English**
 
 > **A self-hosted, open-source core platform that puts a seal of trust on everything that passes through it** — with
 > its first application on top: an **e-Office** for incoming and outgoing official documents under Vietnam's Decree
@@ -216,7 +218,7 @@ package, transitive ones included, is checked automatically with `make license-a
 | Docker Engine | 24.0 | with the `docker compose` v2 plugin 2.17+ and `docker buildx` |
 | GNU Make | 4.0 | runs the commands |
 | Python | 3.10 | standard library only, nothing to install: sample data, smoke tests, demos, backup, install and operations commands |
-| RAM | 8 GB | the whole system (default profiles: 19 services, 18 running continuously) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages), `app-tai-lieu-api` (the API docs page, capped at 64 MB) and `alertmanager` (capped at 64 MB) were added; the AI model needs up to 6 GB more |
+| RAM | 8 GB | the default profiles (19 services, 18 running continuously) measured about 4.6 GiB on release 1.3.0 (`docker stats`, 2026-10-31; ClamAV 0.9 GiB, Meilisearch 0.75 GiB, Keycloak 0.6 GiB, APISIX 0.5 GiB, Hasura 0.4 GiB); the AI profile (`ai`, both default models loaded) adds about 3.2 GiB, so plan on 16 GB |
 | Free disk | 10 GB | images about 5 GB; AI models about 2 GB more |
 
 Every tool used to build Signet is open-source software. No closed-source or home-made tool is needed.

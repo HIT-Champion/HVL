@@ -8,9 +8,9 @@ pull request hay thảo luận công khai về nó.
 
 | Phiên bản | Nhận bản vá bảo mật |
 |---|---|
-| Bản phát hành mới nhất (hiện là 1.2.x, nhánh `main`) | ✅ |
+| Bản phát hành mới nhất (hiện là 1.4.x, nhánh `main`) | ✅ |
 | `develop` (chưa phát hành) | ✅ — bản vá gộp vào đây, bản đã phát hành nhận qua [bản vá nóng](docs/git_flow.md#6-phát-hành) |
-| Các bản cũ hơn (0.1.0 tới 1.1.x) | ❌ — hãy nâng lên bản mới nhất |
+| Các bản cũ hơn (0.1.0 tới 1.3.x) | ❌ — hãy nâng lên bản mới nhất |
 
 Danh sách bản phát hành: [trang Releases](https://github.com/HIT-Champion/Signet/releases); thay đổi của từng bản:
 [`CHANGELOG.md`](CHANGELOG.md).

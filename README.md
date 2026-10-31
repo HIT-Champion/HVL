@@ -1,6 +1,8 @@
 # Signet
 
-**English:** [README.en.md](README.en.md)
+![Signet — Văn phòng điện tử nguồn mở, tự triển khai, tự chủ dữ liệu](docs/anh/signet-banner.png)
+
+🇻🇳 **Tiếng Việt** | 🇬🇧 [English](README.en.md)
 
 > **Lõi nền tảng nguồn mở, tự cài, đóng dấu tin cậy lên mọi thứ đi qua nó** — kèm ứng dụng đầu tiên chạy trên lõi:
 > **Văn phòng điện tử** quản lý văn bản đến, văn bản đi theo Nghị định 30/2020/NĐ-CP.
@@ -206,7 +208,7 @@ tiếp, được kiểm tự động bằng `make license-audit`.
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 và `docker buildx` |
 | GNU Make | 4.0 | điều phối lệnh |
 | Python | 3.10 | chỉ thư viện chuẩn, không cài thêm gì: dữ liệu mẫu, smoke, demo, sao lưu, cài đặt và các lệnh vận hành |
-| RAM | 8 GB | cả hệ thống (profile mặc định: 19 dịch vụ, 18 chạy liên tục) đo được khoảng 3,2 GB khi chạy (ClamAV 0,8 GB, Keycloak 0,6 GB, APISIX và Flowable mỗi dịch vụ 0,35 GB, Grafana 0,3 GB), đo từ trước khi thêm `app-ca-nhan` (một nginx phục vụ trang tĩnh) `app-tai-lieu-api` (trang tài liệu API, giới hạn 64 MB) và `alertmanager` (giới hạn 64 MB); bật mô hình AI cần thêm tới 6 GB |
+| RAM | 8 GB | profile mặc định (19 dịch vụ, 18 chạy liên tục) đo được khoảng 4,6 GiB khi chạy bản 1.3.0 (`docker stats`, 31/10/2026; ClamAV 0,9 GiB, Meilisearch 0,75 GiB, Keycloak 0,6 GiB, APISIX 0,5 GiB, Hasura 0,4 GiB); bật mô hình AI (profile `ai`, hai mô hình mặc định đã nạp) thêm khoảng 3,2 GiB, nên cần 16 GB |
 | Đĩa trống | 10 GB | image khoảng 5 GB; mô hình AI thêm khoảng 2 GB |
 
 Toàn bộ công cụ dùng để dựng Signet đều là phần mềm nguồn mở. Không cần bất kỳ công cụ nguồn đóng hay tự chế nào.

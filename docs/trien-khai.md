@@ -27,7 +27,7 @@ bước 6.
 
 | Thứ cần | Tối thiểu | Ghi chú |
 |---|---|---|
-| Máy chủ | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 40 GB đĩa | Cả hệ thống dùng khoảng 3,5 GB RAM khi chạy (đo lúc diễn tập, chưa bật mô hình); các image khoảng 2,3 GB, lúc dựng cần thêm chỗ cho image nền và bộ đệm. Bật mô hình ngôn ngữ (profile `ai`, F4.1–F4.2) thì cần 16 GB |
+| Máy chủ | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 40 GB đĩa | Profile mặc định dùng khoảng 4,6 GiB RAM khi chạy (đo bản 1.3.0 bằng `docker stats` ngày 31/10/2026, chưa bật mô hình); các image khoảng 2,3 GB, lúc dựng cần thêm chỗ cho image nền và bộ đệm. Bật mô hình ngôn ngữ (profile `ai`, F4.1–F4.2) thì Ollama thêm khoảng 3,2 GiB, cần 16 GB |
 | Tên miền | một bản ghi A trỏ về IP máy chủ | vd `moc.example.vn`; có IPv6 thì thêm bản ghi AAAA. Let's Encrypt cần cổng 80 và 443 mở. Cloudflare Tunnel (mục 5b): không cần IP công khai, tên miền dùng nameserver của Cloudflare |
 | Tài khoản | SSH vào được, có `sudo` | Các bước cài phần nền cần `sudo`; Signet chạy bằng người dùng `moc` |
 
@@ -311,7 +311,21 @@ kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`]
 **Tự phục hồi và GitOps** (tùy chọn): [`van-hanh.md`](van-hanh.md) mục "GitOps và tự phục hồi" — systemd timer
 `platform/systemd/` chạy `reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
-`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`.
+`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`. Bản thật nên nâng có sao lưu, lỗi
+thì tự lùi (`MOC_GITOPS_MODE=nang-cap`), theo từng bản phát hành trên `main` (`MOC_GITOPS_FOLLOW=release`) hoặc qua
+cổng ký nhánh `deploy` (`van-hanh.md` mục GitOps, #344).
+
+**Máy không có systemd** (WSL2 chưa bật systemd, PID 1 là `init`): chạy reconciler bằng cron của người dùng `moc` thay
+cho timer, mỗi phút một lượt như timer. Lượt gặp khóa đang bị giữ (đang nâng, sao lưu) thì tự bỏ qua. Nhật ký mỗi
+phút thêm một dòng: xoay vòng bằng logrotate, hoặc dùng `>` thay `>>` để chỉ giữ lượt cuối.
+
+```
+* * * * * cd /opt/moc && python3 scripts/reconcile.py >> $HOME/reconcile.log 2>&1
+```
+
+WSL không tự chạy cron khi khởi động: thêm `service cron start` vào `command` của mục `[boot]` trong `/etc/wsl.conf`
+(đã có lệnh thì nối bằng `;`). Bảo trì hay nâng tay thì tắt dòng cron trước (`crontab -e`, thêm `#`), như tắt timer:
+`nang_cap.sh` chỉ tự kiểm được timer systemd.
 
 **Nâng cấp tay** (không dùng GitOps): dừng timer reconciler nếu có (`sudo systemctl stop moc-reconcile.timer`), lấy mã
 nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git pull` trong `~/Signet`), rồi từ thư mục đó:

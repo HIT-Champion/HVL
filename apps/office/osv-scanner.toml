@@ -21,18 +21,25 @@
 # đã dựng sẵn qua nginx, không chứa gói npm nào.
 
 [[IgnoredVulns]]
-id = "GHSA-86w9-cpqp-85rv"
-ignoreUntil = 2026-12-31
-reason = "node-forge 1.4.0, chưa có bản vá: nuxt → @nuxt/cli → listhen, chỉ tạo chứng chỉ HTTPS cho nuxt dev."
-
-[[IgnoredVulns]]
 id = "GHSA-vjh5-4x84-xrqp"
 ignoreUntil = 2026-12-31
 # Đã vá ở 4.6.2 (GitHub đóng cảnh báo), nhưng bản ghi OSV còn khoảng 3.x không có bản vá, mở tới mọi phiên bản sau
-reason = "nuxt, @nuxt/nitro-server 4.6.2 đã vá; OSV vẫn khớp do khoảng 3.x chưa vá. App-office là trang tĩnh qua nginx."
+reason = "nuxt, @nuxt/nitro-server 4.6.3 đã vá; OSV vẫn khớp do khoảng 3.x chưa vá. App-office là trang tĩnh qua nginx."
 
 [[IgnoredVulns]]
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-12-31
 # nuxt → @nuxt/nitro-server → nitropack → @rollup/plugin-node-resolve 16.0.3 (bản mới nhất, vẫn cần deepmerge ^4)
 reason = "deepmerge 4.3.1, chưa có bản vá (#387): rollup gộp tùy chọn cấu hình lúc dựng Nuxt; không vào image."
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-12-31
+# nitropack → @vercel/nft (glob 13), archiver → archiver-utils (glob 10); bản vá chỉ có ở glob 14 (#461)
+reason = "glob 10.5.0, 13.0.6: hủy bằng AbortSignal không dừng hẳn việc duyệt thư mục; chỉ chạy lúc dựng Nuxt."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-12-31
+# glob, readdir-glob (archiver) kéo minimatch 5.x, 9.x, 10.x; bản vá chỉ có ở minimatch 11 (#461)
+reason = "minimatch 5.1.9, 9.0.9, 10.2.6: mẫu glob dị dạng làm chậm; mẫu do công cụ dựng tự đặt, chỉ chạy lúc dựng."
