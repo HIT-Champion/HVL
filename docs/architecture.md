@@ -125,13 +125,13 @@ flowchart LR
     U2["Người nhận văn bản<br/>quét QR, không đăng nhập"]
   end
   GW{{"APISIX 3.18 — cổng duy nhất mở ra ngoài<br/>WAF · kiểm JWT · giới hạn tốc độ<br/>X-Request-Id · quản trị: 404"}}
-  subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app; mạng apps: chỉ tới APISIX)"]
-    OFF["app-office<br/>Văn phòng điện tử · Nuxt 4"]
-    CN["app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
-    TL["app-tai-lieu-api<br/>Tài liệu API · Swagger UI"]
-    APP["ứng dụng cắm bằng manifest<br/>Bảng tin, Nghỉ phép (moc app install)"]
-    NR["Node-RED · profile tu-dong<br/>flow tự động, chỉ người vận hành soạn"]
-    WK["DokuWiki · profile wiki<br/>wiki nội bộ từng đơn vị"]
+  T3["Tầng 3 — ứng dụng ngành: đề không bắt buộc, chưa làm"]
+  subgraph TANG2["Tầng 2 — bốn không gian H-P-D-I có giao diện (profile app; mạng apps: chỉ tới APISIX)"]
+    OFF["app-office · Văn phòng điện tử · Nuxt 4<br/>màn hình ở cả bốn không gian [H] [P] [D] [I], bảng ở README"]
+    CN["[H] app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
+    TL["[D] app-tai-lieu-api<br/>Tài liệu API · Swagger UI"]
+    APP["ứng dụng cắm bằng manifest (moc app install)<br/>[H] Bảng tin · [P] Nghỉ phép"]
+    WK["[H] DokuWiki · profile wiki<br/>wiki nội bộ từng đơn vị"]
   end
   subgraph TANG1["Tầng 1 — lõi không giao diện (profile core)"]
     subgraph KGH["[H] Nhân sự"]
@@ -159,6 +159,7 @@ flowchart LR
     end
     subgraph VANHANH["Vận hành"]
       PM["Prometheus + Grafana<br/>Alertmanager"]
+      NR["Node-RED 5.0 · profile tu-dong<br/>kịch bản tự động, chỉ người vận hành soạn"]
       JG["Jaeger 2.22<br/>truy vết · profile trace"]
       LG["Vector 0.59 + Parseable 3.2<br/>log tập trung · profile logs"]
       BK["restic 0.19<br/>sao lưu · moc backup"]
@@ -167,7 +168,7 @@ flowchart LR
   subgraph NGOAI["Ngoài hệ thống — kênh thông báo, tắt mặc định"]
     EM["Máy chủ thư SMTP<br/>webhook Mattermost, Slack, ntfy"]
     SMS["SMS Gateway for Android<br/>điện thoại có SIM cùng LAN"]
-    ZL["Zalo Bot Platform<br/>bot của đơn vị"]
+    ZL["Zalo Bot Platform<br/>một bot cho cả bản cài"]
   end
   U1 --> GW
   U2 --> GW
@@ -215,6 +216,7 @@ flowchart LR
   GW -.->|"log 9 dịch vụ, driver fluentd"| LG
   BK -.->|"sao lưu"| PG
   BK -.->|"sao lưu"| SW
+  style T3 stroke-dasharray: 5 4
 ```
 
 - **Một cửa.** Chỉ APISIX mở cổng ra mạng (`MOC_HTTP_PORT`, mặc định 8080). Yêu cầu GET, HEAD tới đường không có trong

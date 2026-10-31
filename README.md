@@ -48,8 +48,9 @@ chức tự cài, tự làm chủ. Ứng dụng mới chỉ cần cắm vào lõ
 
 ## Kiến trúc
 
-[![Sơ đồ kiến trúc: người dùng đi qua cổng APISIX vào các ứng dụng Tầng 2 và các dịch vụ lõi Tầng 1; cột phải là
-kênh thông báo bên ngoài: email, webhook, SMS, Zalo](docs/anh/kien-truc-tong-the.gif)](docs/anh/kien-truc-tong-the.gif)
+[![Sơ đồ kiến trúc: người dùng đi qua cổng APISIX vào bốn không gian H-P-D-I của Tầng 2 và các dịch vụ lõi Tầng 1;
+cột phải là kênh thông báo bên ngoài: email, webhook, SMS,
+Zalo](docs/anh/kien-truc-tong-the.gif)](docs/anh/kien-truc-tong-the.gif)
 
 Signet theo khung ba tầng của đề DX-OS:
 
@@ -69,7 +70,7 @@ Signet theo khung ba tầng của đề DX-OS:
 |---|---|
 | [H] Con người | Không gian cá nhân P.A.R.A (tệp của từng người), Bảng tin đơn vị, trang Ứng dụng của Văn phòng; wiki DokuWiki (profile `wiki`). Đăng nhập một lần, vai trò, đơn vị lấy từ Keycloak ở Tầng 1 |
 | [P] Quy trình | Văn phòng điện tử: tiếp nhận, văn bản đến, văn bản đi, hộp việc và Lịch hạn, sổ đăng ký; Đơn nghỉ phép; trang Dựng form cho quản trị |
-| [D] Dữ liệu | Văn phòng điện tử: Điều hành, Số đo, Phả hệ số liệu, Sơ đồ cảm biến, Sổ kiểm toán, Hồ sơ công việc (nộp lưu sang kho lạnh, phòng đọc); trang Tài liệu API (REST, GraphQL) |
+| [D] Dữ liệu | Văn phòng điện tử: Điều hành, Số đo, Phả hệ số liệu, Sơ đồ cảm biến, Sổ kiểm toán, Hồ sơ công việc (nộp lưu sang kho lạnh, phòng đọc), trang Trạng thái báo tuổi hai nguồn dữ liệu công khai (`/trang-thai`); trang Tài liệu API (REST, GraphQL) |
 | [I] Trí tuệ | Văn phòng điện tử: Tìm kiếm toàn văn, Hỏi đáp (tìm theo từ khóa và theo nghĩa), gợi ý ô khi tiếp nhận văn bản đến, gợi ý giao việc |
 
 Chỉ cổng APISIX mở ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó trước khi tới lõi; nhãn trên mũi tên là đường

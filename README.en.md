@@ -53,8 +53,8 @@ trust out of the box, without building them itself:
 
 ## Architecture
 
-[![Architecture diagram: users go through the APISIX gateway to the Tier 2 applications and the Tier 1 core services;
-the right column holds the outside notification channels: email, webhooks, SMS,
+[![Architecture diagram: users go through the APISIX gateway to the four H-P-D-I spaces of Tier 2 and the Tier 1 core
+services; the right column holds the outside notification channels: email, webhooks, SMS,
 Zalo](docs/anh/kien-truc-tong-the.en.gif)](docs/anh/kien-truc-tong-the.en.gif)
 
 Signet follows the three tiers of the DX-OS brief:
@@ -75,7 +75,7 @@ Signet follows the three tiers of the DX-OS brief:
 |---|---|
 | [H] Human | P.A.R.A personal space (each person's files), unit news board, the e-Office Apps page; DokuWiki wiki (`wiki` profile). Single sign-on, roles and units come from Keycloak in Tier 1 |
 | [P] Process | e-Office: intake, incoming and outgoing documents, task inbox and deadline calendar, registers; leave requests; the form builder for administrators |
-| [D] Data | e-Office: executive dashboard, metrics, data lineage, sensor map, audit log, case files (archiving to cold storage, reading room); the API docs page (REST, GraphQL) |
+| [D] Data | e-Office: executive dashboard, metrics, data lineage, sensor map, audit log, case files (archiving to cold storage, reading room), the status page with the age of the two public data sources (`/trang-thai`); the API docs page (REST, GraphQL) |
 | [I] Intelligence | e-Office: full-text search, Q&A (keyword and semantic retrieval), field suggestions when taking in an incoming document, assignment suggestions |
 
 Only the APISIX gateway is exposed, and every request passes its web application firewall before it reaches the core;
