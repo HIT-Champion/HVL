@@ -93,6 +93,9 @@ class Scanner(unittest.TestCase):
             create trigger audit after insert on office.documents for each row execute function core.audit();
             create trigger redact before insert on core.users for each row execute function office.redact();
             alter table core.users add column head_title text;
+            create function core.plain() returns int language sql as $$ select 1; $$;
+            comment on function office.redact() is 'không thuộc thân core.plain';
+            grant execute on function office.redact() to service;
             """)
         write(self.root, f"{rg.MIGRATIONS}/3_core_again/up.sql", """
             create or replace function core.visible(f uuid) returns boolean language sql as $$ select true $$;
@@ -139,6 +142,27 @@ class Scanner(unittest.TestCase):
             "csdl rang-buoc core.users.role -> clerk",
             "csdl trigger core.users -> office.redact",
         ])
+
+    def test_later_drops_remove_edges(self) -> None:
+        objects = rg.office_objects(rg.migrations(self.root))
+        write(self.root, f"{rg.MIGRATIONS}/4_split/up.sql", """
+            drop trigger if exists redact on core.users;
+            alter table core.users drop column head_title, drop constraint users_role_check,
+              add constraint users_role_check check (role in ('tenant_admin', 'member'));
+            create function core.reader() returns int language sql as $$ select count(*) from office.documents $$;
+            alter function core.reader() set schema office;
+            """)
+        self.assertEqual(rg.db_edges(self.root, objects), set())
+        write(self.root, f"{rg.MIGRATIONS}/5_back/up.sql", """
+            create trigger redact2 before insert on core.users for each row execute function office.redact();
+            drop function office.redact() cascade;
+            """)
+        self.assertEqual(rg.db_edges(self.root, objects), set())
+
+    def test_statements_keep_dollar_bodies_whole(self) -> None:
+        sql = "create function a() as $f$ select 1; select ';'; $f$; grant x; select 'a;b'"
+        self.assertEqual(rg.statements(sql), ["create function a() as $f$ select 1; select ';'; $f$", "grant x",
+                                              "select 'a;b'"])
 
     def test_metadata_ignores_comments_and_counts_roles(self) -> None:
         objects = rg.office_objects(rg.migrations(self.root))

@@ -29,7 +29,8 @@ Mỗi chỗ dính là một cạnh, một dòng "<mặt> <nguồn> -> <đích>":
               office_x…); tên sự kiện nhật ký như "office.assist.asked" không tính
     csdl      hàm, view của core đọc office; trigger nối core với office (trừ trigger sổ kiểm toán core.audit trên
               bảng office, đúng chiều); ràng buộc CHECK của bảng core liệt kê giá trị của Văn phòng; cột của bảng core
-              do migration của Văn phòng thêm
+              do migration của Văn phòng thêm. Tính trên trạng thái sau migration cuối: câu lệnh tách đúng cả thân
+              $$…$$; drop function, trigger, table, column, constraint và set schema về sau đều gỡ cạnh
     metadata  tệp core_*.yaml của Hasura trỏ sang office (quan hệ, hàm), chú thích không tính
     vai-tro   mô-đun ngoài nhóm Văn phòng, hoặc quyền Hasura của bảng core, viết cứng vai trò văn thư
               (clerk, staff, manager, director)
@@ -223,40 +224,149 @@ def code_edges(root: pathlib.Path, objects: set[str]) -> tuple[set[str], dict[st
     return edges, groups
 
 
+def statements(sql: str) -> list[str]:
+    """Tách câu lệnh theo dấu ; nằm ngoài chuỗi '…' và thân $tag$…$tag$ (thân hàm có ; riêng của nó)."""
+    out, buf, i, tag, quoted = [], [], 0, None, False
+    while i < len(sql):
+        c = sql[i]
+        if tag:
+            if sql.startswith(tag, i):
+                buf.append(tag)
+                i += len(tag)
+                tag = None
+                continue
+        elif quoted:
+            quoted = c != "'"
+        elif c == "'":
+            quoted = True
+        elif c == "$" and (m := re.match(r"\$\w*\$", sql[i:])):
+            tag = m.group(0)
+            buf.append(tag)
+            i += len(tag)
+            continue
+        elif c == ";":
+            out.append("".join(buf).strip())
+            buf = []
+            i += 1
+            continue
+        buf.append(c)
+        i += 1
+    out.append("".join(buf).strip())
+    return [s for s in out if s]
+
+
+def _top_level(text: str) -> list[str]:
+    """Tách theo dấu phẩy không nằm trong ngoặc: các cột của create table, các hành động của alter table."""
+    parts, depth, buf = [], 0, []
+    for c in text:
+        if c == "," and depth == 0:
+            parts.append("".join(buf).strip())
+            buf = []
+            continue
+        depth += (c == "(") - (c == ")")
+        buf.append(c)
+    parts.append("".join(buf).strip())
+    return [p for p in parts if p]
+
+
+def _names(text: str) -> list[tuple[str, str]]:
+    """Các tên schema.tên trong danh sách của drop (bỏ phần tham số trong ngoặc)."""
+    return [(s.lower(), n.lower()) for s, n in re.findall(r"(\w+)\.(\w+)", re.sub(r"\([^)]*\)", "", text))]
+
+
+_CHECK = re.compile(r"check\s*\(\s*(\w+)\s+in\s*\(([^)]*)\)", re.I)
+
+
 def db_edges(root: pathlib.Path, objects: set[str]) -> set[str]:
-    migs = migrations(root)
+    """Trạng thái CSDL sau migration cuối: áp lần lượt create, replace, drop, set schema; chỉ trạng thái cuối có
+    cạnh."""
+    functions: dict[str, str] = {}                       # hàm, view của core → câu tạo mới nhất
+    triggers: dict[tuple[str, str], tuple[str, str]] = {}   # (tên, schema.bảng) → (schema, hàm)
+    checks: dict[tuple[str, str], tuple[str, list[str]]] = {}  # (bảng core, tên ràng buộc) → (cột, giá trị)
+    columns: dict[str, str] = {}                         # core.bảng.cột do migration có nhắc office thêm → migration
+
+    def drop_table(schema: str, table: str) -> None:
+        for key in [k for k in triggers if k[1] == f"{schema}.{table}"]:
+            del triggers[key]
+        if schema == "core":
+            for key in [k for k in checks if k[0] == table]:
+                del checks[key]
+            for key in [k for k in columns if k.startswith(f"core.{table}.")]:
+                del columns[key]
+
+    def add_check(table: str, name: str | None, text: str) -> None:
+        if m := _CHECK.search(text):
+            col = m.group(1).lower()
+            checks[(table, (name or f"{table}_{col}_check").lower())] = (col, re.findall(r"'([^']*)'", m.group(2)))
+
+    for migration, sql in migrations(root):
+        office_tied = bool(re.search(r"\boffice\.", sql))
+        for stmt in statements(sql):
+            flat = " ".join(stmt.split())
+            if m := re.match(r"create\s+(?:or\s+replace\s+)?(?:function|view)\s+core\.(\w+)", flat, re.I):
+                functions[m.group(1).lower()] = stmt
+            elif m := re.match(r"drop\s+(?:function|view)\s+(?:if\s+exists\s+)?(.*)", flat, re.I):
+                for schema, name in _names(m.group(1)):
+                    if schema == "core":
+                        functions.pop(name, None)
+                    for key in [k for k, v in triggers.items() if v == (schema, name)]:
+                        del triggers[key]
+            elif m := re.match(r"alter\s+(?:function|view)\s+core\.(\w+)(?:\([^)]*\))?\s+(set\s+schema|rename\s+to)\s+"
+                               r"(\w+)", flat, re.I):
+                body = functions.pop(m.group(1).lower(), None)
+                if body is not None and m.group(2).lower().startswith("rename"):
+                    functions[m.group(3).lower()] = body
+            elif m := re.match(r"create\s+(?:or\s+replace\s+)?(?:constraint\s+)?trigger\s+(\w+)\s.*?\bon\s+(\w+)\.(\w+)"
+                               r"\s.*?execute\s+(?:function|procedure)\s+(\w+)\.(\w+)", flat, re.I):
+                name, schema, table, fn_schema, fn = (g.lower() for g in m.groups())
+                triggers[(name, f"{schema}.{table}")] = (fn_schema, fn)
+            elif m := re.match(r"drop\s+trigger\s+(?:if\s+exists\s+)?(\w+)\s+on\s+(\w+)\.(\w+)", flat, re.I):
+                triggers.pop((m.group(1).lower(), f"{m.group(2).lower()}.{m.group(3).lower()}"), None)
+            elif m := re.match(r"drop\s+table\s+(?:if\s+exists\s+)?(.*)", flat, re.I):
+                for schema, table in _names(m.group(1)):
+                    drop_table(schema, table)
+            elif m := re.match(r"create\s+table\s+(?:if\s+not\s+exists\s+)?core\.(\w+)\s*\((.*)\)", flat, re.I):
+                table = m.group(1).lower()
+                for item in _top_level(m.group(2)):
+                    if c := re.match(r"constraint\s+(\w+)\s+(check\b.*)", item, re.I):
+                        add_check(table, c.group(1), c.group(2))
+                    elif not re.match(r"(primary|unique|foreign|exclude)\b", item, re.I):
+                        add_check(table, None, item)
+            elif m := re.match(r"alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?core\.(\w+)\s+(.*)", flat, re.I):
+                table = m.group(1).lower()
+                for action in _top_level(m.group(2)):
+                    if a := re.match(r"add\s+column\s+(?:if\s+not\s+exists\s+)?(\w+)(.*)", action, re.I):
+                        key = f"core.{table}.{a.group(1).lower()}"
+                        if office_tied and key not in COT_LOI:
+                            columns[key] = migration
+                        add_check(table, None, a.group(1) + a.group(2))
+                    elif a := re.match(r"add\s+(?:constraint\s+(\w+)\s+)?(check\b.*)", action, re.I):
+                        add_check(table, a.group(1), a.group(2))
+                    elif a := re.match(r"drop\s+constraint\s+(?:if\s+exists\s+)?(\w+)", action, re.I):
+                        checks.pop((table, a.group(1).lower()), None)
+                    elif a := re.match(r"drop\s+column\s+(?:if\s+exists\s+)?(\w+)", action, re.I):
+                        col = a.group(1).lower()
+                        columns.pop(f"core.{table}.{col}", None)
+                        for key in [k for k, v in checks.items() if k[0] == table and v[0] == col]:
+                            del checks[key]
+                    elif re.match(r"set\s+schema\b", action, re.I):
+                        drop_table("core", table)
+
     edges = set()
-    latest: dict[str, str] = {}
-    checks: dict[str, list[str]] = {}
-    body = (r"create\s+(?:or\s+replace\s+)?(?:function|view)\s+core\.(\w+)(.*?)"
-            r"(?=\bcreate\s+(?:or\s+replace\s+)?(?:function|view|table|trigger|index|unique|policy)\b|\Z)")
-    for name, sql in migs:
-        for m in re.finditer(body, sql, re.I | re.S):
-            latest[m.group(1).lower()] = m.group(2)
-        for m in re.finditer(r"create\s+(?:constraint\s+)?trigger\s+\w+.*?\bon\s+(\w+)\.(\w+).*?"
-                             r"execute\s+(?:function|procedure)\s+(\w+)\.(\w+)", sql, re.I | re.S):
-            on_schema, table, fn_schema, fn = (g.lower() for g in m.groups())
-            if on_schema == "core" and fn_schema == "office":
-                edges.add(f"csdl trigger core.{table} -> office.{fn}")
-            if on_schema == "office" and fn_schema == "core" and fn != "audit":
-                edges.add(f"csdl trigger office.{table} -> core.{fn}")
-        for m in re.finditer(r"(?:create\s+table\s+(?:if\s+not\s+exists\s+)?|alter\s+table\s+(?:if\s+exists\s+)?)"
-                             r"core\.(\w+)(.*?);", sql, re.I | re.S):
-            table, rest = m.group(1).lower(), m.group(2)
-            for col, values in re.findall(r"check\s*\(\s*(\w+)\s+in\s*\(([^)]*)\)", rest, re.I):
-                checks[f"core.{table}.{col.lower()}"] = re.findall(r"'([^']*)'", values)
-            if m.group(0).lower().startswith("alter") and re.search(r"\boffice\.", sql):
-                for col in re.findall(r"add\s+column\s+(?:if\s+not\s+exists\s+)?(\w+)", rest, re.I):
-                    key = f"core.{table}.{col.lower()}"
-                    if key not in COT_LOI:
-                        edges.add(f"csdl cot {key} <- {name}")
-    for fn, text in latest.items():
-        for ref in sorted(_office_refs(text, objects)):
+    for fn, stmt in functions.items():
+        for ref in sorted(_office_refs(stmt, objects)):
             edges.add(f"csdl ham core.{fn} -> {ref}")
-    for col, values in checks.items():
+    for (_, on), (fn_schema, fn) in triggers.items():
+        if on.startswith("core.") and fn_schema == "office":
+            edges.add(f"csdl trigger {on} -> office.{fn}")
+        if on.startswith("office.") and fn_schema == "core" and fn != "audit":
+            edges.add(f"csdl trigger {on} -> core.{fn}")
+    for (table, _), (col, values) in checks.items():
         vp = sorted(v for v in values if GIA_TRI_VP.match(v))
         if vp:
-            edges.add(f"csdl rang-buoc {col} -> {','.join(vp)}")
+            edges.add(f"csdl rang-buoc core.{table}.{col} -> {','.join(vp)}")
+    for key, migration in columns.items():
+        edges.add(f"csdl cot {key} <- {migration}")
     return edges
 
 
