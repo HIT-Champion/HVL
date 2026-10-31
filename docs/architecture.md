@@ -530,6 +530,7 @@ hiện tại. Nhóm của mọi mô-đun theo mã hiện tại nằm ở `NHOM` 
 | `alerts.py`, route `POST /ops/alerts` | Lõi | Cảnh báo vận hành Alertmanager gửi sang (#284) → thông báo `ops.alert` cho vai trò `tenant_admin` của mọi đơn vị, không gắn văn bản; phần chung, gắn cả khi tắt Văn phòng |
 | `tu_dong.py`, route `POST /actions/tu-dong/{name}` | Dáng nghiệp vụ | Kiểm kê #484: kèm văn bản thì đọc `office_documents_by_pk`, vai trò văn thư viết cứng. Action `notifyFromFlow` của robot flow Node-RED (vai trò Hasura `tu_dong`, #366) → thông báo `flow.message` cho người của đơn vị robot theo vai trò; kèm văn bản thì chỉ `director`, `clerk`; cùng khóa không báo lại |
 | `parts.py` | Lõi | Khuôn `Part` (`install`, `jobs`, `aclose`) để gắn một phần nghiệp vụ; vòng định kỳ, triển khai BPMN có thử lại, định dạng lỗi Hasura Action; không biết phần cụ thể nào |
+| `thoi_gian.py` | Lõi | Thời hạn ISO 8601, ngày nghỉ lễ (#489): `config.py` đọc cấu hình bằng nó; `sla.py`, `suggest.py` của Văn phòng dùng lại, đúng chiều Văn phòng → lõi |
 | `app.py`, `config.py` | Trộn | `create_app` dựng phần chung (danh bạ, thông báo: hai vòng định kỳ) và quy trình của ứng dụng (`apps/`, #301); chỉ dựng và gắn phần Văn phòng khi `MOC_OFFICE_ENABLED` bật (#302). Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
 
 CSDL và metadata Hasura:
@@ -574,9 +575,10 @@ tám bảng `core` và bảy mô-đun dùng chung viết cứng vai trò văn th
   `svc_files/office/hasura.py`, `svc_workflow/office/queries.py`. Bước 2: 12 route Văn phòng của `svc-files` sang ba
   `APIRouter` trong `svc_files/office/api.py`; Actions, `/ot/notify/{tenant}`, BPMN và vòng định kỳ của Văn phòng trong
   `svc-workflow` sang lớp `Office` (`svc_workflow/office/api.py`, khuôn `parts.py`); cả hai chỉ gắn khi
-  `MOC_OFFICE_ENABLED` bật. Còn lại: `app.py` của hai dịch vụ vẫn import gói Văn phòng (cùng WeasyPrint, pyHanko…) cả
-  khi tắt; khi tắt, `svc-files` vẫn dò két cho ký số lúc khởi động và `/readyz` báo `"ai": false` (cờ này lấy từ tác
-  tử đọc văn bản đến).
+  `MOC_OFFICE_ENABLED` bật. Từ #489 `app.py` của hai dịch vụ chỉ nạp gói Văn phòng (cùng WeasyPrint) bên trong
+  `create_app` khi cờ bật, `config.py` của `svc-workflow` không còn kéo theo `sla.py`, `suggest.py`; test mỗi dịch vụ
+  kiểm trong tiến trình riêng rằng tắt cờ thì không mô-đun Văn phòng nào được nạp. Còn lại: khi tắt, `svc-files`
+  vẫn dò két cho ký số lúc khởi động và `/readyz` báo `"ai": false` (cờ này lấy từ tác tử đọc văn bản đến).
 - **Phạm vi.** Tìm kiếm, đọc chữ PDF, chỉ mục đoạn của trợ lý chọn dữ liệu từ `office.documents`,
   `office.document_files`: tệp của ứng dụng khác (vd trong `personal`) không tìm được, trợ lý không đọc tới.
 - **Tệp và quyền xem tệp.** Route `/api/files` có nhánh `restricted` của văn bản hạn chế. Bộ lọc quyền của `core.files`
@@ -648,7 +650,8 @@ Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.5.0`, chưa x
 **Tiêu chí xong** — kiểm được, không cần tin lời:
 
 1. Gói lõi không import gói nào của Văn phòng (`git grep` các dòng `from .docread`, `from .render`… trong mô-đun lõi
-   không in gì). **Đạt ở #302**, trừ chỗ ráp: `app.py` của hai dịch vụ (nhóm "Trộn" ở §4.3) còn import `office`.
+   không in gì). **Đạt ở #302**; chỗ ráp `app.py` của hai dịch vụ (nhóm "Trộn" ở §4.3) chỉ nạp `office` khi cờ bật
+   từ #489.
 2. Không còn hàm, cột, quan hệ metadata nào của `core` trỏ sang `office`; quyền xem `core.files` không phụ thuộc bảng
    nào của `office`.
 3. Vai trò của một ứng dụng là của ứng dụng đó: ứng dụng mới khai vai trò riêng mà không sửa `core.users.role` hay

@@ -115,9 +115,23 @@ class Scanner(unittest.TestCase):
             EVENT = "office.documents.cached"
             def who(role):
                 "chuỗi đứng một mình: 'clerk' không tính"
+                from .render import pdf
                 return role == "manager"
             ''')
         write(self.root, "services/svc-files/src/svc_files/office/api.py", 'Q = "office_documents"\n')
+        write(self.root, "services/svc-files/src/svc_files/render.py", 'def pdf():\n    return b""\n')
+        # mô-đun trộn (chỗ ráp): import cho chú thích kiểu và import trong hàm khi cờ bật đều không tính
+        write(self.root, "services/svc-files/src/svc_files/app.py", '''
+            from typing import TYPE_CHECKING
+            if TYPE_CHECKING:
+                from .office import api as office_api
+            def create_app(enabled):
+                if enabled:
+                    from .assist import similar
+                    from .office import api as office_api
+            ''')
+        write(self.root, "services/svc-files/src/svc_files/assist/similar.py", "X = 1\n")
+        write(self.root, "services/svc-files/src/svc_files/core_two.py", "from .assist import similar\n")
         write(self.root, "services/svc-workflow/src/svc_workflow/__init__.py", '"""Gói."""\n__version__ = "1"\n')
 
     def tearDown(self) -> None:
@@ -128,10 +142,13 @@ class Scanner(unittest.TestCase):
         self.assertEqual(objects, {"documents", "redact"})
         edges, groups = rg.code_edges(self.root, objects)
         self.assertEqual(groups["svc_files/office/api.py"], rg.VP)
+        self.assertEqual(groups["svc_files/app.py"], rg.TRON)
         self.assertIsNone(groups["svc_files/core_mod.py"])
         self.assertEqual(sorted(edges), [
             "du-lieu svc_files/core_mod.py -> office.documents",
-            "import svc_files/core_mod.py -> svc_files/office/",
+            "import svc_files/core_mod.py -> svc_files/office/api.py",     # from .office import api: mô-đun api
+            "import svc_files/core_mod.py -> svc_files/render.py",         # trong hàm, nhưng không phải chỗ ráp
+            "import svc_files/core_two.py -> svc_files/assist/similar.py",  # from .assist import similar
             "vai-tro svc_files/core_mod.py -> manager",
         ])
 

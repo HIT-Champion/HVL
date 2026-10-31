@@ -24,21 +24,17 @@ from datetime import date, timedelta
 import pytest
 
 from svc_workflow.suggest import (
-    LEGAL_HOLIDAYS,
     MAX_DAYS,
-    NO_HOLIDAYS,
     TOP_K,
     Evidence,
     Hit,
-    Holidays,
     Past,
     lead_unit,
-    next_workday,
-    parse_holidays,
     past_days,
     suggest,
     vn_date,
 )
+from svc_workflow.thoi_gian import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, next_workday, parse_holidays
 
 DT, KTPM, HTTT, CTSV = "dt", "ktpm", "httt", "ctsv"  # CTSV: phòng không có lãnh đạo phòng
 UNITS = {DT, KTPM, HTTT}

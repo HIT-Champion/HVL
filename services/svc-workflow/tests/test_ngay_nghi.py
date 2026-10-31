@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Lịch nghỉ chính thức của nguồn công khai B (#427): svc-workflow đọc ``seed/du-lieu-mo/ngay-nghi-le/ngay-nghi.json``
-cộng với ``MOC_HOLIDAYS`` cho hạn gợi ý (config.read_holidays_file, suggest.holidays_from_data)."""
+cộng với ``MOC_HOLIDAYS`` cho hạn gợi ý (config.read_holidays_file, thoi_gian.holidays_from_data)."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from datetime import date
 import pytest
 
 from svc_workflow.config import HOLIDAYS_FILE, ConfigError, Settings, read_holidays_file
-from svc_workflow.suggest import Holidays, holidays_from_data, next_workday
+from svc_workflow.thoi_gian import Holidays, holidays_from_data, next_workday
 from test_app import ENV
 
 SNAPSHOT = pathlib.Path(__file__).resolve().parents[3] / "seed" / "du-lieu-mo" / "ngay-nghi-le" / "ngay-nghi.json"

@@ -28,8 +28,7 @@ from email.utils import parseaddr
 from urllib.parse import urlsplit
 
 from .channels import KINDS, SMTP_PORTS, WEBHOOK_FORMATS
-from .sla import parse_duration
-from .suggest import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, holidays_from_data, parse_holidays
+from .thoi_gian import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, holidays_from_data, parse_duration, parse_holidays
 
 REQUIRED = (
     "HASURA_ADMIN_SECRET",
@@ -112,7 +111,7 @@ class Settings:
     suggest_timeout_s: float = 10.0
     suggest_min_score: float = 0.3
     assigner_id: str = "moc-assigner"
-    # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật: MOC_HOLIDAYS (cú pháp ở suggest.parse_holidays) cộng lịch
+    # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật: MOC_HOLIDAYS (cú pháp ở thoi_gian.parse_holidays) cộng lịch
     # nghỉ chính thức của nguồn công khai B (MOC_HOLIDAYS_FILE, #427), kể cả thứ Bảy làm bù
     holidays: Holidays = NO_HOLIDAYS
     holidays_file: str = ""     # tệp lịch nghỉ đã đọc; rỗng khi tắt hay không có tệp
