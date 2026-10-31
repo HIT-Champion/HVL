@@ -191,7 +191,7 @@ flowchart LR
   GW -->|"/api/verify, /api/verify/*, /api/status<br/>không cần token"| SF
   GW -->|"/realtime · WebSocket"| CE
   GW -->|"/api/workflow/* — quy trình của ứng dụng cắm thêm"| WF
-  HA -->|"6 Actions"| WF
+  HA -->|"9 Actions"| WF
   HA -->|"SQL"| PG
   WF -->|"REST, external worker"| FL
   WF -->|"đẩy thông báo"| CE
@@ -258,7 +258,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 |---|---|
 | Nền chung | APISIX 3.18.0 · `svc-files`, `svc-workflow` (Python 3.13, FastAPI 0.143) · ClamAV 1.5.4 · OpenBao 2.7.1 · sổ kiểm toán chuỗi băm · pyHanko 0.37.0 · bộ che thông tin cá nhân |
 | [H] Nhân sự | Keycloak 26.7.5 · Không gian cá nhân P.A.R.A (ứng dụng thứ hai) · DokuWiki 2026-07-14c (profile `wiki`) |
-| [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) · Node-RED 5.0.8 (profile `tu-dong`) |
+| [P] Quy trình | Flowable REST 8.0.0 · 9 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) · Node-RED 5.0.8 (profile `tu-dong`) |
 | [D] Dữ liệu | PostgreSQL 16 · Hasura CE v2.51.0 · SeaweedFS 4.48 · Meilisearch CE v1.54.3 · DuckDB 1.5.6 · phả hệ OpenLineage · dashboard ECharts 6.1.0 · Scorpio 6.0.2 và PostGIS 16-3.5 (profile `iot`) |
 | [I] Trí tuệ | Ollama 0.35.1 (profile `ai`) · Qwen3-1.7B, Qwen3-Embedding-0.6B · Tesseract 5.5.0 · truy xuất có nguồn tự viết · ba tác tử |
 | Vận hành | Prometheus 3.15.0, Alertmanager 0.34.1, Grafana OSS 13.2.3 · Vector 0.59.0, Parseable 3.2.4 (profile `logs`) · restic 0.19.1 · reconciler GitOps · cloudflared 2026.10.0 (profile `tunnel`) |
@@ -273,7 +273,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Apache APISIX | 3.18.0 | Cổng duy nhất: danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ, gắn `X-Request-Id`, xuất chỉ số cho Prometheus | ② | `platform/apisix/` | F1.2 Hoàn thiện |
 | Coraza + OWASP CRS | Coraza 3.3.3, CRS 4.14.0 (coraza-proxy-wasm 0.6.0) | Tường lửa ứng dụng web trong APISIX (plugin proxy-wasm, global rule): soi mọi yêu cầu trước khi kiểm token, chặn mặc định (QĐ-013) | ② | `platform/apisix/` | F3.15 Dùng được |
 | `svc-files` *(mã của đội)* | Python 3.13, FastAPI 0.143 | Cửa duy nhất của tệp, tìm kiếm, dựng PDF, cổng xác thực, trạng thái hệ thống, tác tử đọc văn bản đến và trợ lý hỏi đáp. Phân loại từng module: §4.3 | ① ④ | `services/svc-files/` | nhiều mã F — xem từng thành phần ở các bảng dưới |
-| `svc-workflow` *(mã của đội)* | Python 3.13, FastAPI 0.143 | 6 Hasura Actions, nối Flowable, nhắc hạn, liên thông, thông báo đa kênh, đồng bộ danh bạ Keycloak → `core.users`, tác tử gợi ý giao việc. Phân loại: §4.3 | ⑤ ⑦ | `services/svc-workflow/` | F1.4 Hoàn thiện |
+| `svc-workflow` *(mã của đội)* | Python 3.13, FastAPI 0.143 | 9 Hasura Actions, nối Flowable, nhắc hạn, liên thông, thông báo đa kênh, đồng bộ danh bạ Keycloak → `core.users`, tác tử gợi ý giao việc. Phân loại: §4.3 | ⑤ ⑦ | `services/svc-workflow/` | F1.4 Hoàn thiện |
 | ClamAV | 1.5.4 | Quét mọi tệp trước khi ghi (giao thức INSTREAM qua TCP); không trả lời thì từ chối, không lưu | ① | `svc_files/clamav.py` | F1.6, F3.1 Hoàn thiện |
 | OpenBao | 2.7.1 | Két bí mật (static seal, AppRole cho hai dịch vụ), khóa transit `moc-files` mã hóa tệp của văn bản hạn chế, PKI nội bộ và khóa ký của từng đơn vị | ① | `platform/openbao/`, `svc_files/sealed.py`, `svc_files/signing.py` | F3.2 Hoàn thiện (mục 3 xếp két ở mức Dùng được); F3.7 Hoàn thiện |
 | Sổ kiểm toán chuỗi băm *(mã của đội)* | — | Trigger `core.audit()` ghi mọi thay đổi vào `core.audit_log` nối chuỗi băm; mốc đầu chuỗi neo ra bucket khóa ghi; `make audit` kiểm lại | ⑥ | `db/migrations/default/1792281600100_core_schema/`, `svc_files/anchors.py`, `scripts/audit_chain.py` | F2.12 Hoàn thiện |
@@ -293,7 +293,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
 | Flowable REST | 8.0.0 | Động cơ BPMN cho `van-ban-den`, `van-ban-di`: giữ bước và người phải làm, timer nhắc hạn; việc tự động giao ra ngoài cho `svc-workflow` (QĐ-009) | ⑤ | `services/svc-workflow/processes/` | F1.4, F2.3, F2.4 Hoàn thiện |
-| Hasura Actions | Hasura 2.51.0 | Cửa ghi nghiệp vụ: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `completeTask` (cùng truy vấn hộp việc `myTasks` và sơ đồ cảm biến `otSensorMap` của F3.10) → `svc-workflow`, kèm biến phiên lấy từ JWT | ⑤ | `db/metadata/actions.yaml` | F1.4 Hoàn thiện |
+| Hasura Actions | Hasura 2.51.0 | Cửa ghi nghiệp vụ: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `completeTask` (cùng truy vấn hộp việc `myTasks` và sơ đồ cảm biến `otSensorMap` của F3.10); kênh thông báo người dùng tự bật `myChannels`, `setMyChannel` (#365); `notifyFromFlow` cho robot Node-RED, vai trò `tu_dong` (#366) → `svc-workflow`, kèm biến phiên lấy từ JWT | ⑤ | `db/metadata/actions.yaml` | F1.4 Hoàn thiện |
 | JSON Schema dùng chung | Ajv 8.20.0 (giao diện), jsonschema 4.26 (`svc-workflow`) | Poka-yoke ba lớp: form, máy chủ, ràng buộc CSDL theo cùng một tệp schema | — | `schemas/` | F2.2 Hoàn thiện |
 | Centrifugo | 6.9.7 | Đẩy thông báo từng người qua WebSocket `/realtime`, tự kiểm token Keycloak | ⑦ | `platform/centrifugo/config.yaml`, `svc_workflow/notify.py` | F2.5 Hoàn thiện |
 | Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP, webhook Mattermost, Slack, ntfy, SMS, Zalo (`core.notification_deliveries`, tắt mặc định; SMS, Zalo do từng người tự bật) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
@@ -331,7 +331,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Alertmanager gọi svc-workflow để cảnh báo thành thông báo cho quản trị đơn vị (#284); Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
 | Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 9 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
 | restic | 0.19.1 | Sao lưu mã hóa CSDL, tệp, két (`make backup`, `make restore`) | ⑥ | `scripts/backup.py` | F3.4 Hoàn thiện |
-| Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, kiểm chữ ký commit nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
+| Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, hoặc thẻ `vX.Y.Z` mới nhất trên `main` khi `MOC_GITOPS_FOLLOW=release`; `MOC_GITOPS_MODE=nang-cap` nâng có sao lưu và smoke, lỗi thì tự lùi về bản trước (#344, #467); kiểm chữ ký commit hoặc thẻ nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS`. Hướng dẫn: `docs/van-hanh.md` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
 | cloudflared | 2026.10.0 | Cloudflare Tunnel cho máy không có IP công khai (profile `tunnel`, tùy chọn) | — | dịch vụ `cloudflared` trong `docker-compose.yml` | F1.9 Hoàn thiện (tunnel chưa kiểm trong CI) |
 
 F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (Dùng được): bảng
@@ -400,7 +400,7 @@ flowchart TB
   end
   subgraph WFX["svc-workflow — một tiến trình"]
     WFL["Lõi<br/>flowable · openbao · pii"]:::loi
-    WFN["Dáng nghiệp vụ<br/>directory · notify · hasura<br/>channels · schemas"]:::nv
+    WFN["Dáng nghiệp vụ<br/>directory · notify · hasura<br/>channels · schemas<br/>subscriptions · tu_dong"]:::nv
     WFV["Văn phòng<br/>workflow · forms · sla · dispatch · advisor<br/>suggest · ot · files · BPMN văn bản"]:::vp
   end
   subgraph DB["PostgreSQL — CSDL moc"]
@@ -414,6 +414,7 @@ flowchart TB
   OFF -->|"/api/files, /api/search,<br/>/api/documents/ask"| SFN
   OFF -->|"/api/registers/*, /api/verify,<br/>xem trước, đọc văn bản đến"| SFV
   OFF -->|"6 Actions qua Hasura"| WFV
+  OFF -->|"myChannels, setMyChannel qua Hasura"| WFN
   OFF -->|"/v1/graphql"| OFFICE
   SFN --> SFL
   SFV --> SFL
