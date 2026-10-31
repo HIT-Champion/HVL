@@ -389,8 +389,9 @@ Có ba cách, cách nào cũng đi qua `scripts/nang_cap.sh nang` hoặc `instal
    phút bằng cron của người dùng `moc` (máy Windows qua WSL2 không có systemd, `trien-khai.md` mục 7), đặt
    `MOC_GITOPS_BRANCH=main`, `MOC_GITOPS_FOLLOW=release`, `MOC_GITOPS_MODE=nang-cap`. Thẻ `vX.Y.Z` mới trên `main` là
    bản online tự nâng: sao lưu, nâng, kiểm (có smoke), lỗi sau khi sao lưu thì tự lùi về bản trước (`van-hanh.md` mục
-   GitOps). Người phát hành không làm gì thêm sau khi đẩy thẻ; job "Bản online" sau Release kiểm lại từ bên ngoài. Smoke
-   tạo văn bản thử trên bản online ở mỗi lần nâng. Bảo trì tay thì tắt dòng cron trước (`crontab -e`, thêm `#`).
+   GitOps). Người phát hành không làm gì thêm sau khi đẩy thẻ; job "Kiểm bản online qua HTTPS" sau Release kiểm lại từ
+   bên ngoài. Smoke tạo văn bản thử trên bản online ở mỗi lần nâng. Bảo trì tay thì tắt dòng cron trước (`crontab -e`,
+   thêm `#`).
 2. **Nâng tay** — tải gói của thẻ trên trang Release rồi chạy `scripts/nang_cap.sh nang` (`trien-khai.md` mục 7): sao
    lưu trước, kiểm sau khi nâng, lùi về được. Bản online dùng cách này tới `v1.4.0`.
 3. **Nhánh `deploy`** — cho máy chủ bật reconciler GitOps theo nhánh (`van-hanh.md` mục GitOps): reconciler kéo nhánh
