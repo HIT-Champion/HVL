@@ -311,7 +311,21 @@ kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`]
 **Tự phục hồi và GitOps** (tùy chọn): [`van-hanh.md`](van-hanh.md) mục "GitOps và tự phục hồi" — systemd timer
 `platform/systemd/` chạy `reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
-`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`.
+`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`. Bản thật nên nâng có sao lưu, lỗi
+thì tự lùi (`MOC_GITOPS_MODE=nang-cap`), theo từng bản phát hành trên `main` (`MOC_GITOPS_FOLLOW=release`) hoặc qua
+cổng ký nhánh `deploy` (`van-hanh.md` mục GitOps, #344).
+
+**Máy không có systemd** (WSL2 chưa bật systemd, PID 1 là `init`): chạy reconciler bằng cron của người dùng `moc` thay
+cho timer, mỗi phút một lượt như timer. Lượt gặp khóa đang bị giữ (đang nâng, sao lưu) thì tự bỏ qua. Nhật ký mỗi
+phút thêm một dòng: xoay vòng bằng logrotate, hoặc dùng `>` thay `>>` để chỉ giữ lượt cuối.
+
+```
+* * * * * cd /opt/moc && python3 scripts/reconcile.py >> $HOME/reconcile.log 2>&1
+```
+
+WSL không tự chạy cron khi khởi động: thêm `service cron start` vào `command` của mục `[boot]` trong `/etc/wsl.conf`
+(đã có lệnh thì nối bằng `;`). Bảo trì hay nâng tay thì tắt dòng cron trước (`crontab -e`, thêm `#`), như tắt timer:
+`nang_cap.sh` chỉ tự kiểm được timer systemd.
 
 **Nâng cấp tay** (không dùng GitOps): dừng timer reconciler nếu có (`sudo systemctl stop moc-reconcile.timer`), lấy mã
 nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git pull` trong `~/Signet`), rồi từ thư mục đó:
