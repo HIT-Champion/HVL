@@ -44,6 +44,14 @@ def routed(question: str, *, scoped: bool = False) -> tuple[str, str, str]:
     ("Trợ lý này dùng mô hình nào?", "gioi_thieu", "kw:dung-mo-hinh"),
     ("Tôi nên hỏi bạn thế nào?", "gioi_thieu", "kw:hoi-the-nao"),
     ("Cho tôi hỏi, bạn làm được gì?", "gioi_thieu", "kw:lam-duoc-gi"),
+    ("Bạn có thể giúp gì cho tôi?", "gioi_thieu", "kw:lam-duoc-gi"),              # "gì" trước người được giúp
+    ("Em làm được gì cho mình không?", "gioi_thieu", "kw:lam-duoc-gi"),
+    ("hello em", "gioi_thieu", "kw:xin-chao"),                                    # chào tiếng Anh, gọi tiếng Việt
+    ("Hi bạn ơi", "gioi_thieu", "kw:xin-chao"),
+    ("Em ơi", "gioi_thieu", "kw:xin-chao"),
+    ("Chào em nhé", "gioi_thieu", "kw:xin-chao"),
+    ("Tôi cần giúp đỡ", "gioi_thieu", "kw:can-giup"),
+    ("Giúp tôi với", "gioi_thieu", "kw:can-giup"),
     # cách dùng Signet
     ("Nộp đơn nghỉ phép ở đâu?", "huong_dan", "kw:o-dau"),
     ("Làm thế nào để ký số văn bản đi?", "huong_dan", "kw:lam-the-nao"),
@@ -216,3 +224,35 @@ def test_incoming_is_counted_by_registration_time_outgoing_by_issue_date():
         {"direction": {"_eq": "out"}}, {"issued_on": {"_gte": "2026-10-01", "_lt": "2026-11-01"}}]}
     typed = data.count_query(route.folded("Có bao nhiêu công văn đến?"), TODAY)
     assert data.where("in", typed) == {"_and": [{"direction": {"_eq": "in"}}, {"type_code": {"_eq": "CV"}}]}
+
+
+@pytest.mark.parametrize("question", [
+    "bạn có thể giups gì cho tôi?",         # gõ sai: không mẫu nào khớp
+    "alo alo",
+    "ok",
+    "tôi không biết hỏi gì",
+])
+def test_short_unmatched_questions_without_evidence_fall_back_to_the_intro(question):
+    q = vi.normalize(question)
+    chosen = route.route(q)
+    assert (chosen.name, chosen.reason) == ("van_ban", "mac-dinh")
+    caught = route.fallback(q, chosen)
+    assert caught is not None and (caught.name, caught.reason) == ("gioi_thieu", "luoi-an-toan")
+
+
+@pytest.mark.parametrize(("question", "kwargs"), [
+    ("Điều kiện xét học bổng là gì?", {}),                      # có từ chỉ văn bản
+    ("Lịch thi học kỳ 1 năm 2026", {}),                         # có số
+    ("Tôi phải chuẩn bị những gì cho buổi bảo vệ đồ án cuối khóa?", {}),   # dài hơn 8 term
+    ("lịch thi", {"scoped": True}),                             # hỏi trong một văn bản
+    ("lịch thi", {"filtered": True}),                           # đang lọc loại, năm, chiều
+])
+def test_the_fallback_leaves_real_document_questions_as_no_evidence(question, kwargs):
+    q = vi.normalize(question)
+    assert route.fallback(q, route.route(q), **kwargs) is None
+
+
+def test_the_fallback_only_catches_the_default_route():
+    for chosen in (route.Route("van_ban", route.NO_GUIDE_REASON), route.Route("huong_dan", "kw:o-dau"),
+                   route.Route("gioi_thieu", "kw:xin-chao")):
+        assert route.fallback("lịch thi", chosen) is None

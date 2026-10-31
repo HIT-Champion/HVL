@@ -37,6 +37,12 @@ so read the source passage before you use an answer.
 
 Glad to help. You can ask more about the documents or about how to use Signet.
 
+## Unclear question {#chua-ro}
+
+I did not quite understand this and found no document you can read that matches it. I answer questions about the
+content of documents, how to use Signet, your tasks and document counts. Please ask in more detail, for example: "What
+are the conditions for a scholarship?", "Where do I submit a leave request?", "Which of my tasks are almost due?".
+
 ## Out of scope {#ngoai-pham-vi}
 
 This question is outside what I can answer. I answer questions about the documents you can read, about how to use

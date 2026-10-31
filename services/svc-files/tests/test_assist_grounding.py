@@ -262,3 +262,15 @@ def test_answer_whitespace_is_tidied_but_lines_are_kept():
     got = validate(reply("  Sinh viên cần   điểm trung bình chung học kỳ từ 3,2 [1].\r\n\r\n\r\n- Điểm rèn luyện "
                          "đạt loại Tốt [1].  "), srcs_of(PAGE_88), QUESTION)
     assert got.text == "Sinh viên cần điểm trung bình chung học kỳ từ 3,2 [1].\n\n- Điểm rèn luyện đạt loại Tốt [1]."
+
+
+def test_intro_answers_need_no_citation_but_no_number_outside_the_sources():
+    srcs = [grounding.Source(1, "gioi_thieu", "", "Tôi trả lời câu hỏi về cách dùng Signet, tối đa 4 đoạn.")]
+    ok = grounding.validate_intro(json.dumps({"du_can_cu": True, "tra_loi": "Chào bạn! Tôi đọc tối đa 4 đoạn."}),
+                                  srcs, "hello e")
+    assert (ok.text, ok.reason) == ("Chào bạn! Tôi đọc tối đa 4 đoạn.", None)
+    bad = grounding.validate_intro(json.dumps({"du_can_cu": True, "tra_loi": "Tôi trả lời trong 2 giây."}),
+                                   srcs, "hello e")
+    assert (bad.text, bad.reason) == (None, "unsupported_number")
+    assert grounding.validate_intro("không phải JSON", srcs, "hello e").reason == "bad_json"
+    assert grounding.validate_intro(json.dumps({"du_can_cu": False, "tra_loi": ""}), srcs, "x").declined

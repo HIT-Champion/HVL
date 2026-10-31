@@ -358,11 +358,15 @@ chủ không lưu hội thoại: câu nối tiếp gửi kèm câu hỏi lượt
 **Bộ định tuyến** (`route.py`, `guide.py`, #423). Trước khi tìm, mỗi câu hỏi đi qua các mẫu tất định so trên chữ bỏ
 dấu, có cả tiếng Anh; mỗi mẫu có mã lý do (`route_reason`, vd `kw:lam-duoc-gi`, `kw:o-dau`, `kw:thoi-tiet`; mặc định
 `mac-dinh`). Không mô hình nào chọn đường. Câu có từ chỉ văn bản ("văn bản", "quyết định", "học bổng", "Điều 5"…) luôn
-về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất là như trước khi có bộ định tuyến.
+về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất là như trước khi có bộ định tuyến. Lưới an toàn
+(`route.fallback`): câu về `van_ban` theo mặc định mà không ra đoạn nào, ngắn (≤ 8 term), không có từ chỉ văn bản,
+không có số, không lọc, không hỏi trong một văn bản thì trả mục "Chưa rõ câu hỏi" của tệp Giới thiệu trợ lý (mã
+`luoi-an-toan`) thay cho "không tìm thấy": câu gõ sai như "bạn có thể giups gì cho tôi" không còn nhận câu trả lời
+của một lượt tìm văn bản thất bại.
 
 | `route` | Nhận ra bằng | Trả lời | Tìm trong kho · gọi mô hình |
 |---|---|---|---|
-| `gioi_thieu` | "làm được gì", "bạn là ai", "dùng mô hình nào", "xin chào", "cảm ơn", "what can you do"… | Câu đầu của mục ứng với mã lý do trong tệp Giới thiệu trợ lý (`assist/gioi_thieu/vi.md`, `en.md` khi câu hỏi tiếng Anh), các mục khác của tệp làm nguồn phụ; `answer.source: extract` | không · không, kể cả `mode: generate` |
+| `gioi_thieu` | "làm được gì", "bạn là ai", "dùng mô hình nào", "xin chào", "cảm ơn", "what can you do"… | Câu đầu của mục ứng với mã lý do trong tệp Giới thiệu trợ lý (`assist/gioi_thieu/vi.md`, `en.md` khi câu hỏi tiếng Anh), các mục khác của tệp làm nguồn phụ; `answer.source: extract`; lượt `generate`: mô hình viết lời đáp từ các mục đó, lời dặn nêu phạm vi trợ lý (`grounding.SYSTEM_INTRO`), hạn 6 giây, không đạt thì giữ câu trích, không cảnh báo | không · có ở `mode: generate` |
 | `huong_dan` | "ở đâu", "làm thế nào để", "hướng dẫn cách"… kèm tên chức năng (nghỉ phép, văn bản đi, ký số, mật khẩu…), không có số ký hiệu, "số N" | Như `van_ban` nhưng nguồn là các mục của hướng dẫn sử dụng (`docs/huong-dan/*.md`, thư mục `MOC_ASK_GUIDE_DIR`); không mục nào khớp thì tìm văn bản như `van_ban` (mã lý do `khong-khop-huong-dan`) | không · như `van_ban` (bộ kiểm căn cứ y nguyên) |
 | `ngoai_pham_vi` | thời tiết, giá cả, thể thao, viết hộ, lập trình… | Câu cố định nói trợ lý làm được gì, `answer.source: fixed`, `status: no_evidence`, `sources: []` | không · không |
 | `viec_cua_toi` (#441) | việc của chính người hỏi: "việc (nào) của tôi", "tôi có bao nhiêu việc", "tôi được giao", "hộp việc … quá hạn", "my tasks"; ngôi thứ nhất so trên chữ có dấu ("tối", "tới" không phải "tôi"); không có từ chỉ văn bản | Action `myTasks` bằng token người hỏi (như Hộp việc): số việc, quá hạn, đến hạn hôm nay, đến hạn trong 2 ngày (như Lịch hạn, giờ Việt Nam), ba việc gần hạn nhất kèm số ký hiệu văn bản người hỏi đọc được; `answer.source: data`, `data`, `link: /` | không · không |
