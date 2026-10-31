@@ -1,0 +1,53 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Đổi, bù lịch giảng — ứng dụng ngành (Tầng 3) của trường, cắm vào lõi bằng MỘT lệnh, không sửa tệp nào ngoài thư
+# mục này, dựng theo khuôn Đơn nghỉ phép (apps/nghi-phep):
+#   python3 scripts/moc.py app install apps/lich-giang/app.yaml     (make app-install APP=apps/lich-giang/app.yaml)
+# Ứng dụng không có máy chủ nghiệp vụ, không bảng riêng: quy trình hai cấp duyệt (BPMN) và form (JSON Schema) khai ở
+# mục workflow, lõi triển khai lên động cơ quy trình của nó và mở API chung /api/workflow/lich-giang/… cho client
+# app-lich-giang. Container chỉ phục vụ trang tĩnh. Cách làm: docs/them-ung-dung.md; trang và kịch bản: README.md.
+
+name: lich-giang
+title: Đổi, bù lịch giảng
+description: Giảng viên đề nghị đổi lịch, dạy bù; trưởng bộ môn rồi lãnh đạo khoa duyệt trên quy trình của lõi
+version: 1.0.0
+path: /lich-giang
+
+# Dựng từ thư mục này lúc cài (Dockerfile: Python thư viện chuẩn trên image ghim digest, không root)
+image: {build: .}
+port: 8080
+healthcheck:
+  test: [CMD, python3, -c,
+         "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/lich-giang/healthz', timeout=3)"]
+  interval: 15s
+  timeout: 5s
+  retries: 3
+memory: 64m
+
+# Manifest bắt buộc có mục database. Ứng dụng không có bảng nào nên không khai migration: lõi chỉ tạo schema trống
+# lich_giang và vai trò CSDL của nó. Đề nghị, quyết định nằm trong động cơ quy trình của lõi
+database:
+  schema: lich_giang
+
+# Process id và formKey đều mang tiền tố "lich-giang." (tên ứng dụng); form kiểm ở cả trình duyệt
+# (public/schema-form.js) lẫn lõi khi nhận dữ liệu
+workflow:
+  processes: [workflow/doi-lich-giang.bpmn20.xml]
+  forms:
+    lich-giang.don: forms/don.json
+    lich-giang.bo-mon: forms/bo-mon.json
+    lich-giang.khoa: forms/khoa.json

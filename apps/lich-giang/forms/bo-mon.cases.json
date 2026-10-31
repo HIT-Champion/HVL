@@ -1,0 +1,24 @@
+{
+  "$comment": "Ca thử dùng chung cho forms/bo-mon.json: trình duyệt (tests/schema-form.test.js) và svc-workflow.",
+  "base": {
+    "quyetDinhBoMon": "dong-y",
+    "ghiChuBoMon": "Phòng A1-301 trống buổi chiều, đồng ý"
+  },
+  "valid": [
+    {"name": "đồng ý kèm ghi chú"},
+    {"name": "chỉ quyết định", "unset": ["ghiChuBoMon"]},
+    {"name": "không đồng ý, ghi chú nhiều dòng",
+     "set": {"quyetDinhBoMon": "tu-choi", "ghiChuBoMon": "Trùng lịch thi giữa kỳ.\nChọn tuần sau."}}
+  ],
+  "invalid": [
+    {"name": "thiếu quyết định", "unset": ["quyetDinhBoMon"], "error": {"quyetDinhBoMon": "required"}},
+    {"name": "quyết định viết khác mã", "set": {"quyetDinhBoMon": "Đồng ý"}, "error": {"quyetDinhBoMon": "enum"}},
+    {"name": "quyết định là true", "set": {"quyetDinhBoMon": true}, "error": {"quyetDinhBoMon": "enum"}},
+    {"name": "ghi chú rỗng", "set": {"ghiChuBoMon": ""}, "error": {"ghiChuBoMon": "minLength"}},
+    {"name": "ghi chú 501 ký tự", "set": {"ghiChuBoMon": {"$repeat": "a", "times": 501}},
+     "error": {"ghiChuBoMon": "maxLength"}},
+    {"name": "ghi chú xuống dòng ở cuối", "set": {"ghiChuBoMon": "Đồng ý\n"}, "error": {"ghiChuBoMon": "not"}},
+    {"name": "ghi chú là null", "set": {"ghiChuBoMon": null}, "error": {"ghiChuBoMon": "type"}},
+    {"name": "trường không có trong mẫu", "set": {"nguoiDuyet": "x"}, "error": {"nguoiDuyet": "additionalProperties"}}
+  ]
+}

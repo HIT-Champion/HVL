@@ -1,0 +1,98 @@
+<!doctype html>
+<!--
+  Copyright 2026 Signet Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- chữ tĩnh để sẵn bằng tiếng Việt (ngôn ngữ mặc định); app.js gán lại theo ngôn ngữ đã chọn: data-i18n là chữ của
+       phần tử, data-i18n-<thuộc tính> là thuộc tính, khóa ở i18n.js (tests/i18n.test.js kiểm chữ ở đây khớp bảng) -->
+  <title data-i18n="page.title">Đổi, bù lịch giảng — Signet</title>
+  <meta name="description" data-i18n-content="page.description"
+        content="Signet — giảng viên đề nghị đổi lịch, dạy bù; trưởng bộ môn rồi lãnh đạo khoa duyệt">
+  <link rel="icon" href="/lich-giang/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/lich-giang/style.css">
+  <!-- thư viện trước, mã của trang sau: cả hai chạy theo thứ tự sau khi đọc xong trang -->
+  <script src="/lich-giang/lib/oidc-client-ts.min.js" defer></script>
+  <script src="/lich-giang/app.js" type="module"></script>
+</head>
+<body>
+  <a class="bo-qua" href="#noi-dung" data-i18n="page.skip">Bỏ qua, tới nội dung chính</a>
+  <header class="top">
+    <a class="brand" href="/lich-giang/">
+      <img src="/lich-giang/favicon.svg" alt="" width="28" height="28">
+      <span><strong data-i18n="page.brand">Đổi, bù lịch giảng</strong>
+        <small data-i18n="page.tagline">Signet · ứng dụng ngành trên lõi</small></span>
+    </a>
+    <nav class="top-nav" aria-label="Ứng dụng" data-i18n-aria-label="nav.apps">
+      <a href="/" data-i18n="nav.office">Văn phòng điện tử</a>
+      <span id="nguoi" class="who" data-i18n="status.signingIn">Đang đăng nhập…</span>
+      <!-- tên ngôn ngữ kia viết bằng chính tiếng đó; lang của nút đổi theo (lang.other) -->
+      <button id="doi-ngon-ngu" type="button" class="btn ghost" lang="en" data-i18n="lang.switch"
+              data-i18n-lang="lang.other">English</button>
+      <button id="thoat" type="button" class="btn ghost" data-i18n="nav.logout" hidden>Đăng xuất</button>
+    </nav>
+  </header>
+
+  <main id="noi-dung" tabindex="-1">
+    <p id="tin" class="status" role="status" data-i18n="status.loadingForms">Đang nạp mẫu đề nghị…</p>
+    <div id="loi" class="loi" role="alert" hidden></div>
+
+    <div id="ung-dung" hidden>
+      <nav class="tabs" aria-label="Các phần của ứng dụng" data-i18n-aria-label="nav.sections">
+        <button type="button" class="tab" data-phan="gui-don" aria-controls="gui-don"
+                data-i18n="tab.request">Gửi đề nghị</button>
+        <!-- nhãn trong span riêng: gán chữ theo ngôn ngữ không xóa số đếm bên cạnh -->
+        <button type="button" class="tab" data-phan="don-cua-toi" aria-controls="don-cua-toi">
+          <span data-i18n="tab.mine">Đề nghị của tôi</span> <span id="dem-don" class="dem"></span>
+        </button>
+        <button type="button" class="tab" data-phan="viec-can-duyet" aria-controls="viec-can-duyet" hidden>
+          <span data-i18n="tab.review">Việc cần duyệt</span> <span id="dem-viec" class="dem"></span>
+        </button>
+      </nav>
+
+      <section id="gui-don" class="phan" aria-labelledby="tieu-de-gui-don">
+        <h1 id="tieu-de-gui-don" tabindex="-1" data-i18n="request.heading">Đề nghị đổi lịch, dạy bù</h1>
+        <p class="hint" data-i18n="request.hint">Trưởng bộ môn của bạn xem trước, rồi lãnh đạo khoa phê duyệt. Kết quả
+          hiện ở phần "Đề nghị của tôi".</p>
+        <div id="form-don" class="khung-form"></div>
+      </section>
+
+      <section id="don-cua-toi" class="phan" aria-labelledby="tieu-de-don-cua-toi" hidden>
+        <h1 id="tieu-de-don-cua-toi" tabindex="-1" data-i18n="mine.heading">Đề nghị của tôi</h1>
+        <p id="khong-co-don" class="empty" data-i18n="mine.empty" hidden>Bạn chưa gửi đề nghị nào.</p>
+        <ul id="danh-sach-don" class="danh-sach"></ul>
+      </section>
+
+      <section id="viec-can-duyet" class="phan" aria-labelledby="tieu-de-viec-can-duyet" hidden>
+        <h1 id="tieu-de-viec-can-duyet" tabindex="-1" data-i18n="review.heading">Việc cần duyệt</h1>
+        <p class="hint" data-i18n="review.hint">Đề nghị đang chờ quyết định của bạn: trưởng bộ môn duyệt đề nghị của
+          giảng viên trong bộ môn, lãnh đạo khoa phê duyệt đề nghị bộ môn đã đồng ý. Người gửi đọc được ghi chú.</p>
+        <p id="khong-co-viec" class="empty" data-i18n="review.empty" hidden>Không còn đề nghị nào chờ duyệt.</p>
+        <ul id="danh-sach-viec" class="danh-sach"></ul>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot" data-i18n="page.footer">
+    Ứng dụng ngành này không có máy chủ nghiệp vụ: đề nghị, việc duyệt, ai được thấy việc nào đều do động cơ quy trình
+    của lõi Signet giữ và kiểm. Mẫu đề nghị là tệp JSON Schema, quy trình hai cấp duyệt là tệp BPMN nằm trong thư mục
+    của ứng dụng.
+  </footer>
+</body>
+</html>

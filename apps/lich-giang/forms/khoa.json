@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:moc:app:lich-giang:form:khoa",
+  "title": "Phê duyệt của khoa",
+  "description": "Form của bước lãnh đạo khoa duyệt (formKey lich-giang.khoa). Ca thử dùng chung: khoa.cases.json.",
+  "x-moc-title": {"vi": "Phê duyệt của khoa", "en": "Faculty approval"},
+  "x-moc-order": ["quyetDinhKhoa", "ghiChuKhoa"],
+  "x-moc-nfc": true,
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["quyetDinhKhoa"],
+  "properties": {
+    "quyetDinhKhoa": {
+      "title": "Quyết định",
+      "enum": ["dong-y", "tu-choi"],
+      "x-moc-ui": {
+        "widget": "radio",
+        "label": {"vi": "Quyết định của lãnh đạo khoa", "en": "Faculty dean's decision"},
+        "options": {
+          "dong-y": {"vi": "Đồng ý", "en": "Approve"},
+          "tu-choi": {"vi": "Không đồng ý", "en": "Decline"}
+        }
+      }
+    },
+    "ghiChuKhoa": {
+      "title": "Ghi chú",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "$ref": "#/$defs/text",
+      "x-moc-ui": {
+        "widget": "textarea",
+        "rows": 3,
+        "label": {"vi": "Ghi chú của lãnh đạo khoa", "en": "Faculty dean's note"},
+        "help": {"vi": "Người gửi đọc được ghi chú này.", "en": "The requester can read this note."}
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "$comment": "Như $defs.text của schemas/van-ban-den.json: xuống dòng được, không ký tự ẩn, không trắng hai đầu.",
+      "type": "string",
+      "allOf": [
+        {"not": {"pattern": "[\u0000-\t\u000b\f\u000e-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f]"}},
+        {"not": {"pattern": "[\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\u2028\u2029]"}},
+        {"not": {"pattern": "^[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]"}},
+        {"not": {"pattern": "[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$"}}
+      ]
+    }
+  }
+}

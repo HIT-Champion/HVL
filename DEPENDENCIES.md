@@ -66,7 +66,7 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
 | [Docker Compose v2](https://github.com/docker/compose) | ≥ 2.20 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
 | [Caddy](https://caddyserver.com) | ≥ 2.6 | Apache-2.0 | Proxy TLS trên máy chủ: HTTPS, chứng thư Let's Encrypt tự gia hạn ([`docs/trien-khai.md`](docs/trien-khai.md)); không nằm trong Compose | Gói hệ thống của máy chủ (`apt install caddy`) |
 | [Python](https://www.python.org) | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
-| [Node.js](https://nodejs.org) | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep`, `app-tai-lieu-api` và phông của theme đăng nhập (chỉ ở bước dựng image); image `moc/keycloak-fonts` (#305) dựng trên image này, chạy một lần mỗi lần `up` để chép phông vào volume (chỉ `sh` và lệnh chép, không chạy Node); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests`, `apps/nghi-phep/tests` | `node:24.20.0-slim` |
+| [Node.js](https://nodejs.org) | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep`, `app-lich-giang`, `app-tai-lieu-api` và phông của theme đăng nhập (chỉ ở bước dựng image); image `moc/keycloak-fonts` (#305) dựng trên image này, chạy một lần mỗi lần `up` để chép phông vào volume (chỉ `sh` và lệnh chép, không chạy Node); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests`, `apps/nghi-phep/tests` | `node:24.20.0-slim` |
 | [Playwright](https://playwright.dev) | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
 | [axe-core](https://github.com/dequelabs/axe-core), @axe-core/playwright | 4.13.0 | MPL-2.0 | Kiểm trợ năng tự động theo WCAG 2.0, 2.1 mức A, AA trong e2e (`tests/e2e/tro-nang.spec.ts`, #246); chỉ dùng trong test, dùng nguyên bản, không vào gói phát hành | npm, `tests/e2e/package-lock.json` |
 | [GNU Make](https://www.gnu.org/software/make/) | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
@@ -161,7 +161,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 |---|---|---|---|---|---|
 | [Nuxt](https://nuxt.com) | 4.6.3 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
 | [Vue](https://vuejs.org) | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
-| [oidc-client-ts](https://github.com/authts/oidc-client-ts) | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep`, `app-tai-lieu-api` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
+| [oidc-client-ts](https://github.com/authts/oidc-client-ts) | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep`, `app-lich-giang`, `app-tai-lieu-api` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | [Swagger UI](https://github.com/swagger-api/swagger-ui) (`swagger-ui-dist`) | 5.33.2 | Apache-2.0 | Trang Tài liệu API `/tai-lieu-api/` (`app-tai-lieu-api`, #357): đọc và gọi thử API lõi, API Văn phòng điện tử từ OpenAPI. Dùng nguyên `swagger-ui-bundle.js`, `swagger-ui.css` của gói, kèm `LICENSE`, `NOTICE`; bản dựng sẵn đã gồm các thư viện swagger-ui dùng: React, Redux, Immutable và đa số còn lại MIT, swagger-client Apache-2.0, DOMPurify MPL-2.0 hoặc Apache-2.0, sha.js, ieee754 BSD-3-Clause, zenscroll Unlicense (đều được OSI phê duyệt). Gói kéo theo `@scarf/scarf` 1.4.0 (Apache-2.0), chỉ có bước postinstall gửi số liệu sử dụng: cài bằng `npm ci --ignore-scripts` nên không chạy, không vào image. Trang không gọi CDN | npm, ghim trong `package-lock.json` của `apps/tai-lieu-api` | 3 |
 | [vue-i18n](https://vue-i18n.intlify.dev) | 11.4.14 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | [Tailwind CSS](https://tailwindcss.com) (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
@@ -277,9 +277,10 @@ viện thì gỡ khỏi image, cùng các bản sao thư viện nó mang theo (`
 bản cũ có lỗ hổng đã có bản sửa). Còn lại wheel pip trong `ensurepip/_bundled` của image nền (cùng các bản sao đó, nằm
 trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
 
-Phần máy chủ của Bảng tin (`apps/bang-tin`) và máy chủ trang của Đơn nghỉ phép (`apps/nghi-phep`) dựng từ cùng image
-`python:3.13.16-slim`, chỉ thư viện chuẩn, không cài gói nào. `moc app` đọc manifest bằng bộ đọc YAML tự viết, chỉ
-thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục cài; test so kết quả với PyYAML khi máy có sẵn.
+Phần máy chủ của Bảng tin (`apps/bang-tin`), máy chủ trang của Đơn nghỉ phép (`apps/nghi-phep`) và của Đổi, bù lịch
+giảng (`apps/lich-giang`) dựng từ cùng image `python:3.13.16-slim`, chỉ thư viện chuẩn, không cài gói nào. `moc app` đọc
+manifest bằng bộ đọc YAML tự viết, chỉ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục cài; test
+so kết quả với PyYAML khi máy có sẵn.
 
 ## Vận hành và bốn nguyên lý thiết kế
 

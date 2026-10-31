@@ -20,7 +20,7 @@ Closes #
 - [ ] Infrastructure / CI / shared docs
 
 <!-- Main component (commit scope): gateway · auth · db · workflow · files · realtime · office · ca-nhan · bang-tin ·
-     nghi-phep · ai · data · ops · cli · scripts · e2e · ci · deps · docs · release -->
+     nghi-phep · lich-giang · ai · data · ops · cli · scripts · e2e · ci · deps · docs · release -->
 
 ## Checklist
 

@@ -120,6 +120,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         gửi đơn qua API chung bằng token app-nghi-phep (dữ liệu sai → 422 đúng mã từng trường); chỉ trưởng phòng cùng
         phòng thấy và duyệt được; token của client khác → 403; hộp việc Văn phòng điện tử không lẫn việc nghỉ phép;
         duyệt → đơn kết thúc với quyết định đồng ý; cài lại không đổi gì; gỡ giữ lịch sử đơn. (make demo-quy-trinh)
+    python3 scripts/demo.py lich-giang
+        Ứng dụng ngành (Tầng 3) Đổi, bù lịch giảng (apps/lich-giang), cùng cơ chế với quy-trinh, hai cấp duyệt: cài một
+        lệnh; giảng viên gửi đề nghị (ngày dạy mới đã qua → 422 x-moc-date); trưởng Bộ môn KTPM thấy, phòng khác và
+        lãnh đạo khoa chưa thấy; bộ môn không đồng ý → đề nghị dừng, khoa không nhận; bộ môn đồng ý → lãnh đạo khoa
+        thấy kèm ý kiến bộ môn, phê duyệt → đề nghị kết thúc đã duyệt; gỡ; tệp của lõi không đổi. (make
+        demo-lich-giang)
     python3 scripts/demo.py canh-bao
         Cảnh báo vận hành (F3.13, #284): Prometheus nối Alertmanager; một cảnh báo giả đẩy vào Alertmanager thành thông
         báo ở chuông của quản trị mọi đơn vị (quantri thấy qua GraphQL), không ai khác nhận; hết cảnh báo thì mỗi quản
@@ -133,6 +139,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import hashlib
 import json
 import pathlib
@@ -4464,15 +4471,17 @@ def poison_copy(target: pathlib.Path) -> pathlib.Path:
     return target / "app.yaml"
 
 
-def qt_call(token: str, method: str, path: str, data: Any = None) -> tuple[int, Any]:
-    """API quy trình chung của lõi, gọi như trang (apps/nghi-phep/public/don.js) → (mã HTTP, thân JSON hoặc None)."""
+def qt_call(token: str, method: str, path: str, data: Any = None, *, app: str = QT_NAME) -> tuple[int, Any]:
+    """API quy trình chung của lõi cho ứng dụng app (mặc định nghi-phep), gọi như trang (apps/nghi-phep/public/don.js)
+    → (mã HTTP, thân JSON hoặc None)."""
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     body = None
     if data is not None:
         body = json.dumps({"data": data}, ensure_ascii=False).encode()
         headers["Content-Type"] = "application/json"
     try:
-        status, _, raw = request(method, f"{QT_API}{path}", data=body, headers=headers)
+        api = QT_API if app == QT_NAME else f"{PUBLIC_URL}/api/workflow/{app}"
+        status, _, raw = request(method, f"{api}{path}", data=body, headers=headers)
     except HTTPError as exc:
         status, raw = exc.status, exc.body.encode()
     try:
@@ -4481,36 +4490,38 @@ def qt_call(token: str, method: str, path: str, data: Any = None) -> tuple[int, 
         return status, None
 
 
-def qt_ok(token: str, method: str, path: str, data: Any = None, *, want: int = 200) -> Any:
-    status, body = qt_call(token, method, path, data)
+def qt_ok(token: str, method: str, path: str, data: Any = None, *, want: int = 200, app: str = QT_NAME) -> Any:
+    status, body = qt_call(token, method, path, data, app=app)
     if status != want:
-        raise DemoFailed(f"{method} /api/workflow/{QT_NAME}{path} trả {status} (cần {want}): {json.dumps(body)[:300]}")
+        raise DemoFailed(f"{method} /api/workflow/{app}{path} trả {status} (cần {want}): {json.dumps(body)[:300]}")
     return body
 
 
-def qt_list(token: str, path: str) -> list[dict[str, Any]]:
+def qt_list(token: str, path: str, *, app: str = QT_NAME) -> list[dict[str, Any]]:
     """GET một danh sách của API chung (/processes, /tasks): phải là mảng các đối tượng."""
-    body = qt_ok(token, "GET", path)
+    body = qt_ok(token, "GET", path, app=app)
     if not isinstance(body, list) or not all(isinstance(x, dict) for x in body):
-        raise DemoFailed(f"GET /api/workflow/{QT_NAME}{path} phải trả một mảng: {json.dumps(body)[:300]}")
+        raise DemoFailed(f"GET /api/workflow/{app}{path} phải trả một mảng: {json.dumps(body)[:300]}")
     return body
 
 
-def qt_login(username: str, browser: Any = None) -> str:
+def qt_login(username: str, browser: Any = None, *, app: str = QT_NAME) -> str:
     """Đăng nhập như trang (apps/nghi-phep/public/auth.js): code + PKCE S256, response_mode=fragment, client
-    app-nghi-phep. Phiên SSO có sẵn thì Keycloak chuyển thẳng về; chưa có thì gõ mật khẩu, rồi mã TOTP nếu Keycloak hỏi
-    (trưởng phòng — mã tính từ MOC_DEMO_TOTP_SECRET như make seed cài) → access token."""
+    app-<app> (mặc định app-nghi-phep). Phiên SSO có sẵn thì Keycloak chuyển thẳng về; chưa có thì gõ mật khẩu, rồi mã
+    TOTP nếu Keycloak hỏi (trưởng phòng — mã tính từ MOC_DEMO_TOTP_SECRET như make seed cài) → access token."""
     import html
     import urllib.parse
 
     from demo_ca_nhan import Browser, exchange
     from moc_env import _otp_counter, totp_at
 
+    client = QT_CLIENT if app == QT_NAME else f"app-{app}"
+    callback = QT_CALLBACK if app == QT_NAME else f"{PUBLIC_URL}/{app}/dang-nhap"
     browser = browser or Browser()
     verifier = base64.urlsafe_b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes).rstrip(b"=").decode()
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = uuid.uuid4().hex
-    query = urllib.parse.urlencode({"client_id": QT_CLIENT, "redirect_uri": QT_CALLBACK, "response_type": "code",
+    query = urllib.parse.urlencode({"client_id": client, "redirect_uri": callback, "response_type": "code",
                                     "response_mode": "fragment", "scope": "openid profile", "state": state,
                                     "code_challenge": challenge, "code_challenge_method": "S256"})
     resp = browser.opener.open(f"{PUBLIC_URL}/realms/{ENV.get('MOC_REALM', 'moc')}/protocol/openid-connect/auth?"
@@ -4518,12 +4529,12 @@ def qt_login(username: str, browser: Any = None) -> str:
     otp_sent = 0
     for _ in range(6):
         url = urllib.parse.urlsplit(resp.geturl())
-        if url.path == urllib.parse.urlsplit(QT_CALLBACK).path:
+        if url.path == urllib.parse.urlsplit(callback).path:
             break
         page = resp.read().decode(errors="replace")
         form = re.search(r'<form[^>]*\saction="([^"]+)"', page)
         if form is None:
-            raise DemoFailed(f"{username}: Keycloak không chuyển về {QT_CALLBACK}, cũng không hỏi đăng nhập "
+            raise DemoFailed(f"{username}: Keycloak không chuyển về {callback}, cũng không hỏi đăng nhập "
                              f"({url.path})")
         if 'name="otp"' in page:
             if not ENV.get("MOC_DEMO_TOTP_SECRET") or otp_sent >= 3:
@@ -4541,8 +4552,8 @@ def qt_login(username: str, browser: Any = None) -> str:
                                    data=urllib.parse.urlencode(fields).encode())
     params = urllib.parse.parse_qs(urllib.parse.urlsplit(resp.geturl()).fragment)
     if "code" not in params or params.get("state") != [state]:
-        raise DemoFailed(f"{username}: {QT_CLIENT} không nhận được mã cấp quyền đúng state sau khi đăng nhập")
-    return exchange(QT_CLIENT, QT_CALLBACK, params["code"][0], verifier)["access_token"]
+        raise DemoFailed(f"{username}: {client} không nhận được mã cấp quyền đúng state sau khi đăng nhập")
+    return exchange(client, callback, params["code"][0], verifier)["access_token"]
 
 
 def task_of(tasks: Any, process_id: str) -> dict[str, Any] | None:
@@ -4722,12 +4733,147 @@ def quy_trinh() -> None:
     ok("không tệp nào được theo dõi trong git đổi; không tệp mới ngoài .gitignore")
 
 
+LG_MANIFEST = "apps/lich-giang/app.yaml"
+LG_NAME, LG_PATH = "lich-giang", "/lich-giang/"
+LG_PROCESS = "lich-giang.don"
+LG_FORMS = {"lich-giang.don": "don", "lich-giang.bo-mon": "bo-mon", "lich-giang.khoa": "khoa"}
+# seed/users.csv, Khoa CNTT: giảng viên, trưởng Bộ môn KTPM; lãnh đạo khoa; tổ trưởng Đào tạo (trưởng phòng khác)
+LG_STAFF, LG_HEAD, LG_DEAN, LG_OTHER = "giangvienktpm", "truongbmktpm", "truongkhoa", "totruongdt"
+
+
+def teaching_change(today: Any, tag: str, kind: str = "doi-lich") -> dict[str, str]:
+    """Đề nghị hợp lệ theo apps/lich-giang/forms/don.json: buổi hai ngày nữa dời sang năm ngày nữa (dạy bù: buổi tuần
+    trước bù vào ngày mai)."""
+    old, new = (today + timedelta(days=2), today + timedelta(days=5)) if kind == "doi-lich" \
+        else (today - timedelta(days=7), today + timedelta(days=1))
+    return {"loai": kind, "hocPhan": "Phát triển phần mềm nguồn mở", "lopHocPhan": "20261IT6060001",
+            "ngayCu": old.isoformat(), "tietCu": "1-3", "ngayMoi": new.isoformat(), "tietMoi": "7-9",
+            "phongMoi": "A1-301", "lyDo": unicodedata.normalize("NFC", f"Dự hội thảo khoa học ({tag})")}
+
+
+def lich_giang() -> None:
+    from demo_ca_nhan import claims_of
+
+    print("Ứng dụng ngành Đổi, bù lịch giảng (apps/lich-giang, Tầng 3): cắm một lệnh, hai cấp duyệt trên động cơ quy "
+          "trình của lõi; không sửa tệp nào của lõi")
+    need_sources("lich-giang", LG_MANIFEST, f"apps/{LG_NAME}/forms")
+    listed = json.loads(moc_app("list", "--json"))["apps"]
+    if any(a["name"] == LG_NAME and (a["installed"] or a["removing"]) for a in listed):
+        moc_app("remove", LG_NAME)
+        print("   (gỡ bản cài từ lần chạy trước)")
+    git_before = git_state()
+    tag = uuid.uuid4().hex[:6].upper()
+    call = functools.partial(qt_call, app=LG_NAME)
+    listing = functools.partial(qt_list, app=LG_NAME)
+
+    def wait_task(token: str, pid: str) -> dict[str, Any] | None:
+        deadline = time.monotonic() + 20
+        while True:
+            task = task_of(listing(token, "/tasks"), pid)
+            if task or time.monotonic() > deadline:
+                return task
+            time.sleep(1)
+
+    def wait_ended(token: str, pid: str) -> dict[str, Any] | None:
+        deadline = time.monotonic() + 10
+        while True:
+            done = next((p for p in listing(token, "/processes") if p.get("id") == pid and p.get("endedAt")), None)
+            if done or time.monotonic() > deadline:
+                return done
+            time.sleep(1)
+
+    say(1, f"moc app install {LG_MANIFEST} — một lệnh: trang, client, BPMN hai cấp duyệt và ba form lên lõi")
+    started = time.monotonic()
+    print("\n".join(f"   {ln}" for ln in moc_app("install", LG_MANIFEST).strip().splitlines()))
+    status, _, body = request("GET", f"{PUBLIC_URL}{LG_PATH}")
+    config = json.loads(request("GET", f"{PUBLIC_URL}{LG_PATH}config.json")[2])
+    if not app_container(LG_NAME) or app_clients(LG_NAME) != [f"app-{LG_NAME}"] or status != 200 \
+            or "Đổi, bù lịch giảng" not in body.decode() or config.get("clientId") != f"app-{LG_NAME}":
+        raise DemoFailed(f"sau khi cài: container {app_container(LG_NAME)}, client {app_clients(LG_NAME)}, "
+                         f"{LG_PATH} {status}, config {config}")
+    ok(f"xong sau {time.monotonic() - started:.0f} giây: container app-{LG_NAME}, client app-{LG_NAME}; {LG_PATH} 200")
+
+    say(2, f"{LG_STAFF} đăng nhập (PKCE, client app-{LG_NAME}): ba form lấy từ lõi đúng tệp của ứng dụng")
+    staff = qt_login(LG_STAFF, app=LG_NAME)
+    if claims_of(staff).get("azp") != f"app-{LG_NAME}":
+        raise DemoFailed(f"token của trang có azp {claims_of(staff).get('azp')}")
+    for key, name in LG_FORMS.items():
+        status, served = call(staff, "GET", f"/forms/{key}")
+        mine = json.loads((ROOT / "apps" / LG_NAME / "forms" / f"{name}.json").read_text(encoding="utf-8"))
+        if status != 200 or not isinstance(served, dict) or served.get("properties") != mine["properties"]:
+            raise DemoFailed(f"GET /forms/{key} trả {status}, không đúng forms/{name}.json của ứng dụng")
+    ok(f"azp app-{LG_NAME}; {', '.join(LG_FORMS)} đúng JSON Schema trong forms/")
+
+    say(3, "Giảng viên gửi hai đề nghị: ngày dạy mới đã qua → 422; đổi lịch, dạy bù → quy trình chạy")
+    today = datetime.now(timezone(timedelta(hours=7))).date()
+    doi, bu = teaching_change(today, tag), teaching_change(today, tag, "day-bu")
+    status, body = call(staff, "POST", f"/processes/{LG_PROCESS}", {**doi, "ngayMoi": (today - timedelta(days=1))
+                                                                     .isoformat()})
+    if status != 422 or (body or {}).get("errors") != {"ngayMoi": "x-moc-date"}:
+        raise DemoFailed(f"ngày dạy mới đã qua: cần 422 {{\"ngayMoi\": \"x-moc-date\"}}, nhận {status} {body}")
+    pid_doi = (qt_ok(staff, "POST", f"/processes/{LG_PROCESS}", doi, want=201, app=LG_NAME) or {}).get("id")
+    pid_bu = (qt_ok(staff, "POST", f"/processes/{LG_PROCESS}", bu, want=201, app=LG_NAME) or {}).get("id")
+    if not pid_doi or not pid_bu:
+        raise DemoFailed(f"gửi đề nghị không trả id: {pid_doi}, {pid_bu}")
+    ok(f"422 {{\"ngayMoi\": \"x-moc-date\"}}; 201 hai đề nghị {pid_doi}, {pid_bu}")
+
+    say(4, f"Cấp 1: trưởng bộ môn ({LG_HEAD}) thấy cả hai; phòng khác ({LG_OTHER}), lãnh đạo khoa ({LG_DEAN}) chưa")
+    head = qt_login(LG_HEAD, app=LG_NAME)
+    tasks = {pid: wait_task(head, pid) for pid in (pid_doi, pid_bu)}
+    if any(not t or t.get("formKey") != "lich-giang.bo-mon" for t in tasks.values()):
+        raise DemoFailed(f"{LG_HEAD} phải thấy hai việc lich-giang.bo-mon: {tasks}")
+    other, dean = qt_login(LG_OTHER, app=LG_NAME), qt_login(LG_DEAN, app=LG_NAME)
+    for who_, token in ((LG_OTHER, other), (LG_DEAN, dean)):
+        seen = listing(token, "/tasks")
+        if task_of(seen, pid_doi) or task_of(seen, pid_bu):
+            raise DemoFailed(f"{who_} thấy việc của bước bộ môn")
+    ok(f"{LG_HEAD}: hai việc \"{tasks[pid_doi].get('name')}\"; {LG_OTHER}, {LG_DEAN} không thấy")
+
+    say(5, "Bộ môn không đồng ý đề nghị dạy bù → dừng, khoa không nhận; đồng ý đề nghị đổi lịch → chuyển lên khoa")
+    qt_ok(head, "POST", f"/tasks/{tasks[pid_bu]['id']}", {"quyetDinhBoMon": "tu-choi", "ghiChuBoMon": "Trùng lịch thi"},
+          want=204, app=LG_NAME)
+    note = unicodedata.normalize("NFC", f"Phòng A1-301 trống buổi chiều ({tag})")
+    qt_ok(head, "POST", f"/tasks/{tasks[pid_doi]['id']}", {"quyetDinhBoMon": "dong-y", "ghiChuBoMon": note},
+          want=204, app=LG_NAME)
+    stopped = wait_ended(staff, pid_bu)
+    if not stopped or (stopped.get("data") or {}).get("quyetDinhBoMon") != "tu-choi":
+        raise DemoFailed(f"đề nghị {pid_bu} phải kết thúc ở bộ môn: {stopped}")
+    faculty = wait_task(dean, pid_doi)
+    if not faculty or faculty.get("formKey") != "lich-giang.khoa" \
+            or (faculty.get("data") or {}).get("ghiChuBoMon") != note or task_of(listing(dean, "/tasks"), pid_bu):
+        raise DemoFailed(f"{LG_DEAN} phải thấy việc lich-giang.khoa của {pid_doi} kèm ý kiến bộ môn, không thấy "
+                         f"{pid_bu}: {faculty}")
+    ok(f"{pid_bu} kết thúc: bộ môn không đồng ý; {LG_DEAN}: việc \"{faculty.get('name')}\" kèm ghi chú bộ môn")
+
+    say(6, f"Cấp 2: {LG_DEAN} phê duyệt → đề nghị đổi lịch kết thúc, đã duyệt; việc không còn ở ai")
+    qt_ok(dean, "POST", f"/tasks/{faculty['id']}", {"quyetDinhKhoa": "dong-y"}, want=204, app=LG_NAME)
+    done = wait_ended(staff, pid_doi)
+    data = (done or {}).get("data") or {}
+    if data.get("quyetDinhBoMon") != "dong-y" or data.get("quyetDinhKhoa") != "dong-y":
+        raise DemoFailed(f"đề nghị {pid_doi} phải kết thúc với cả hai cấp đồng ý: {done}")
+    if task_of(listing(dean, "/tasks"), pid_doi) or task_of(listing(head, "/tasks"), pid_doi):
+        raise DemoFailed(f"việc của đề nghị {pid_doi} vẫn còn")
+    ok(f"\"Đề nghị của tôi\": {pid_doi} kết thúc lúc {done['endedAt']}, bộ môn và khoa đồng ý")
+
+    say(7, f"moc app remove {LG_NAME}: trang, client, container mất; tệp của lõi không đổi")
+    print("\n".join(f"   {ln}" for ln in moc_app("remove", LG_NAME).strip().splitlines()))
+    status, _ = call(staff, "GET", "/processes")
+    if app_container(LG_NAME) or app_clients(LG_NAME) or status == 200:
+        raise DemoFailed(f"sau khi gỡ còn container {app_container(LG_NAME)}, client {app_clients(LG_NAME)}, API "
+                         f"{status}")
+    git_after = git_state()
+    if git_before is not None and git_after != git_before:
+        raise DemoFailed("cây mã nguồn đổi trong lúc cài/gỡ:\n" + git_after)
+    ok(f"không container, client; API trả {status}; "
+       + ("không tệp nào được theo dõi trong git đổi" if git_before is not None else "bản cài: bỏ qua so git"))
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
          "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
          "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung,
-         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh, "canh-bao": canh_bao}
+         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh, "lich-giang": lich_giang, "canh-bao": canh_bao}
 
 
 def main(argv: list[str] | None = None) -> int:

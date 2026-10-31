@@ -29,8 +29,9 @@ Caddy                           ≥ 2.6           Apache-2.0              Proxy 
 Python                          ≥ 3.10          PSF-2.0                 Chạy make seed, make smoke                https://www.python.org
 Node.js                         24.20.0         MIT                     Dựng giao diện thành trang tĩnh, cài gói  https://nodejs.org
                                                                         npm của app-ca-nhan, app-bang-tin,
-                                                                        app-nghi-phep, app-tai-lieu-api và phông
-                                                                        của theme đăng nhập
+                                                                        app-nghi-phep, app-lich-giang,
+                                                                        app-tai-lieu-api và phông của theme đăng
+                                                                        nhập
 Playwright                      1.63.0          Apache-2.0              Kiểm thử trên trình duyệt thật            https://playwright.dev
 axe-core, @axe-core/playwright  4.13.0          MPL-2.0                 Kiểm trợ năng tự động theo WCAG 2.0, 2.1  https://github.com/dequelabs/axe-core
                                                                         mức A, AA trong e2e

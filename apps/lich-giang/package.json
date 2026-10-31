@@ -1,0 +1,17 @@
+{
+  "name": "moc-app-lich-giang",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Signet — Đổi, bù lịch giảng (ứng dụng ngành, hai cấp duyệt trên quy trình của lõi)",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "oidc-client-ts": "3.5.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

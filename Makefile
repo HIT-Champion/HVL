@@ -241,6 +241,8 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@python3 -m unittest discover -s apps/bang-tin/tests
 	@cd apps/nghi-phep && node --test tests/*.test.js
 	@python3 -m unittest discover -s apps/nghi-phep/tests
+	@cd apps/lich-giang && node --test tests/*.test.js
+	@python3 -m unittest discover -s apps/lich-giang/tests
 	@python3 -m unittest discover -s apps/tai-lieu-api/tests
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
@@ -346,6 +348,9 @@ demo-cai-ung-dung: $(ENV_FILE) ## Cắm Bảng tin bằng một lệnh: cài, SS
 
 demo-quy-trinh: $(ENV_FILE) ## Quy trình ứng dụng qua lõi (Đơn nghỉ phép): BPMN độc bị từ chối, 422, duyệt theo phòng
 	@python3 scripts/demo.py quy-trinh
+
+demo-lich-giang: $(ENV_FILE) ## Ứng dụng ngành Đổi, bù lịch giảng (Tầng 3): cài một lệnh, bộ môn rồi khoa duyệt, gỡ
+	@python3 scripts/demo.py lich-giang
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py
