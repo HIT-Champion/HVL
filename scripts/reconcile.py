@@ -24,6 +24,9 @@ Mỗi lượt đưa hệ thống đang chạy về đúng trạng thái khai tro
      `git fetch` nhánh MOC_GITOPS_BRANCH (mặc định `deploy`). Có commit mới, hoặc tệp đã cài bị sửa tay (khác băm
      lúc cài) → dựng image của commit đó, dừng Signet, cài lại đúng commit vào thư mục này (`install.sh`), chạy lại.
      Cài hỏng giữa chừng thì cài lại commit cũ. Commit áp lỗi thì không thử lại mỗi phút: đợi commit kế tiếp.
+     MOC_GITOPS_MODE=nang-cap (bản thật, #344): áp bằng đường nâng tay `scripts/nang_cap.sh nang` của commit đó (sao
+     lưu, cài, realm, kiểm); lỗi sau khi đã sao lưu thì tự `nang_cap.sh lui` về commit cũ, khôi phục lượt vừa lấy.
+     MOC_GITOPS_FOLLOW=release: áp thẻ phát hành vX.Y.Z mới nhất trên nhánh (vd. `main`) thay cho đầu nhánh.
   2. Tự phục hồi: container unhealthy → khởi động lại; dịch vụ khai trong compose mà thiếu container hoặc đã dừng →
      `docker compose up -d` đúng các dịch vụ đó. Dịch vụ chạy một lần (keycloak-fonts) đã xong, thoát 0, không tính
      là đã dừng.
@@ -50,6 +53,8 @@ import hashlib
 import json
 import os
 import pathlib
+import re
+import shutil
 import subprocess
 import sys
 import time
@@ -59,6 +64,11 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANIFEST = ".moc-install"           # danh sách tệp do make install quản lý (scripts/install.sh)
 STATE = "moc-reconcile.json"        # trong thư mục .git của bản sao: commit đã áp, băm tệp lúc cài
+UPGRADE_LOG = "moc-nang-cap.log"    # cũng trong thư mục .git: đầu ra lần nâng, lùi gần nhất (chế độ nang-cap)
+MODES = ("", "nang-cap")            # MOC_GITOPS_MODE: để trống là cài lại bằng install.sh như trước
+FOLLOWS = ("", "release")           # MOC_GITOPS_FOLLOW: để trống là theo đầu nhánh như trước
+RELEASE_TAG = re.compile(r"v\d+\.\d+\.\d+")  # thẻ phát hành; bản thử (-rc…) không tự lên
+BACKUP_RUN = re.compile(r"lượt sao lưu (\S+);")  # dòng nang_cap.sh nang in sau khi sao lưu xong
 RESTORING = ".moc-restoring"        # scripts/backup.py đặt trước khi dừng Signet để khôi phục, xóa khi xong
 APPS = ".moc-apps/apps"             # bản ghi ứng dụng cài bằng moc app install (scripts/ung_dung.py)
 # Dịch vụ `moc backup create` tạm dừng (cùng danh sách WRITERS, DB_WRITERS trong scripts/backup.py)
@@ -225,15 +235,17 @@ def drift(recorded: dict[str, str], now: dict[str, str]) -> list[str]:
     return sorted(f for f in set(recorded) | set(now) if recorded.get(f) != now.get(f))
 
 
-def verify_signature(git: list[str], commit: str, signers: str) -> None:
+def verify_signature(git: list[str], commit: str, signers: str, *, tag: bool = False) -> None:
     """MOC_GITOPS_ALLOWED_SIGNERS: chỉ áp commit ký bằng khóa SSH có trong tệp allowed_signers (định dạng của
     `ssh-keygen -Y`, như `gpg.ssh.allowedSignersFile` của git). Chữ ký OpenPGP, X.509 không được nhận dù khóa có trong
-    keyring của người chạy reconciler: chỉ danh sách này quyết định ai được đưa mã lên máy chủ."""
+    keyring của người chạy reconciler: chỉ danh sách này quyết định ai được đưa mã lên máy chủ. `tag`
+    (MOC_GITOPS_FOLLOW=release): kiểm chữ ký của thẻ (`git tag -s`), vì commit gộp trên main do GitHub ký OpenPGP."""
     path = pathlib.Path(signers).expanduser().resolve()
     if not path.is_file():
         raise ReconcileError(f"MOC_GITOPS_ALLOWED_SIGNERS: không có tệp {path}")
     proc = _run([*git, "-c", f"gpg.ssh.allowedSignersFile={path}", "-c", "gpg.openpgp.program=false",
-                 "-c", "gpg.x509.program=false", "verify-commit", "--raw", commit], check=False)
+                 "-c", "gpg.x509.program=false", "verify-tag" if tag else "verify-commit", "--raw", commit],
+                check=False)
     if proc.returncode != 0:
         detail = " ".join((proc.stderr or proc.stdout).split())[:200] or "không có chữ ký"
         raise ReconcileError(f"commit {commit[:12]} không ký bằng khóa trong {path}, không áp ({detail})")
@@ -245,6 +257,11 @@ def gitops(report: dict[str, Any]) -> None:
         return
     src = pathlib.Path(src_setting).expanduser().resolve()
     branch = setting("MOC_GITOPS_BRANCH", "deploy")
+    mode, follow = setting("MOC_GITOPS_MODE"), setting("MOC_GITOPS_FOLLOW")
+    if mode not in MODES:
+        raise ReconcileError(f"MOC_GITOPS_MODE={mode}: chỉ nhận để trống hoặc nang-cap")
+    if follow not in FOLLOWS:
+        raise ReconcileError(f"MOC_GITOPS_FOLLOW={follow}: chỉ nhận để trống hoặc release")
     if not (ROOT / MANIFEST).exists():
         raise ReconcileError("GitOps chỉ chạy từ bản cài (make install PREFIX=…), không chạy trong thư mục mã nguồn")
     if src == ROOT or ROOT in src.parents or src in ROOT.parents:
@@ -259,8 +276,10 @@ def gitops(report: dict[str, Any]) -> None:
         raise ReconcileError(f"{src} có thay đổi chưa commit — MOC_GITOPS_DIR phải là bản sao riêng của reconciler"
                              f" (git clone -b {branch} <repo> <thư mục mới>)")
 
-    _run([*git, "fetch", "-q", "origin", branch], timeout=300)
-    target = _run([*git, "rev-parse", f"origin/{branch}^{{commit}}"]).stdout.strip()
+    # nang-cap, release: kéo cả thẻ — chọn bản phát hành, nhận bản đang chạy (adopt), phiên bản ghi vào bản cài
+    _run([*git, "fetch", "-q", *(["--tags"] if mode or follow else []), "origin", branch], timeout=300)
+    tag = latest_release(git, branch) if follow else None
+    target = _run([*git, "rev-parse", f"{tag or 'origin/' + branch}^{{commit}}"]).stdout.strip()
     report["commit"] = target
     changed = drift(state.get("files", {}), installed_files()) if state.get("commit") == target else []
     if state.get("commit") == target and not changed:
@@ -272,15 +291,24 @@ def gitops(report: dict[str, Any]) -> None:
     # kiểm trước khi dừng Signet. Không ghi "failed": thêm khóa vào danh sách thì lượt sau áp được, không cần commit mới
     signers = setting("MOC_GITOPS_ALLOWED_SIGNERS")
     if signers:
-        verify_signature(git, target, signers)
+        verify_signature(git, tag or target, signers, tag=bool(tag))
+    adopted = adopt(git, target) if (mode or follow) and not state else None
+    if adopted:
+        state = {"commit": target, "files": installed_files(), "applied_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                 "adopted": adopted}
+        write_private(state_path, json.dumps(state, indent=2))
+        report["actions"].append(f"nhận bản đang chạy (Signet {adopted}, cùng cây với commit {target[:12]}),"
+                                 " không cài lại")
+        return
     if state.get("commit") != target:
         reason = f"nhánh {branch}: {str(state.get('commit', 'chưa áp'))[:12]} → {target[:12]}"
+        reason += f" (thẻ {tag})" if tag else ""
     else:
         reason = f"tệp đã cài bị sửa tay, đưa về commit {target[:12]}: {', '.join(changed[:5])}"
         reason += f" (+{len(changed) - 5} tệp)" if len(changed) > 5 else ""
     print(f"· áp cấu hình — {reason}", flush=True)
     try:
-        apply(git, src, target, state.get("commit"))
+        (upgrade if mode else apply)(git, src, target, state.get("commit"))
     except ConfigError as exc:
         # chưa dừng Signet; không ghi "failed": sửa .env thì lượt sau áp được, không cần commit mới
         raise ReconcileError(f"không áp được commit {target[:12]}: {exc}") from None
@@ -294,13 +322,15 @@ def gitops(report: dict[str, Any]) -> None:
     report["actions"].append(f"áp commit {target[:12]} ({reason})")
 
 
-def checkout(git: list[str], src: pathlib.Path, commit: str) -> dict[str, str]:
-    """Đưa bản sao về đúng commit; trả biến môi trường để dựng, cài commit đó (MOC_VERSION theo `git describe`)."""
+def checkout(git: list[str], src: pathlib.Path, commit: str, *, release: bool = False) -> dict[str, str]:
+    """Đưa bản sao về đúng commit; trả biến môi trường để dựng, cài commit đó (MOC_VERSION theo `git describe`, hay
+    theo thẻ phát hành khi `release`: xem release_version())."""
     _run([*git, "checkout", "-q", "-f", "--detach", commit])
     _run([*git, "clean", "-q", "-fd"])                 # giữ tệp đã ignore, gồm .env của bản sao
     # install.sh đọc compose của mã nguồn cùng .env: chép lại mỗi lần từ bản cài (bản cài giữ .env của nó)
     write_private(src / ".env", (ROOT / ".env").read_text(encoding="utf-8"))
-    version = _run([*git, "describe", "--tags", "--always"]).stdout.strip().removeprefix("v")
+    version = release_version(git, commit) if release else \
+        _run([*git, "describe", "--tags", "--always"]).stdout.strip().removeprefix("v")
     # đã giữ khóa thư mục cài: install.sh không lấy khóa lần nữa
     return {**os.environ, "MOC_VERSION": version, "MOC_OPS_LOCKED": "1"}
 
@@ -348,6 +378,98 @@ def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) 
         except (ReconcileError, subprocess.TimeoutExpired, OSError) as again:
             raise ReconcileError(f"{exc}; cài lại commit cũ {previous[:12]} cũng lỗi: {again}") from None
         raise ReconcileError(f"{exc} — đã cài lại commit cũ {previous[:12]}") from None
+
+
+def tree(git: list[str], ref: str) -> str:
+    return _run([*git, "rev-parse", "--verify", "-q", f"{ref}^{{tree}}"], check=False).stdout.strip()
+
+
+def release_version(git: list[str], commit: str) -> str:
+    """Phiên bản ghi vào bản cài ở chế độ nang-cap. Đầu nhánh deploy là commit gộp `deploy vX.Y.Z` (cùng cây với thẻ):
+    `git describe` ra X.Y.Z-1-g…, thậm chí thẻ cũ hơn (đi theo cha thứ nhất là lần deploy trước), /api/status sẽ báo
+    sai bản. Thẻ trong lịch sử của commit mà cây trùng cây commit thì lấy thẻ đó (mới nhất trước)."""
+    want = tree(git, commit)
+    tags = _run([*git, "for-each-ref", "--sort=-v:refname", f"--merged={commit}",
+                 "--format=%(refname:short) %(tree) %(*tree)", "refs/tags"]).stdout.splitlines()
+    for line in tags:
+        name, *trees = line.split()
+        if want and want in trees:                      # thẻ nhẹ: %(tree); thẻ có chú thích: %(*tree)
+            return name.removeprefix("v")
+    return _run([*git, "describe", "--tags", "--always", commit]).stdout.strip().removeprefix("v")
+
+
+def latest_release(git: list[str], branch: str) -> str:
+    """MOC_GITOPS_FOLLOW=release: thẻ phát hành vX.Y.Z mới nhất (theo số phiên bản) mà commit của nó nằm trên nhánh.
+    Commit mới trên nhánh mà chưa gắn thẻ thì chưa áp: bản online chỉ đổi khi có bản phát hành."""
+    tags = _run([*git, "for-each-ref", "--sort=-v:refname", f"--merged=origin/{branch}", "--format=%(refname:short)",
+                 "refs/tags/v*"]).stdout.split()
+    found = next((t for t in tags if RELEASE_TAG.fullmatch(t)), None)
+    if not found:
+        raise ReconcileError(f"nhánh {branch} chưa có thẻ phát hành vX.Y.Z — MOC_GITOPS_FOLLOW=release chưa áp gì")
+    return found
+
+
+def adopt(git: list[str], target: str) -> str | None:
+    """Lượt đầu ở chế độ nang-cap (chưa có tệp trạng thái): bản cài đang chạy đúng thẻ mà commit deploy mang (cây
+    của commit trùng cây thẻ v<phiên bản trong VERSION>) thì nhận nó làm commit đã áp, không dừng trang cài lại. Trả
+    phiên bản đã nhận, None khi không khớp (khi đó nâng như mọi commit mới)."""
+    path = ROOT / "VERSION"
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    installed = next((line.split()[1] for line in lines if line.startswith("Signet ") and len(line.split()) > 1), "")
+    if not installed:
+        return None
+    want = tree(git, target)
+    return installed if want and want == tree(git, f"v{installed}") else None
+
+
+def upgrade(git: list[str], src: pathlib.Path, target: str, previous: str | None) -> None:
+    """MOC_GITOPS_MODE=nang-cap: áp commit bằng đúng đường nâng tay — `scripts/nang_cap.sh nang` của chính commit đó
+    (dựng khi trang còn chạy, sao lưu, dừng, cài, realm, kiểm dữ liệu, dịch vụ, smoke). Lỗi trước khi sao lưu thì bản
+    cũ vẫn chạy. Lỗi sau đó (đã dừng trang, hay kiểm trượt) thì tự lùi: `nang_cap.sh lui` cài lại commit cũ (lấy bằng
+    `git archive` ra .git/moc-lui của bản sao — chỗ người chạy reconciler chắc chắn ghi được) với .env lúc trước, khôi
+    phục lượt sao lưu vừa lấy. Đầu ra cả hai lệnh ghi vào UPGRADE_LOG, cũng trong thư mục .git."""
+    gitdir = pathlib.Path(_run([*git, "rev-parse", "--absolute-git-dir"]).stdout.strip())
+    log = gitdir / UPGRADE_LOG
+    env = checkout(git, src, target, release=True)
+    script = src / "scripts" / "nang_cap.sh"
+    if not script.is_file():
+        raise ReconcileError("commit không có scripts/nang_cap.sh, không nâng được ở chế độ nang-cap")
+    check_gateway_env(src, env)
+    env_before = (ROOT / ".env").read_text(encoding="utf-8")   # lùi thì cài lại bản cũ với đúng .env này
+    proc = _run(["bash", str(script), "nang", str(ROOT)], cwd=src, env=env, timeout=7200, check=False)
+    write_private(log, f"$ nang_cap.sh nang {ROOT}   # {target}\n{proc.stdout}{proc.stderr}")
+    if proc.returncode == 0:
+        return
+    detail = " / ".join((proc.stderr or proc.stdout).strip().splitlines()[-3:])
+    found = BACKUP_RUN.search(proc.stdout)
+    if not found:
+        raise ReconcileError(f"nang_cap.sh nang thoát {proc.returncode} trước khi sao lưu, bản cũ vẫn chạy: {detail}")
+    run = found.group(1)
+    if not previous:
+        raise ReconcileError(f"nang_cap.sh nang thoát {proc.returncode} sau khi sao lưu lượt {run}, chưa có commit cũ"
+                             f" để tự lùi — xem {log}: {detail}")
+    old, archive = gitdir / "moc-lui", gitdir / "moc-lui.tar"
+    try:
+        shutil.rmtree(old, ignore_errors=True)
+        old.mkdir(mode=0o700)
+        _run([*git, "archive", "--format=tar", "-o", str(archive), previous])
+        _run(["tar", "-xf", str(archive), "-C", str(old)])
+        write_private(old / ".env", env_before)
+        back_env = {**os.environ, "MOC_VERSION": release_version(git, previous), "MOC_OPS_LOCKED": "1"}
+    except (ReconcileError, subprocess.TimeoutExpired, OSError) as exc:
+        raise ReconcileError(f"nâng {target[:12]} lỗi ({detail}); không lấy được mã nguồn {previous[:12]} để tự lùi"
+                             f" ({exc}) — lùi tay: nang_cap.sh lui {ROOT} <mã nguồn bản cũ> {run}") from None
+    finally:
+        archive.unlink(missing_ok=True)
+    back = _run(["bash", str(script), "lui", str(ROOT), str(old), run], cwd=src, env=back_env, timeout=7200,
+                check=False)
+    with log.open("a", encoding="utf-8") as f:
+        f.write(f"\n$ nang_cap.sh lui {ROOT} {old} {run}   # {previous}\n{back.stdout}{back.stderr}")
+    if back.returncode != 0:
+        again = " / ".join((back.stderr or back.stdout).strip().splitlines()[-3:])
+        raise ReconcileError(f"nâng {target[:12]} lỗi ({detail}); lùi về {previous[:12]} cũng lỗi ({again})"
+                             f" — xem {log}")
+    raise ReconcileError(f"nâng {target[:12]} lỗi ({detail}) — đã lùi về {previous[:12]}, khôi phục lượt sao lưu {run}")
 
 
 # ----------------------------------------------------------------------------------------------- ứng dụng cài thêm

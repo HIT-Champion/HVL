@@ -93,7 +93,9 @@ preflight() {
   avail=$(free -m | awk '/^Mem:/ { print $7 }')
   [ "${avail:-0}" -ge "$MIN_RAM_MB" ] \
     || die "RAM trống ${avail} MiB, dưới ${MIN_RAM_MB} MiB: chưa đổi gì (đặt MOC_NANG_CAP_RAM_MB để đổi ngưỡng)"
-  if command -v systemctl >/dev/null && systemctl is-active --quiet moc-reconcile.timer 2>/dev/null; then
+  # MOC_OPS_LOCKED=1: chính reconciler gọi (MOC_GITOPS_MODE=nang-cap, đang giữ khóa bản cài), timer chạy là đúng
+  if [ "${MOC_OPS_LOCKED:-}" != 1 ] && command -v systemctl >/dev/null \
+    && systemctl is-active --quiet moc-reconcile.timer 2>/dev/null; then
     die "moc-reconcile.timer đang chạy: dừng trước (sudo systemctl stop moc-reconcile.timer), xong việc thì bật lại"
   fi
 }
