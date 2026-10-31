@@ -44,7 +44,7 @@ Bảng đầy đủ — vai trò, cách nạp, digest image, mã băm bản kê 
 | Qwen3-1.7B | `qwen3:1.7b`, Q4_K_M, bản kê `8f68893c685c…` | Apache-2.0 | Viết trích yếu (F4.1), viết câu trả lời (F4.2) |
 | Qwen3-Embedding-0.6B | `qwen3-embedding:0.6b`, Q8_0, 1024 chiều, bản kê `ac6da0dfba84…` | Apache-2.0 | Nhúng đoạn và câu hỏi (F4.2), trích yếu cần tìm văn bản tương tự (F4.3) |
 | Tesseract OCR + dữ liệu `vie` | 5.5.0, `vie` 4.1.0 (tessdata_fast) | Apache-2.0 | Nhận dạng chữ bản scan, ảnh chụp (F4.1) |
-| pypdf | 6.21.1 | BSD-3-Clause | Lớp chữ PDF giữ bố cục (F4.1), chữ từng trang cho chỉ mục đoạn (F4.2) |
+| pypdf | 6.21.4 | BSD-3-Clause | Lớp chữ PDF giữ bố cục (F4.1), chữ từng trang cho chỉ mục đoạn (F4.2) |
 | Meilisearch CE | v1.54.3 | MIT | Chỉ mục đoạn `chunks`, tìm lai từ khóa + véc-tơ (F4.2, F4.3) |
 
 Mã bản kê là 12 ký tự đầu `ollama list` in ra sau `make ai-model`; bản đầy đủ ở `DEPENDENCIES.md`. Đổi mô hình bằng
