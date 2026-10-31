@@ -542,17 +542,30 @@
 .sg-brand-full b { font-size: 18px; font-weight: 700; letter-spacing: -.03em; color: #ffffff; }
 .sg-brand-full small { font-size: 12px; color: var(--field-ink); }
 .sg-close-menu { display: none; }
+/* Menu dài hơn màn hình thì cuộn dọc. Thanh cuộn nằm vào lề phải của thanh bên, không lấn vào nền mục: default.vue đo
+   bề rộng thanh cuộn (0 với thanh cuộn nổi) vào --sg-nav-gutter, menu kéo sang phải đúng chừng đó. Bóng mờ ở mép trên,
+   mép dưới báo còn mục khuất: lớp nền "local" cuộn theo danh sách, che bóng khi đã ở đầu hay ở cuối */
 .sg-nav {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 0;
+  margin-right: calc(-1 * min(var(--sg-nav-gutter, 0px), 14px));
   overflow-y: auto;
   overflow-x: hidden;
   flex: 1;
   scrollbar-width: thin;
   scrollbar-color: #ffffff40 transparent;
+  background:
+    linear-gradient(#0b5a47 40%, #0b5a4700) top / 100% 32px no-repeat local,
+    linear-gradient(#0b5a4700, #0b5a47 60%) bottom / 100% 32px no-repeat local,
+    linear-gradient(#00000040, #00000000) top / 100% 12px no-repeat scroll,
+    linear-gradient(#00000000, #00000040) bottom / 100% 12px no-repeat scroll;
 }
+/* Thu gọn: không có thanh cuộn. Dải 76px chỉ còn 48px cho mục, thanh cuộn (10px trên Windows) cắt nền mục đang chọn.
+   Vẫn cuộn được bằng con lăn, bàn phím, cảm ứng; rê chuột vào thì thanh bên mở ra, thanh cuộn hiện lại */
+.is-collapsed .sg-nav { scrollbar-width: none; }
+.is-collapsed .sg-nav::-webkit-scrollbar { display: none; }
 .sg-nav-link {
   position: relative;
   isolation: isolate;
@@ -658,7 +671,15 @@
 }
 .sg-topbar-context { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .sg-crumb { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; }
-.sg-crumb b { font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+/* một dòng: thiếu chỗ thì tên đơn vị co trước (tên đầy đủ ở title), tên trang co sau */
+.sg-crumb b {
+  flex-shrink: 4;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .sg-crumb svg { flex-shrink: 0; color: #7a8d84; }
 .sg-crumb span { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sg-topbar-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -767,11 +788,13 @@
 }
 .sg-calendar-edge.is-over { background: #fdf1ef; color: #9f2019; }
 .sg-calendar-edge.is-over b { color: #9f2019; }
+/* 14 cột chia đều; cột nào chữ dài hơn (Hôm nay) thì giãn theo chữ thay vì tràn sang cột bên: laptop 1366px zoom 125%
+   còn khoảng 540px cho dải ngày, đủ 14 cột không phải cuộn ngang */
 .sg-calendar-days {
   flex: 1;
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(14, minmax(46px, 1fr));
+  grid-template-columns: repeat(14, minmax(min-content, 1fr));
   overflow-x: auto;
   scrollbar-width: thin;
   position: relative;
@@ -781,8 +804,9 @@
   justify-items: center;
   align-content: start;
   gap: 2px;
+  min-width: 36px;
   min-height: 80px;
-  padding: 10px 2px 8px;
+  padding: 10px 4px 8px;
   color: var(--text);
   transition: background-color 140ms;
 }
@@ -1061,6 +1085,14 @@
 .sg-scrim-leave-active { transition: opacity 140ms ease; }
 .sg-scrim-enter-from, .sg-scrim-leave-to { opacity: 0; }
 
+/* Màn vừa: giữ hai hàng tuần ở cả hai trạng thái thanh bên để rê chuột không làm danh sách việc nhảy dọc. */
+@media (min-width: 901px) and (max-width: 1050px) {
+  .sg-calendar-days { grid-template-columns: repeat(7, minmax(min-content, 1fr)); }
+  .sg-day { min-height: 64px; }
+  .sg-day.is-week { border-left: 0; }
+  .sg-day:nth-child(n+8) { border-top: 1px solid var(--edge); }
+}
+
 @media (max-width: 1200px) {
   .sg-topbar { padding-inline: 28px; }
   .moc-sheet { padding: 28px 28px 48px; }
@@ -1068,7 +1100,9 @@
   .moc-inbox-toolbar { flex-wrap: wrap; }
   .moc-desk-search { flex-basis: 220px; }
   .moc-inbox-filter { width: 148px; }
-  .sg-calendar-edge { flex-basis: 84px; }
+  /* ô hai đầu lịch: chữ một dòng ("Chưa có hạn" xuống dòng làm số lệch hàng với ô bên cạnh) */
+  .sg-calendar-edge { flex-basis: 80px; padding-inline: 4px; font-size: 12px; }
+  .sg-calendar-edge span { white-space: nowrap; }
   .sg-due-group { grid-template-columns: 112px minmax(0, 1fr); gap: 20px; }
   .sg-due-num { font-size: 38px; line-height: 40px; }
   .sg-task-link { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 14px; padding: 14px 18px; }
@@ -1160,6 +1194,7 @@
   .sg-calendar-range { display: none; }
   .sg-calendar-strip { overflow-x: auto; scrollbar-width: none; }
   .sg-calendar-edge { flex: 0 0 68px; padding: 8px 4px; font-size: 12px; text-align: center; }
+  .sg-calendar-edge span { white-space: normal; }
   .sg-calendar-edge:disabled { display: none; }
   .sg-calendar-edge:first-child { position: sticky; left: 0; z-index: 1; }
   .sg-calendar-edge b { font-size: 18px; line-height: 24px; }

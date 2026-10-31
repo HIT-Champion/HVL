@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Sửa lỗi
+- Thanh bên không cắt mục đang chọn; lịch hạn vừa khung laptop khi phóng to hoặc mở menu (#465).
+
 ## [1.4.0] - 2026-10-31
 
 Bản online tự nâng khi có bản phát hành trên `main`: reconciler theo thẻ `vX.Y.Z` mới nhất, nâng bằng
