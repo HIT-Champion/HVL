@@ -30,7 +30,9 @@ giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nh
   tự kiểm. Route nằm trong `.moc-apps/apisix.yaml`, không có trong tệp này
   ([`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) 1.3).
 
-Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`.
+Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`. Bản cài bật GitOps (`MOC_GITOPS_DIR`,
+[`docs/van-hanh.md`](../../docs/van-hanh.md) mục GitOps) thì reconciler đưa tệp đã cài bị sửa tay về đúng commit nó
+theo, trong vòng một phút: sửa route trong git rồi đưa lên nhánh reconciler kéo, hoặc dừng reconciler trước khi thử.
 
 ## Sau proxy TLS trên máy chủ (F1.9)
 
@@ -209,8 +211,9 @@ Thêm một loại trừ khi có chặn nhầm: lấy `X-Request-Id` của phả
 (mục dưới) để biết luật (`[id "…"]`) và tham số (`… found within ARGS:<tên>`). Viết một `SecRule REQUEST_FILENAME` giới
 hạn theo đường, `ctl:ruleRemoveTargetById=<luật>;ARGS:<tên>` — không gỡ luật cho mọi tham số, không gỡ toàn cục nếu
 không có lý do như 920350; id mới trong 10000–10099; chú thích lý do ngay trên; thêm dòng vào bảng trên
-(`scripts/tests/test_waf.py` đòi đủ). Sửa `apisix.yaml` xong: `docker compose restart apisix`. Dò chặn nhầm cho một
-luồng mới mà không làm phiền người dùng: chạy `MOC_WAF=DetectionOnly`. Lưu ý:
+(`scripts/tests/test_waf.py` đòi đủ). Sửa `apisix.yaml` xong: `docker compose restart apisix` (bản cài bật GitOps:
+sửa trong git, như mục đầu). Dò chặn nhầm cho một luồng mới mà không làm phiền người dùng: chạy
+`MOC_WAF=DetectionOnly`. Lưu ý:
 
 - Gỡ theo id hay dải id (`932000-932999`), không theo nhãn: nhãn `attack-rce` gồm cả 934… (Node.js) và 944… (Java,
   Log4Shell) — gỡ theo nhãn thì mất luôn hai nhóm đó trên khóa ấy (đã thử: `${jndi:ldap://…}` qua WAF).

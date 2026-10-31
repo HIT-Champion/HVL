@@ -318,10 +318,10 @@ nộp chấm (mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ. G
 #    "[Chưa phát hành]" trong CHANGELOG.md sang "## [1.1.0] - <ngày phát hành>", viết 3–8 dòng tóm tắt ngay dưới
 #    tiêu đề đó (trang Release hiện phần này, phần còn lại gập lại), để lại tiêu đề
 #    "## [Chưa phát hành]" trống (CI đòi có mục này)
-#    tiêu đề PR: chore(release): chốt ghi chép thay đổi v1.1.0  → review → squash merge vào develop
+#    tiêu đề PR: chore(release): finalize the changelog for v1.1.0  → review → squash merge vào develop
 
 # 2. PR phát hành develop → main, tiêu đề đúng "chore(release): v1.1.0"
-gh pr create --base main --head develop --title "chore(release): v1.1.0" --body "Phát hành v1.1.0"
+gh pr create --base main --head develop --title "chore(release): v1.1.0" --body "Release v1.1.0"
 #    CI kiểm: nguồn là develop, CHANGELOG có mục [1.1.0] có dòng thay đổi, thẻ v1.1.0 chưa có
 #    → review → Create a merge commit
 
@@ -349,13 +349,13 @@ git fetch origin && git switch -c hotfix/1.1.1 origin/main
 # sửa, commit "fix(…): …"; thêm mục "## [1.1.1] - <ngày>" ngay dưới "## [Chưa phát hành]" của CHANGELOG.md,
 # ghi dòng sửa vào đó
 git push -u origin hotfix/1.1.1
-gh pr create --base main --title "chore(release): v1.1.1" --body "Sửa gấp …"   # → review → merge commit
+gh pr create --base main --title "chore(release): v1.1.1" --body "Urgent fix …"   # → review → merge commit
 git switch main && git pull && make release VERSION=1.1.1 && git push origin v1.1.1
 # gộp ngược vào develop qua một nhánh riêng (không sửa thẳng develop hay main được):
 git switch -c chore/gop-nguoc-1-1-1 origin/develop && git merge --no-ff origin/main
 #    CHANGELOG.md xung đột ở đầu tệp thì giữ cả mục [Chưa phát hành] của develop lẫn mục [1.1.1]
 git push -u origin chore/gop-nguoc-1-1-1
-gh pr create --base develop --title "chore(release): gộp ngược v1.1.1 vào develop" --body ""
+gh pr create --base develop --title "chore(release): merge v1.1.1 back into develop" --body ""
 #    → review → Create a merge commit (không squash: giữ quan hệ cha con để lần phát hành sau không xung đột)
 ```
 

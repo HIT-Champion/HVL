@@ -30,8 +30,9 @@ Keycloak, Docker, `svc-workflow`.
 
 Người dùng thấy ứng dụng đã cài ở trang **Danh mục ứng dụng** của Văn phòng điện tử (`/ung-dung`, mục "Ứng dụng" ở
 thanh bên, mọi vai trò): tên, mô tả (`description` của manifest), nút Mở tới `/<đường>/`, phiên bản, lúc cài, cùng hai
-ứng dụng có sẵn trong lõi (Văn phòng điện tử, Không gian cá nhân — phiên bản lõi lấy từ `/api/status`). Lãnh đạo, quản
-trị đơn vị thấy thêm **băm manifest** (SHA-256 các byte của `app.yaml` lúc cài — so với `sha256sum
+ứng dụng có sẵn trong lõi (Văn phòng điện tử, Không gian cá nhân — phiên bản lõi lấy từ `/api/status`) và Wiki nội bộ
+khi profile `wiki` đang chạy (trang gọi được `/wiki/health.php`; phiên bản là của DokuWiki). Lãnh đạo, quản trị đơn vị
+thấy thêm **băm manifest** (SHA-256 các byte của `app.yaml` lúc cài — so với `sha256sum
 apps/<thư mục>/app.yaml` để biết bản đang cài đúng bản đã duyệt; nút chép đủ 64 ký tự) và ứng dụng **đã gỡ**. Trang
 đọc khung nhìn `core.app_catalog` (migration `1792281603400`): 9 cột của `core.apps`, không có manifest (image, cổng,
 healthcheck, biến môi trường, cổng webhook), không schema; `core.apps` vẫn không vào GraphQL; không vai trò nào ghi.

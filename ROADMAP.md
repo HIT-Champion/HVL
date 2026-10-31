@@ -4,7 +4,7 @@ Lộ trình bám theo nguyên lý **tiến hóa tuyến tính** của mô hình 
 danh tính, sự kiện, dữ liệu của không gian trước ([`docs/architecture.md`](docs/architecture.md) §1.2). Đây cũng là thứ
 tự mà một tổ chức áp dụng Signet nên đi theo, không chỉ là lịch phát triển nội bộ.
 
-Trạng thái ghi ngày 30/10/2026, trên nhánh `develop`, đúng nội dung bản `v1.3.0` (30/10). Các giai đoạn là thứ tự
+Trạng thái ghi ngày 31/10/2026, trên nhánh `develop`, đúng nội dung bản `v1.4.0` (31/10). Các giai đoạn là thứ tự
 phụ thuộc, không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ
 25/10 tới 27/10 đã ra ở `v1.2.0` (27/10), giao diện Lịch hạn ở bản vá `v1.2.1` (28/10), việc làm 28/10 (cảnh báo qua
 Alertmanager, Node-RED, DokuWiki, tiếng Anh, truy vết phân tán) và đêm 29–30/10 (hai nguồn dữ liệu công khai, trợ lý
@@ -32,10 +32,11 @@ Mục tiêu: kho mã nguồn đạt chuẩn dự án nguồn mở bền vững t
 - [x] CI trên pull request (`.github/workflows/ci.yml`): giấy phép, dựng từ mã nguồn, tài liệu, bảo mật chuỗi cung
       ứng, test đơn vị, test trên CSDL thật, chạy thử toàn hệ thống. Ruleset `.github/rulesets/develop.json` đòi đủ kiểm
       tra mới gộp được; nhánh và tiêu đề PR theo [`docs/git_flow.md`](docs/git_flow.md)
-- [x] CI ngắn lại: job chạy thử toàn hệ thống chia năm phần chạy song song, mỗi phần tự dựng và nạp mẫu, vẫn đủ mọi
+- [x] CI ngắn lại: job chạy thử toàn hệ thống chia sáu phần chạy song song, mỗi phần tự dựng và nạp mẫu, vẫn đủ mọi
       bước (#111)
 - [x] Phát hành gói `.tar.gz` kèm `.sha256` theo thẻ phiên bản (`.github/workflows/release.yml`, `make release`): đã
-      phát hành `v0.1.0` (18/10) và `v1.0.0` (23/10). Bản sau `v1.0.0` đính kèm thêm SBOM CycloneDX (`make sbom`)
+      phát hành 7 bản, từ `v0.1.0` (18/10), `v1.0.0` (23/10) tới `v1.4.0` (31/10). Bản sau `v1.0.0` đính kèm thêm
+      SBOM CycloneDX (`make sbom`)
 - [x] Tài liệu nền: README (cả bản tiếng Anh), CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG, DEPENDENCIES, SECURITY
 
 ## Giai đoạn 1 — [H] Không gian Nhân sự
@@ -90,8 +91,9 @@ bộ phận.
       đảm thứ tự (cụm ⑥)
 - [ ] **Một phần** — biểu mẫu low-code: form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form
       (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã, JSON Schema dùng chung mới có cho form tiếp nhận văn bản
-      đến, khuôn văn bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4); chưa có trình dựng form
-      (#303)
+      đến, khuôn văn bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4). Trang Dựng form của Văn
+      phòng (`/ung-dung/dung-form`, quản trị đơn vị, #303): khai trường, xem trước, tải tệp JSON Schema về đặt vào gói
+      ứng dụng; form chỉ vào lõi khi chạy `moc app install`
 - [ ] **Một phần** — tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): Node-RED ở `/tu-dong/`,
       profile `tu-dong` tắt mặc định, cho người vận hành nền tảng soạn flow; đăng nhập Keycloak, chỉ vai trò `operator`
       ([`docs/van-hanh.md`](docs/van-hanh.md) mục Tự động hóa bằng Node-RED, bước CI `make demo-tu-dong`, #366). Flow
@@ -132,9 +134,10 @@ Mục tiêu: mọi câu hỏi điều hành trả lời được bằng số li�
 chạy được không cần mô hình ngôn ngữ (quy tắc, OCR, tìm kiếm toàn văn); bật mô hình thì thêm phần viết trích yếu, viết
 câu trả lời và tìm theo nghĩa.
 
-- [x] Mô hình chạy tại chỗ, không gửi dữ liệu ra ngoài: Ollama với Qwen3 1,7B và Qwen3-Embedding 0,6B trên CPU, tắt
-      mặc định (`make ai-model`, `make up-ai`). Tìm theo nghĩa dùng lại Meilisearch, không thêm CSDL véc-tơ riêng
-      (`docs/architecture.md` QĐ-004)
+- [x] Mô hình chạy tại chỗ, mặc định không gửi dữ liệu ra ngoài: Ollama với Qwen3 1,7B và Qwen3-Embedding 0,6B trên
+      CPU, tắt mặc định (`make ai-model`, `make up-ai`). Tìm theo nghĩa dùng lại Meilisearch, không thêm CSDL véc-tơ
+      riêng (`docs/architecture.md` QĐ-004). Tùy chọn `MOC_ASK_API=openai` (#430) cho bước viết câu trả lời gọi API
+      chuẩn OpenAI do người vận hành khai: câu hỏi và tối đa 4 đoạn căn cứ (đã che thông tin cá nhân) rời máy chủ
 - [x] Truy xuất tri thức (RAG): trợ lý hỏi đáp trên kho văn bản, trả câu trích nguyên văn kèm "số ký hiệu · tr. n",
       lọc quyền ở bước truy xuất (F4.2). Kho tri thức hiện là văn bản của Văn phòng điện tử; wiki nội bộ (#367)
       chưa nối vào

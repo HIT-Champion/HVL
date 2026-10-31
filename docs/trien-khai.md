@@ -66,11 +66,11 @@ Máy 8 GB nên thêm 4 GB swap cho lần dựng image đầu tiên:
 
 ## 2b. Máy không kéo được image từ Docker Hub
 
-Phần lớn image của Signet lấy từ Docker Hub (`docker.io`): 17 image trong `docker-compose.yml` và 4 image nền mà các
-Dockerfile của đội dựng lên (`node`, `python`, `nginxinc/nginx-unprivileged`, `apache/apisix`). Mạng chặn Docker Hub,
-hay đã hết lượt tải ẩn danh của Docker Hub (lỗi `toomanyrequests`), thì `make up`, `make install` và
-`scripts/nang_cap.sh` dừng ở bước kéo hoặc dựng image. Cách xử lý: cho Docker kéo các image này qua `mirror.gcr.io`, bản
-sao Docker Hub của Google.
+Phần lớn image của Signet lấy từ Docker Hub (`docker.io`): 19 image trong `docker-compose.yml` và 6 image nền mà các
+Dockerfile của đội dựng lên (`node`, `python`, `nginxinc/nginx-unprivileged`, `apache/apisix`, `dokuwiki/dokuwiki`,
+`nodered/node-red`). Mạng chặn Docker Hub, hay đã hết lượt tải ẩn danh của Docker Hub (lỗi `toomanyrequests`), thì
+`make up`, `make install` và `scripts/nang_cap.sh` dừng ở bước kéo hoặc dựng image. Cách xử lý: cho Docker kéo các
+image này qua `mirror.gcr.io`, bản sao Docker Hub của Google.
 
 Tạo hoặc sửa `/etc/docker/daemon.json` (cần `sudo`; người cài tự làm, Signet không sửa cấu hình Docker của máy) cho có
 khóa `registry-mirrors`. Tệp đã có nội dung thì chỉ thêm khóa này, giữ JSON hợp lệ:
@@ -93,10 +93,10 @@ kéo image nền qua mirror. Đã đổi sang builder `docker-container` (`docke
 ([Configure BuildKit](https://docs.docker.com/build/buildkit/configure/#registry-mirror)). Mọi image đều ghim theo
 digest (`@sha256:…`), Docker kiểm nội dung tải về theo digest, nên mirror không tráo được image.
 
-Ngày 26/10/2026 đã kiểm: cả 21 image ghim đều có trên `mirror.gcr.io`, đủ mọi lớp của bản `linux/amd64`. `mirror.gcr.io`
-chỉ giữ các image được kéo nhiều, nên khi cài một phiên bản khác hãy kiểm lại bằng lệnh dưới. Lệnh chỉ đọc manifest,
-không kéo image; chạy trong thư mục mã nguồn (bản clone hay gói phát hành đã giải nén), nơi `make up`, `make install`
-dựng image:
+Ngày 26/10/2026 đã kiểm 21 image ghim lúc đó (chưa có `jaegertracing/jaeger`, `prom/alertmanager`, `dokuwiki/dokuwiki`,
+`nodered/node-red`): đều có trên `mirror.gcr.io`, đủ mọi lớp của bản `linux/amd64`. `mirror.gcr.io` chỉ giữ các image
+được kéo nhiều, nên khi cài một phiên bản khác hãy kiểm lại bằng lệnh dưới. Lệnh chỉ đọc manifest, không kéo image;
+chạy trong thư mục mã nguồn (bản clone hay gói phát hành đã giải nén), nơi `make up`, `make install` dựng image:
 
 ```bash
 grep -hoE '(image:|FROM) +[a-z][^ ]*@sha256:[0-9a-f]{64}' docker-compose.yml */*/Dockerfile \
@@ -120,10 +120,13 @@ Ngoài Docker Hub, lần cài đầu còn tải từ các nguồn sau, mirror tr
 
 ## 3. Lấy mã nguồn và cấu hình
 
-Từ đây chạy bằng người dùng `moc` (`sudo -iu moc`).
+Từ đây chạy bằng người dùng `moc` (`sudo -iu moc`). Lấy đúng một bản phát hành: thẻ mới nhất ở trang Release (dưới
+đây `v1.4.0`) hoặc gói `signet-X.Y.Z.tar.gz` của Release, không lấy nhánh mặc định `develop`. Bản cài từ `develop` mang
+phiên bản `1.4.0-N-g…` (`git describe`), nên reconciler theo bản phát hành (`MOC_GITOPS_FOLLOW=release`, mục 7) lượt
+đầu không nhận bản đang chạy mà dừng trang cài lại; bản cài từ thẻ thì được nhận nguyên.
 
 ```bash
-git clone https://github.com/HIT-Champion/Signet.git ~/Signet
+git clone -b v1.4.0 https://github.com/HIT-Champion/Signet.git ~/Signet
 cd ~/Signet
 make env          # sinh .env, mọi mật khẩu ngẫu nhiên
 ```
@@ -154,7 +157,9 @@ make check
   - Đặt một dải cụ thể (vd `172.16.0.0/12`) vẫn được, nhưng dải đó phải khớp mạng sau mỗi lần tạo lại (mục 8).
 - Máy demo công khai: giữ `MOC_CLI_CLIENT_ENABLED=true` để `seed.py`, `smoke.py` chạy được; muốn xem nhắc hạn ngay khi
   demo thì `MOC_SLA_DURATION=PT1M` (mặc định `PT24H`). Máy có dữ liệu thật: `MOC_CLI_CLIENT_ENABLED=false`, không chạy
-  `seed.py`, `smoke.py` (cả hai ghi dữ liệu thử vào hệ thống).
+  `seed.py`, `smoke.py` (cả hai ghi dữ liệu thử vào hệ thống). Nhưng phần kiểm của `scripts/nang_cap.sh` (mục 7) luôn
+  chạy smoke, nên trên máy này nâng tay luôn báo mục smoke trượt, còn GitOps `MOC_GITOPS_MODE=nang-cap` coi đó là nâng
+  lỗi và tự lùi mọi bản (#491): chưa bật chế độ này trên máy có dữ liệu thật.
 - **Chép `.env` ra ngoài máy chủ ngay** (trình quản lý mật khẩu của đội): `MOC_BACKUP_PASSWORD` mở kho sao lưu,
   `MOC_OPENBAO_SEAL_KEY` mở két — mất là mất bản sao lưu và tệp văn bản hạn chế. Cất bản chép này ở chỗ khác với kho
   sao lưu.
@@ -313,7 +318,7 @@ kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`]
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
 `deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`. Bản thật nên nâng có sao lưu, lỗi
 thì tự lùi (`MOC_GITOPS_MODE=nang-cap`), theo từng bản phát hành trên `main` (`MOC_GITOPS_FOLLOW=release`) hoặc qua
-cổng ký nhánh `deploy` (`van-hanh.md` mục GitOps, #344).
+cổng ký nhánh `deploy` (`van-hanh.md` mục GitOps, #344); máy có dữ liệu thật thì chưa được (mục 3, #491).
 
 **Máy không có systemd** (WSL2 chưa bật systemd, PID 1 là `init`): chạy reconciler bằng cron của người dùng `moc` thay
 cho timer, mỗi phút một lượt như timer. Lượt gặp khóa đang bị giữ (đang nâng, sao lưu) thì tự bỏ qua. Nhật ký mỗi
@@ -328,7 +333,8 @@ WSL không tự chạy cron khi khởi động: thêm `service cron start` vào 
 `nang_cap.sh` chỉ tự kiểm được timer systemd.
 
 **Nâng cấp tay** (không dùng GitOps): dừng timer reconciler nếu có (`sudo systemctl stop moc-reconcile.timer`), lấy mã
-nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git pull` trong `~/Signet`), rồi từ thư mục đó:
+nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git fetch --tags && git checkout vX.Y.Z` trong `~/Signet`), rồi
+từ thư mục đó:
 
 ```bash
 scripts/nang_cap.sh nang /opt/moc

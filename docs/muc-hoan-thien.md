@@ -7,8 +7,9 @@ repo: tệp test và số hàm test, bước CI, lệnh trình diễn, hạn ch�
 mà đề liệt kê ([`du-thi/olp-2026-de-thi.md`](du-thi/olp-2026-de-thi.md) §2.1), kể cả những năng lực chưa có.
 Việc sắp làm nằm ở [`ROADMAP.md`](../ROADMAP.md).
 
-Số liệu chụp ngày 23/10/2026 trên nhánh `develop`, trừ số hàm test của từng tệp ở mục 2: số đó luôn khớp mã, có test
-kiểm. Tổng ở mục 1 đổi theo khi thêm, bớt test — mục 4 có lệnh để đếm lại.
+Tài liệu lập ngày 23/10/2026 trên nhánh `develop`, các dòng sửa theo thay đổi về sau; số đếm tĩnh ở mục 1 đếm lại
+ngày 31/10/2026 trên `develop` 23bfadb. Số hàm test của từng tệp ở mục 2 luôn khớp mã, có test kiểm. Tổng ở mục 1 đổi
+theo khi thêm, bớt test — mục 4 có lệnh để đếm lại.
 Đường dẫn trong bảng tính từ gốc repo. Cột CI ghi job, bước có trong `.github/workflows/ci.yml`; lượt chạy gần nhất
 xanh hay đỏ thì xem trang Actions, tài liệu này không chép lại.
 
@@ -35,32 +36,34 @@ kiểm của `scripts/smoke.py`.
 
 ## 1. Số test
 
-Đếm tĩnh trên `develop` 6e2ba1f (gộp ngược `v1.2.1`); số chạy lấy từ log của lần CI
-[40552387498](https://github.com/HIT-Champion/Signet/actions/runs/40552387498) trên e32dd1d (27/10/2026, xanh hết) —
-cây mã của e32dd1d và 6e2ba1f giống hệt nhau.
+Đếm tĩnh ngày 31/10/2026 trên `develop` 23bfadb (sau bản `v1.4.0`), bằng các lệnh ở mục 4. Số chạy vẫn lấy từ log của
+lần CI [40552387498](https://github.com/HIT-Champion/Signet/actions/runs/40552387498) trên e32dd1d (27/10/2026, xanh
+hết), chưa đếm lại: cây mã lúc đó ít test hơn và chưa có Đổi, bù lịch giảng.
 
-| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh | Chạy trong CI (lần 40552387498) | Job CI |
+| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh (23bfadb) | Chạy trong CI (lần 40552387498, 27/10) | Job CI |
 |---|---|---|---|---|---|
-| svc-files | `services/svc-files/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 952 hàm | 1 691 đạt, 9 bỏ qua | `unit` (`make test`) |
-| svc-workflow | `services/svc-workflow/tests/` | như trên | 433 hàm | 963 đạt | `unit` (`make test`) |
-| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 596 hàm | 596 chạy, 594 đạt, 2 bỏ qua | `unit` (`make test`) |
-| Giao diện Văn phòng điện tử | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 212 lời gọi | 262 đạt | `unit` (`make test`) |
+| svc-files | `services/svc-files/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 1 043 hàm | 1 691 đạt, 9 bỏ qua | `unit` (`make test`) |
+| svc-workflow | `services/svc-workflow/tests/` | như trên | 506 hàm | 963 đạt | `unit` (`make test`) |
+| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 754 hàm | 596 chạy, 594 đạt, 2 bỏ qua | `unit` (`make test`) |
+| Giao diện Văn phòng điện tử | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 259 lời gọi | 262 đạt | `unit` (`make test`) |
 | Không gian cá nhân P.A.R.A | `apps/ca-nhan/tests/` | như trên | 20 lời gọi | 20 đạt | `unit` (`make test`) |
 | Bảng tin đơn vị | `apps/bang-tin/tests/` | như trên; `def test_` cho tệp Python | 14 lời gọi + 15 hàm | 14 + 15 đạt | `unit` (`make test`) |
-| Đơn nghỉ phép (#301) | `apps/nghi-phep/tests/` | như trên | 24 lời gọi + 12 hàm | 111 + 12 đạt | `unit` (`make test`) |
+| Đơn nghỉ phép (#301) | `apps/nghi-phep/tests/` | như trên | 33 lời gọi + 12 hàm | 111 + 12 đạt | `unit` (`make test`) |
+| Đổi, bù lịch giảng (#482) | `apps/lich-giang/tests/` | như trên | 32 lời gọi + 12 hàm | chưa có, ra sau lần chạy này | `unit` (`make test`) |
 | Trang tài liệu API (#357) | `apps/tai-lieu-api/tests/` | `def test_` | 15 hàm | 15 đạt | `unit` (`make test`) |
-| CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 337 hàm | 583 đạt | `db` (`MOC_IT=1`) |
+| CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 349 hàm | 583 đạt | `db` (`MOC_IT=1`) |
 | Trình duyệt thật (Playwright) | `tests/e2e/` | `grep -hE '^test\('` | 43 test trong 28 tệp `*.spec.ts` | 49 đạt | `chay-thu`, phần `e2e`, bước `make e2e` |
-| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 101 kiểm | 99 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
+| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 103 kiểm | 99 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
 
-**Tổng đếm tĩnh: 2 673 test** (952 + 433 + 596 + 212 + 20 + 14 + 15 + 24 + 12 + 15 + 337 + 43), cộng 101 kiểm của smoke;
-**lúc chạy trong CI: 4 329 test đạt** (1 691 + 963 + 594 + 262 + 20 + 14 + 15 + 111 + 12 + 15 + 583 + 49 — `scripts`
-tính 594 vì 2 test bỏ qua), cộng 99 kiểm smoke. Số lúc chạy lớn hơn số đếm tĩnh vì `pytest.mark.parametrize` và test
-sinh trong vòng lặp nhân một hàm thành nhiều ca; smoke đạt ít hơn số `ok(` vì vài kiểm nằm trong nhánh `if`, chỉ chạy
-khi đủ điều kiện. Test của `scripts` chỉ bỏ qua có điều kiện (`skipIf`, `skipUnless`: thiếu công cụ, thư viện hay thư
-mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job
-`unit` không đặt, nên 9 test này không chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 20
-(máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 6, `paging.test.ts` 4.
+**Tổng đếm tĩnh (23bfadb, 31/10): 3 107 test** (1 043 + 506 + 754 + 259 + 20 + 14 + 15 + 33 + 12 + 32 + 12 + 15 + 349 +
+43), cộng 103 kiểm của smoke; **lúc chạy trong CI (lần 40552387498, 27/10): 4 329 test đạt** (1 691 + 963 + 594 + 262 +
+20 + 14 + 15 + 111 + 12 + 15 + 583 + 49 — `scripts` tính 594 vì 2 test bỏ qua), cộng 99 kiểm smoke. Trên cùng cây mã, số
+lúc chạy lớn hơn số đếm tĩnh vì `pytest.mark.parametrize` và test sinh trong vòng lặp nhân một hàm thành nhiều ca; smoke
+đạt ít hơn số `ok(` vì vài kiểm nằm trong nhánh `if`, chỉ chạy khi đủ điều kiện. Test của `scripts` chỉ bỏ qua có điều
+kiện (`skipIf`, `skipUnless`: thiếu công cụ, thư viện hay thư mục). 9 test bỏ qua của svc-files là
+`integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job `unit` không đặt, nên 9 test này không
+chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 20 (máy khách Hasura dùng chung),
+`integration/test_live.py` 9, office `format.test.ts` 6, `paging.test.ts` 4.
 
 ## 2. Ma trận tính năng
 
@@ -73,7 +76,7 @@ mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ ch
 | F1.3 | Dữ liệu có cấu trúc: PostgreSQL 16 + Hasura v2 CE, GraphQL tự sinh, quyền theo vai trò và đơn vị tới từng dòng, migrations và metadata tự áp | Hoàn thiện | db `test_schema.py` 15, `test_permissions.py` 23 | job `db`; smoke: văn thư Khoa Kinh tế không thấy văn bản Khoa CNTT, không tải được tệp (404); văn thư không ghi thẳng được bảng văn bản | `svc-files`, `svc-workflow` giữ khóa quản trị Hasura (lấy từ két): quyền cấp dòng không giới hạn chính hai dịch vụ này |
 | F1.4 | Quy trình BPMN: Flowable REST 8, Hasura Actions → `svc-workflow`, callback, job đối soát | Hoàn thiện | svc-workflow `test_workflow.py` 32, `test_app.py` 8 | smoke: vào sổ khởi chạy quy trình → chỉ đạo → phân công → báo xong, dòng thời gian đủ 5 bước từ tiếp nhận; e2e `van-ban-den.spec.ts`, `van-ban-di.spec.ts` | Đơn vị gắn vào quy trình bằng biến `tenantId` và nhóm ứng viên `t:<đơn vị>:…`, không dùng tenant của Flowable. Lệch giữa Flowable và CSDL chỉ được sửa ở lượt đối soát kế tiếp (`MOC_RECONCILE_INTERVAL_S`) |
 | F1.5 | Dữ liệu phi cấu trúc: SeaweedFS, tải lên và tải xuống chỉ qua `svc-files` | Hoàn thiện | svc-files `test_upload.py` 18, `test_download.py` 10 | smoke: văn thư tải công văn lên, quét sạch; đơn vị khác tải tệp → 404 | Một bucket chung, đơn vị tách bằng tiền tố `tenant/<id>/` — có chủ ý, lý do ở `docs/mo-hinh-du-lieu.md` |
-| F1.6 | Trạm kiểm dịch: ClamAV quét trước khi ghi | Hoàn thiện | svc-files `test_clamav.py` 8 | smoke: EICAR → 422, không lưu, lần chặn vào sổ kiểm toán; e2e `kiem-dich.spec.ts`; `make demo-kiem-dich` | ClamAV chiếm khoảng 0,8 GB RAM (README, mục Yêu cầu hệ thống) |
+| F1.6 | Trạm kiểm dịch: ClamAV quét trước khi ghi | Hoàn thiện | svc-files `test_clamav.py` 8 | smoke: EICAR → 422, không lưu, lần chặn vào sổ kiểm toán; e2e `kiem-dich.spec.ts`; `make demo-kiem-dich` | ClamAV chiếm khoảng 0,9 GiB RAM (`docker stats` trên bản 1.3.0; README, mục Yêu cầu hệ thống) |
 | F1.7 | Tìm kiếm toàn văn: Meilisearch qua `/api/search`, lọc đơn vị ở máy chủ | Hoàn thiện | svc-files `test_search.py` 34 | e2e `van-ban-den.spec.ts`: tìm lại bằng chữ không dấu | Xem F2.7 |
 | F1.8 | Cài ra ngoài thư mục mã nguồn: `make install PREFIX=…` | Hoàn thiện | — (không có test đơn vị cho `scripts/install.sh`) | bước CI "Cài ra ngoài thư mục mã nguồn và chạy từ đó (make install)": cài sang thư mục tạm, dựng lại từ đó, chạy smoke | — |
 | F1.9 | Lên mạng: HTTPS sau proxy (`MOC_TRUSTED_PROXY`), Cloudflare Tunnel tùy chọn | Hoàn thiện | scripts `test_duong_ham.py` 13 (kiểm chữ cấu hình tunnel, route Keycloak sau proxy, `MOC_TRUSTED_PROXY=auto` chỉ tin mạng `moc`), `test_kiem_ban_online.py` 24 (site giả) | Job `.github/workflows/ban-online.yml` kiểm bản online https://signet.htechcs.com hằng ngày và ngay sau mỗi lần phát hành, bản dev theo `develop` https://signet-dev.htechcs.com hằng ngày (đúng commit đầu `develop`) (`scripts/kiem_ban_online.py`: chứng chỉ, HTTP sang HTTPS, `/api/status` đúng thẻ phát hành mới nhất, URL của Keycloak sau proxy, header bảo mật); diễn tập tay 22/10/2026 trên máy phát triển (CHANGELOG [1.0.0]); phần CI `https` trên mọi pull request (#261): `.env` như `docs/trien-khai.md` bước 3, proxy TLS nginx với chứng thư tự ký như bước 5, rồi `kiem_ban_online.py`, smoke trọn qua `https://`, nhật ký APISIX ghi IP của máy gọi; với `MOC_TRUSTED_PROXY=auto`, `X-Forwarded-For` giả từ container ở mạng `apps` bị bỏ (#211); hướng dẫn `docs/trien-khai.md` | Máy chạy bản online tắt, hoặc bản online chưa nâng lên thẻ mới (quá 60 phút sau khi phát hành, hay tới lượt mỗi sáng), thì job đỏ. CI dùng nginx với chứng thư tự ký thay Caddy và Let's Encrypt, không kiểm Cloudflare Tunnel |
@@ -218,6 +221,9 @@ grep -hE '^\s*(test|it)\(' apps/ca-nhan/tests/*.test.js apps/bang-tin/tests/*.te
 grep -rhoE '^\s*(async )?def test_' apps/bang-tin/tests | wc -l     # Bảng tin, phần Python
 grep -hE '^\s*(test|it)\(' apps/nghi-phep/tests/*.test.js | wc -l   # Đơn nghỉ phép (#301)
 grep -rhoE '^\s*(async )?def test_' apps/nghi-phep/tests | wc -l   # Đơn nghỉ phép, phần Python
+grep -hE '^\s*(test|it)\(' apps/lich-giang/tests/*.test.js | wc -l  # Đổi, bù lịch giảng (#482)
+grep -rhoE '^\s*(async )?def test_' apps/lich-giang/tests | wc -l  # Đổi, bù lịch giảng, phần Python
+grep -rhoE '^\s*(async )?def test_' apps/tai-lieu-api/tests | wc -l # trang tài liệu API (#357)
 grep -hE '^test\(' tests/e2e/*.spec.ts | wc -l                     # kịch bản Playwright
 grep -cE '^\s*ok\(' scripts/smoke.py                               # kiểm của make smoke
 grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng tệp (đổi thư mục cho phần khác)
@@ -226,7 +232,7 @@ grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng 
 Chạy thật (cần gì cho từng lệnh: README, mục Kiểm thử):
 
 ```bash
-make test                     # hai dịch vụ, scripts, apps/office, ca-nhan, bang-tin, nghi-phep — như job unit
+make test                     # hai dịch vụ, scripts, apps/office và năm ứng dụng còn lại ở apps/ — như job unit
 db/tests/stack.sh up          # PostgreSQL + Hasura cho db/tests — như job db (lệnh đủ ở db/README.md)
 make up && make seed && make smoke && make e2e   # như job chay-thu (phần luong-chinh, e2e)
 make demo-nong-lanh           # từng màn ở mục 2; make help liệt kê tất cả

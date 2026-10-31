@@ -47,7 +47,8 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
   vòng lặp vô hạn hay ngốn bộ nhớ); nuxt 4.6.3 (27/10, vá GHSA-9v7c-q64q-vv33 và ba GHSA của máy chủ phát triển) và
   node-forge 1.4.1 (27/10, mười một GHSA) cho `apps/office`, joi 17.13.9 (28/10, GHSA-4528-x5fx-h6hg) cho `website/`,
   đều chỉ chạy lúc dựng. Khóa npm sinh lại với `npm install --package-lock-only --before=<giờ ra bản vá>`, nên không
-  gói kéo theo nào mới hơn bản vá.
+  gói kéo theo nào mới hơn bản vá; lần sinh lại này đưa serialize-javascript của `apps/office` lên 7.1.4 (23/10),
+  `website/` vẫn ép 7.1.3.
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -63,7 +64,7 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
 | Thành phần | Phiên bản | Giấy phép | Vai trò | Cách nạp |
 |---|---|---|---|---|
 | [Docker Engine](https://docs.docker.com/engine/) | ≥ 24.0 | Apache-2.0 | Đóng gói và chạy container | Cài sẵn trên máy chủ |
-| [Docker Compose v2](https://github.com/docker/compose) | ≥ 2.20 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
+| [Docker Compose v2](https://github.com/docker/compose) | ≥ 2.17 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
 | [Caddy](https://caddyserver.com) | ≥ 2.6 | Apache-2.0 | Proxy TLS trên máy chủ: HTTPS, chứng thư Let's Encrypt tự gia hạn ([`docs/trien-khai.md`](docs/trien-khai.md)); không nằm trong Compose | Gói hệ thống của máy chủ (`apt install caddy`) |
 | [Python](https://www.python.org) | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
 | [Node.js](https://nodejs.org) | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep`, `app-lich-giang`, `app-tai-lieu-api` và phông của theme đăng nhập (chỉ ở bước dựng image); image `moc/keycloak-fonts` (#305) dựng trên image này, chạy một lần mỗi lần `up` để chép phông vào volume (chỉ `sh` và lệnh chép, không chạy Node); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests`, `apps/nghi-phep/tests` | `node:24.20.0-slim` |
@@ -191,13 +192,13 @@ Centrifugo bằng WebSocket có sẵn của trình duyệt (`app/composables/use
 của Centrifugo), không dùng thư viện `centrifuge`: nó kéo theo `protobufjs` (có script chạy lúc cài) và hơn chục
 gói khác, trong khi giao diện chỉ cần nhận tin.
 
-## Dịch vụ tự viết (`services/`, `cli/`)
+## Dịch vụ tự viết (`services/`)
 
 Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 
 | Thành phần | Phiên bản | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| [FastAPI](https://fastapi.tiangolo.com) | 0.143 | MIT | Khung viết `svc-files`, `svc-workflow`, `svc-ai` (kéo theo Starlette, Pydantic — BSD-3, MIT) | pip | 1 |
+| [FastAPI](https://fastapi.tiangolo.com) | 0.143 | MIT | Khung viết `svc-files`, `svc-workflow` (kéo theo Starlette, Pydantic — BSD-3, MIT) | pip | 1 |
 | [uvicorn](https://uvicorn.dev) | 0.54 | BSD-3-Clause | Máy chủ ASGI chạy các dịch vụ | pip | 1 |
 | [httpx2](https://github.com/pydantic/httpx2) (+ httpcore2, truststore) | 2.13 | BSD-3-Clause (truststore: MIT) | Gọi Hasura, Flowable, Keycloak, Meilisearch | pip | 1 |
 | [python-multipart](https://github.com/Kludex/python-multipart) | 0.0.32 | Apache-2.0 | Đọc tệp tải lên (`svc-files`) | pip | 1 |
@@ -275,7 +276,8 @@ NĐ 30/2020 quy định, có đủ dấu tiếng Việt; từ F4.1 thêm Tessera
 gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python. pip của image nền chỉ dùng lúc dựng: cài xong thư
 viện thì gỡ khỏi image, cùng các bản sao thư viện nó mang theo (`pip/_vendor`: certifi, urllib3, msgpack, setuptools
 bản cũ có lỗ hổng đã có bản sửa). Còn lại wheel pip trong `ensurepip/_bundled` của image nền (cùng các bản sao đó, nằm
-trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
+trong tệp nén): không cài, không nạp lúc chạy; lần quét image bằng Trivy chạy tay ngày 23/10/2026 không báo chúng. CI
+không chạy Trivy, chỉ quét tệp khóa bằng OSV-Scanner.
 
 Phần máy chủ của Bảng tin (`apps/bang-tin`), máy chủ trang của Đơn nghỉ phép (`apps/nghi-phep`) và của Đổi, bù lịch
 giảng (`apps/lich-giang`) dựng từ cùng image `python:3.13.16-slim`, chỉ thư viện chuẩn, không cài gói nào. `moc app` đọc

@@ -154,10 +154,12 @@ do-hoi-dap)", không có mô hình.
 `make backup` sao lưu mọi CSDL (nghiệp vụ, Keycloak, Flowable), toàn bộ tệp và két OpenBao vào kho restic mã hóa; để
 CSDL và tệp cùng một thời điểm, Signet tạm dừng ghi vài giây. `make restore` kiểm bản sao đọc được trọn vẹn rồi mới thay
 dữ liệu, ghi lần khôi phục vào sổ kiểm toán; `make audit` sau đó vẫn khớp mốc neo. CI diễn tập đúng chuỗi sao lưu → xóa
-dữ liệu → khôi phục → smoke ở mọi pull request. Tự phục hồi: reconciler (systemd timer mỗi 60 giây) dựng lại container
-bị xóa, chạy lại container đã dừng hay unhealthy, và khi bật GitOps thì đưa cấu hình bị sửa tay về đúng commit; két tự
-mở khóa nên khởi động lại không cần người. Giới hạn: một máy, nên mất phần dữ liệu từ lần sao lưu gần nhất; kho sao lưu
-phải chép ra máy khác, `.env` (khóa kho, khóa két) cất riêng; chưa đo thời gian khôi phục trên dữ liệu lớn.
+dữ liệu → khôi phục → smoke ở mọi pull request. Tự phục hồi: reconciler (mỗi phút một lượt: systemd timer, bản online
+chạy WSL2 dùng cron) dựng lại container bị xóa, chạy lại container đã dừng hay unhealthy, và khi bật GitOps thì đưa cấu
+hình bị sửa tay về đúng commit; két tự mở khóa nên máy Linux có systemd khởi động lại không cần người (bản online
+chạy WSL2: Windows khởi động lại thì cần đăng nhập để bật WSL, Docker, cron). Giới hạn: một máy, nên mất phần dữ
+liệu từ lần sao lưu gần nhất; kho sao lưu phải chép ra máy khác, `.env` (khóa kho, khóa két) cất riêng; chưa đo thời
+gian khôi phục trên dữ liệu lớn.
 
 **Bằng chứng:** [`docs/van-hanh.md`](../van-hanh.md) mục "Sao lưu và khôi phục", "GitOps và tự phục hồi";
 [`docs/trien-khai.md`](../trien-khai.md) §7 (sao lưu hằng đêm); `make demo-tu-phuc-hoi`; CI job `chay-thu`, phần

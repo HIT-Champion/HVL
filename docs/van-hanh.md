@@ -119,9 +119,10 @@ Nói rõ giới hạn:
   `/xac-thuc` ẩn khối mốc neo; `moc audit anchor --to`, `--publish` ghi dòng không chữ ký. Mốc cũ không chữ ký vẫn hợp
   lệ khi kiểm. Nâng cấp xong, `svc-files` ký từ lượt neo kế tiếp, không cần khởi động lại: policy mới áp ngay cho token
   đang dùng.
-- Nâng cấp tay một két cũ, một lần: dừng timer reconciler trước như mục GitOps bên dưới, sao lưu (`python3
-  scripts/moc.py backup create`), rồi từ thư mục mã nguồn của bản đang cài chạy `scripts/nang_cap.sh ket /opt/moc`.
-  Két đã có khóa `moc-anchor` (`/api/verify/anchor-key.pem` trả khóa công khai) thì kịch bản không làm gì. Các bước:
+- Nâng cấp tay một két cũ, một lần: dừng reconciler trước (timer systemd hoặc dòng cron, như mục GitOps bên dưới),
+  sao lưu (`python3 scripts/moc.py backup create`), rồi từ thư mục mã nguồn của bản đang cài chạy
+  `scripts/nang_cap.sh ket /opt/moc`. Két đã có khóa `moc-anchor` (`/api/verify/anchor-key.pem` trả khóa công khai)
+  thì kịch bản không làm gì. Các bước:
   1. Thêm tạm vào cuối `platform/openbao/openbao.hcl` của bản cài một listener chỉ nghe trong container
      (`127.0.0.1:8210`, `disable_unauthed_generate_root_endpoints = false`): bật lại endpoint tạo token root bằng khóa
      phục hồi, OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không dùng
@@ -279,7 +280,8 @@ Nói rõ giới hạn:
 
 `scripts/reconcile.py` đưa hệ thống đang chạy về đúng trạng thái khai trong git, mỗi lượt một lần gọi. Trên máy chủ,
 systemd timer gọi nó mỗi 60 giây (tệp mẫu [`platform/systemd/`](../platform/systemd/), chạy trên máy chủ chứ không trong
-container: không gắn socket Docker vào container nào). Mỗi lượt:
+container: không gắn socket Docker vào container nào); máy không có systemd (WSL2) thì cron của người dùng `moc` gọi
+mỗi phút ([`trien-khai.md`](trien-khai.md) mục 7). Mỗi lượt:
 
 - **Tự phục hồi**: container unhealthy thì khởi động lại; dịch vụ khai trong compose mà mất container hoặc đã dừng
   thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Dịch vụ chạy một lần `keycloak-fonts` (chép phông của
@@ -293,7 +295,9 @@ container: không gắn socket Docker vào container nào). Mỗi lượt:
   Commit áp lỗi thì không thử lại mỗi phút mà đợi commit kế tiếp.
 
 ```bash
-# trên máy chủ, đã make install PREFIX=/opt/moc; người vận hành moc thuộc nhóm docker
+# trên máy chủ, đã make install PREFIX=/opt/moc; người vận hành moc thuộc nhóm docker. Nhánh deploy phải có trên
+# GitHub: repo chưa có thì -b deploy báo lỗi (tạo lần đầu: docs/git_flow.md mục 7)
+sudo install -d -o moc -g moc /opt/moc-src      # reconciler chạy bằng moc, mà moc không tạo được thư mục trong /opt
 git clone -b deploy https://github.com/HIT-Champion/Signet.git /opt/moc-src
 echo "MOC_GITOPS_DIR=/opt/moc-src" >> /opt/moc/.env
 python3 /opt/moc/scripts/reconcile.py          # thử một lượt
@@ -309,7 +313,8 @@ sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl 
   khi lần khôi phục trước dừng giữa chừng (không chạy lại Signet trên dữ liệu dở dang: chạy lại `backup restore`) hoặc
   có dịch vụ đang tạm dừng có chủ ý. Dịch vụ còn tạm dừng từ một lần sao lưu bị giết cứng thì reconciler chạy lại.
 - Bảo trì tay (`docker compose down`, sửa cấu hình thử) thì tắt timer trước: `sudo systemctl stop moc-reconcile.timer`,
-  không thì reconciler dựng lại trong vòng một phút.
+  không thì reconciler dựng lại trong vòng một phút. Chạy reconciler bằng cron thì thêm `#` trước dòng cron (`crontab
+  -e`): `scripts/nang_cap.sh` chỉ tự nhận ra timer systemd đang chạy, không thấy dòng cron.
 - `make smoke` và `make demo-tu-phuc-hoi` gọi `reconcile.py --heal-only`: chỉ tự phục hồi, không kéo commit mới.
 - **Chỉ áp commit đã ký** (nên bật trên máy chủ thật): đặt `MOC_GITOPS_ALLOWED_SIGNERS` là tệp allowed_signers
   liệt kê khóa SSH của người được đẩy nhánh `deploy`. Reconciler `git verify-commit` commit đầu nhánh trước khi dừng
@@ -321,7 +326,8 @@ sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl 
 # không dùng agent thì trỏ tới tệp khóa riêng ~/.ssh/id_ed25519)
 git config --global gpg.format ssh && git config --global user.signingkey ~/.ssh/id_ed25519.pub
 # máy chủ: danh sách khóa được phép (chỉ root sửa được; id_ed25519.pub chép từ máy người đẩy), rồi bật
-sudo install -d /etc/moc && echo "vuong@hvl namespaces=\"git\" $(cat id_ed25519.pub)" | sudo tee /etc/moc/allowed_signers
+sudo install -d /etc/moc && echo "releaser@example namespaces=\"git\" $(cat id_ed25519.pub)" |
+  sudo tee /etc/moc/allowed_signers
 echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
 ```
 
@@ -335,15 +341,21 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
   kiểm bị mất. Commit lỗi không thử lại, đợi commit mới. Đầu ra lần nâng, lùi gần nhất ở `moc-nang-cap.log` trong thư
   mục `.git` của bản sao. Phiên bản ghi vào bản cài (`/api/status`) là thẻ cùng cây với commit `deploy vX.Y.Z`, không
   phải `X.Y.Z-1-g…`. Lượt đầu tiên mà bản đang chạy đúng thẻ ở đầu `deploy` (cây trùng) thì chỉ ghi nhận, không dừng
-  trang để cài lại. Nên bật cùng `MOC_GITOPS_ALLOWED_SIGNERS`.
+  trang để cài lại. Nên bật cùng `MOC_GITOPS_ALLOWED_SIGNERS`. Hạn chế (#491): phần kiểm luôn chạy smoke, mà smoke
+  đăng nhập bằng tài khoản mẫu qua client `moc-cli` (và ghi dữ liệu thử). Máy có dữ liệu thật (không chạy `seed.py`,
+  `MOC_CLI_CLIENT_ENABLED=false`, `trien-khai.md` mục 3) thì mọi lần nâng trượt kiểm rồi tự lùi: hiện chế độ này chỉ
+  dùng được trên máy có dữ liệu mẫu như bản online.
 - **Có bản phát hành là tự nâng** (`MOC_GITOPS_FOLLOW=release`, đặt `MOC_GITOPS_BRANCH=main`): reconciler áp thẻ
   `vX.Y.Z` mới nhất có trên `main` thay cho đầu nhánh. Commit trên `main` chưa gắn thẻ, bản thử `-rc`, thẻ chưa vào
   `main` đều không tự lên. Đặt `MOC_GITOPS_ALLOWED_SIGNERS` thì kiểm chữ ký của thẻ (`git verify-tag`), vì commit gộp
-  trên `main` do GitHub ký OpenPGP: người phát hành gắn thẻ bằng `git tag -s` với khóa SSH trong danh sách. Không đặt
-  thì ai đẩy được thẻ `v*` lên GitHub là đưa được bản lên máy chủ: giới hạn bằng ruleset cho thẻ.
+  trên `main` do GitHub ký OpenPGP: thẻ phải ký bằng khóa SSH trong danh sách (`git tag -s`). Nhưng hiện `make
+  release` (`scripts/release.sh`) gắn thẻ bằng `git tag -a`, không ký, nên đặt biến này thì reconciler không nhận bản
+  phát hành nào gắn bằng lệnh đó, bản cũ chạy tiếp (#492). Không đặt thì ai đẩy được thẻ `v*` lên GitHub là đưa được
+  bản lên máy chủ: giới hạn bằng ruleset cho thẻ.
 
 ```bash
-# bản thật: mỗi bản phát hành trên main tự nâng, có sao lưu, lỗi thì tự lùi
+# bản thật: mỗi bản phát hành trên main tự nâng, có sao lưu, lỗi thì tự lùi (máy dữ liệu thật: chưa được, #491)
+sudo install -d -o moc -g moc /opt/moc-src      # như trên: moc không tạo được thư mục trong /opt
 git clone -b main https://github.com/HIT-Champion/Signet.git /opt/moc-src
 printf '%s\n' MOC_GITOPS_DIR=/opt/moc-src MOC_GITOPS_BRANCH=main MOC_GITOPS_FOLLOW=release \
   MOC_GITOPS_MODE=nang-cap >> /opt/moc/.env
@@ -741,9 +753,9 @@ make logs-down                     # tắt: 9 dịch vụ về json-file, dừng
 - **Xóa hẳn log đã lưu:** sau `make logs-down`, `docker volume rm moc_parseable_data` (`make reset` cũng xóa).
 - **Bản cài** (`make install`): `MOC_EXTRA_PROFILES` có `logs` thì `install.sh` ghi `COMPOSE_FILE` (tệp phủ) vào `.env`
   của bản cài, `docker compose` gõ tay và reconciler đều nạp; `.env` của bản cài phải có `MOC_LOGS_PASSWORD`; chạy
-  `python3 scripts/log_tap_trung.py init` trong thư mục cài một lần để đặt thời gian giữ log. Reconciler chỉ dựng lại
-  profile `core`, `app`: Vector, Parseable tự khởi động lại nhờ `restart: unless-stopped`, không được tự phục hồi khi
-  mất container.
+  `python3 scripts/log_tap_trung.py init` trong thư mục cài một lần để đặt thời gian giữ log. Reconciler đi cùng mọi
+  profile trong `MOC_EXTRA_PROFILES` (mục GitOps, #351), nên Vector, Parseable cũng được tự phục hồi khi mất container
+  hay đã dừng, như các dịch vụ khác.
 - **Kiểm cấu hình** không cần bật, không mạng, chỉ gắn tệp trong repo (CI có thể chạy cùng lệnh):
 
   ```bash

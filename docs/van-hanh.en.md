@@ -140,10 +140,10 @@ The limits, stated plainly:
   `--publish` write unsigned lines. Old unsigned anchors are still valid when checked. Once the vault is upgraded,
   `svc-files` signs from the next anchoring round, without a restart: the new policy applies at once to the token in
   use.
-- Upgrading an old vault by hand, once: first stop the reconciler timer as in the GitOps section below, take a backup
-  (`python3 scripts/moc.py backup create`), then from the source folder of the installed version run
-  `scripts/nang_cap.sh ket /opt/moc`. If the vault already has the `moc-anchor` key (`/api/verify/anchor-key.pem`
-  returns the public key), the script does nothing. The steps:
+- Upgrading an old vault by hand, once: first stop the reconciler (systemd timer or cron line, as in the GitOps
+  section below), take a backup (`python3 scripts/moc.py backup create`), then from the source folder of the installed
+  version run `scripts/nang_cap.sh ket /opt/moc`. If the vault already has the `moc-anchor` key
+  (`/api/verify/anchor-key.pem` returns the public key), the script does nothing. The steps:
   1. Temporarily add, at the end of the installation's `platform/openbao/openbao.hcl`, a listener that listens only
      inside the container (`127.0.0.1:8210`, `disable_unauthed_generate_root_endpoints = false`): this turns back on
      the endpoint that creates a root token from the recovery key, which OpenBao turns off by default since 2.5.3; the
@@ -323,7 +323,8 @@ The limits, stated plainly:
 
 `scripts/reconcile.py` brings the running system back to the state declared in git, one round per call. On the
 server, a systemd timer calls it every 60 seconds (sample files in [`platform/systemd/`](../platform/systemd/); it runs
-on the server, not in a container: no container gets the Docker socket mounted). Each round:
+on the server, not in a container: no container gets the Docker socket mounted); on a machine without systemd (WSL2),
+the `moc` user's cron calls it every minute ([`trien-khai.md`](trien-khai.md) section 7). Each round:
 
 - **Self-healing**: an unhealthy container is restarted; a service declared in compose whose container is missing or
   stopped is brought up again (`docker compose up -d` for exactly those services). The one-off service
@@ -338,7 +339,9 @@ on the server, not in a container: no container gets the Docker socket mounted).
   running before. A commit that fails to apply is not retried every minute; the reconciler waits for the next commit.
 
 ```bash
-# on the server, after make install PREFIX=/opt/moc; the moc operator user is in the docker group
+# on the server, after make install PREFIX=/opt/moc; the moc operator user is in the docker group. The deploy branch
+# must exist on GitHub: the repo has none yet, so -b deploy fails until it is created (docs/git_flow.md section 7)
+sudo install -d -o moc -g moc /opt/moc-src      # the reconciler runs as moc, and moc cannot create folders in /opt
 git clone -b deploy https://github.com/HIT-Champion/Signet.git /opt/moc-src
 echo "MOC_GITOPS_DIR=/opt/moc-src" >> /opt/moc/.env
 python3 /opt/moc/scripts/reconcile.py          # try one round
@@ -355,7 +358,9 @@ sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl 
   again), or when a service is paused on purpose. A service still paused by a backup that was killed hard is started
   again by the reconciler.
 - For manual maintenance (`docker compose down`, trying a configuration change), stop the timer first: `sudo systemctl
-  stop moc-reconcile.timer`, otherwise the reconciler brings everything back within a minute.
+  stop moc-reconcile.timer`, otherwise the reconciler brings everything back within a minute. When the reconciler runs
+  from cron, put `#` in front of the cron line (`crontab -e`): `scripts/nang_cap.sh` only detects a running systemd
+  timer, not a cron line.
 - `make smoke` and `make demo-tu-phuc-hoi` call `reconcile.py --heal-only`: self-healing only, no new commits pulled.
 - **Apply signed commits only** (recommended on a real server): set `MOC_GITOPS_ALLOWED_SIGNERS` to an
   allowed_signers file listing the SSH keys of the people allowed to push the `deploy` branch. The reconciler runs
@@ -369,7 +374,7 @@ sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl 
 # is in ssh-agent; without an agent, point to the private key file ~/.ssh/id_ed25519)
 git config --global gpg.format ssh && git config --global user.signingkey ~/.ssh/id_ed25519.pub
 # server: the list of allowed keys (only root can edit it; id_ed25519.pub copied from the pusher's machine), then enable
-sudo install -d /etc/moc && echo "vuong@hvl namespaces=\"git\" $(cat id_ed25519.pub)" |
+sudo install -d /etc/moc && echo "releaser@example namespaces=\"git\" $(cat id_ed25519.pub)" |
   sudo tee /etc/moc/allowed_signers
 echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
 ```
@@ -388,15 +393,22 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
   the installation (`/api/status`) is the tag whose tree matches the `deploy vX.Y.Z` commit, not `X.Y.Z-1-g…`. On the
   first run, when the running installation already matches the tag at the head of `deploy` (same tree), the reconciler
   only records it and does not stop the site to reinstall. Enable it together with `MOC_GITOPS_ALLOWED_SIGNERS`.
+  Limitation (#491): the checks always run smoke, and smoke signs in with the sample accounts through the `moc-cli`
+  client (and writes test data). On a machine with real data (`seed.py` not run, `MOC_CLI_CLIENT_ENABLED=false`,
+  `trien-khai.md` section 3) every upgrade fails its checks and rolls back: for now this mode only works on a machine
+  with sample data, like the online site.
 - **Every release upgrades production** (`MOC_GITOPS_FOLLOW=release` with `MOC_GITOPS_BRANCH=main`): the reconciler
   applies the newest `vX.Y.Z` tag reachable from `main` instead of the branch head. Untagged commits on `main`, `-rc`
   tags and tags not yet on `main` are never applied. With `MOC_GITOPS_ALLOWED_SIGNERS` set, the tag's signature is
-  checked (`git verify-tag`), because merge commits on `main` carry GitHub's OpenPGP signature: the releaser tags with
-  `git tag -s` using an SSH key on the list. Without it, anyone who can push a `v*` tag to GitHub can put a version on
-  the server: restrict that with a ruleset on tags.
+  checked (`git verify-tag`), because merge commits on `main` carry GitHub's OpenPGP signature: the tag must be signed
+  with an SSH key on the list (`git tag -s`). But `make release` (`scripts/release.sh`) currently tags with
+  `git tag -a`, unsigned, so with this variable set the reconciler accepts no release tagged by that command and the
+  old version keeps running (#492). Without it, anyone who can push a `v*` tag to GitHub can put a version on the
+  server: restrict that with a ruleset on tags.
 
 ```bash
-# production: every release on main upgrades the site, with a backup and automatic rollback
+# production: every release on main upgrades the site, with a backup and automatic rollback (real data: not yet, #491)
+sudo install -d -o moc -g moc /opt/moc-src      # as above: moc cannot create folders in /opt
 git clone -b main https://github.com/HIT-Champion/Signet.git /opt/moc-src
 printf '%s\n' MOC_GITOPS_DIR=/opt/moc-src MOC_GITOPS_BRANCH=main MOC_GITOPS_FOLLOW=release \
   MOC_GITOPS_MODE=nang-cap >> /opt/moc/.env
@@ -836,8 +848,8 @@ make logs-down                     # off: 9 services back to json-file, stops Ve
 - **Installation** (`make install`): if `MOC_EXTRA_PROFILES` has `logs`, `install.sh` writes `COMPOSE_FILE` (the
   override file) into the installation's `.env`, so both `docker compose` typed by hand and the reconciler load it; the
   installation's `.env` must have `MOC_LOGS_PASSWORD`; run `python3 scripts/log_tap_trung.py init` in the install folder
-  once to set the log retention. The reconciler only brings back the `core` and `app` profiles: Vector and Parseable
-  restart by themselves thanks to `restart: unless-stopped`, but are not self-healed when their container is lost.
+  once to set the log retention. The reconciler goes with every profile in `MOC_EXTRA_PROFILES` (GitOps section, #351),
+  so Vector and Parseable are self-healed too when their container is lost or stopped, like the other services.
 - **Checking the configuration** needs nothing turned on and no network, only the repository's files mounted (CI can
   run the same commands):
 

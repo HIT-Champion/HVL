@@ -12,9 +12,12 @@ Ba nguyên tắc chung:
 
 - **AI gợi ý, người quyết định.** Không tác tử nào tự tạo văn bản, tự giao việc hay trả lời thay người: văn thư đối
   chiếu rồi tự lưu form, lãnh đạo tự bấm giao, câu trả lời của mô hình luôn đi kèm câu trích nguyên văn và nguồn.
-- **Chạy tại chỗ, không có mô hình vẫn chạy.** Mô hình chạy trong Ollama trên máy của tổ chức, mạng nội bộ không ra
-  Internet. Không bật profile `ai` (mặc định, cả CI) thì cả bốn phần vẫn chạy bằng quy tắc, OCR và tìm kiếm toàn văn;
-  cột "không bật `ai`" trong các bảng dưới đây là đường đó.
+- **Chạy tại chỗ theo mặc định, không có mô hình vẫn chạy.** Mặc định mô hình chạy trong Ollama trên máy của tổ
+  chức, mạng nội bộ không ra Internet. Tùy chọn `MOC_ASK_API=openai` (#430, xem `.env.example`) cho riêng bước viết
+  câu trả lời của F4.2 gọi một máy chủ chuẩn OpenAI ở `MOC_ASK_API_URL`: câu hỏi và tối đa 4 đoạn căn cứ, đã che
+  thông tin cá nhân, rời máy chủ tới đó; tìm theo nghĩa và trích yếu vẫn ở Ollama. Không bật profile `ai` (mặc định,
+  cả CI) thì cả bốn phần vẫn chạy bằng quy tắc, OCR và tìm kiếm toàn văn; cột "không bật `ai`" trong các bảng dưới
+  đây là đường đó.
 - **Số đo là cổng CI.** Mỗi lệnh `make do-…` thoát 1 khi dưới ngưỡng hoặc khi có rò rỉ (nguồn bị cấm, căn cứ là văn
   bản hạn chế, che nhầm). `do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec` là bước của CI job `chay-thu`, phần `ai`
   (`.github/workflows/ci.yml`; phần này mang tên nhóm tác tử AI, CI không bật profile `ai`); `do-che-pii` chạy trong
@@ -61,10 +64,11 @@ không dùng".
 - **Máy đo.**
   - *Máy A* — máy dev của đội: AMD Ryzen 7 7735HS, 16 luồng (số đo trong README dịch vụ và các lần đo không cần
     Docker ngày 23/10/2026: Python 3.14.6 qua `uv`, pypdf 6.21.1).
-  - *Máy B* — laptop chạy bản online của đội: Intel Core i5-12500H, 16 luồng, 15 GiB RAM; Ollama 0.35.1 giới hạn
-    8 lõi và 6 GB (`MOC_AI_CPUS=8`, `MOC_AI_MEM_LIMIT`), mô hình `qwen3:1.7b` + `qwen3-embedding:0.6b`.
-- **Nguồn** ghi ở từng bảng: README dịch vụ, `CHANGELOG.md`, hoặc nhật ký của lần chạy (nhật ký không nằm trong repo —
-  chạy lại đúng lệnh ghi kèm là ra bảng cùng dạng).
+  - *Máy B* — laptop của đội chạy bản online tới 31/10/2026 (từ đó bản online chạy trên một máy Windows qua WSL2,
+    chưa đo lại): Intel Core i5-12500H, 16 luồng, 15 GiB RAM; Ollama 0.35.1 giới hạn 8 lõi và 6 GB
+    (`MOC_AI_CPUS=8`, `MOC_AI_MEM_LIMIT`), mô hình `qwen3:1.7b` + `qwen3-embedding:0.6b`.
+- **Nguồn** ghi ở từng bảng: README dịch vụ, `CHANGELOG.md` ở một commit cũ, hoặc nhật ký của lần chạy (nhật ký không
+  nằm trong repo — chạy lại đúng lệnh ghi kèm là ra bảng cùng dạng).
 - **Số của CI.** Ba lần chạy xanh trên `develop` ngày 26/10/2026, CI job `chay-thu`, phần `ai`, máy chạy
   `ubuntu-24.04` của GitHub (không phải máy A, B), **không bật mô hình ngôn ngữ** (không có cả mô hình nhúng): run
   40273958769 tại `034fcf0`, 40275440368 tại `1799525`, 40277791744 tại `9498628`. Số trùng nhau ở cả ba lần thì ghi
@@ -341,7 +345,7 @@ mồi) hoặc top-1 dưới 60 % (`none`, `failed` tính là sai).
 
 **Kết quả.**
 
-| | `CHANGELOG.md` mục [1.0.0] | Lần chạy trình tự job CI, 22/10/2026, máy A, không bật `ai` | 26/10/2026 · CI, 3 lần · không bật `ai` |
+| | `CHANGELOG.md` mục [1.0.0] ở commit d7b4def | Lần chạy trình tự job CI, 22/10/2026, máy A, không bật `ai` | 26/10/2026 · CI, 3 lần · không bật `ai` |
 |---|---|---|---|
 | top-1 | 29 / 29 | 29 / 29 | 29 / 29 |
 | Gốc so sánh "luôn đoán đơn vị đông nhất" | 55 % | 55 % | 55 % |
@@ -353,7 +357,9 @@ mồi) hoặc top-1 dưới 60 % (`none`, `failed` tính là sai).
 | Lượt tìm theo nghĩa | — | 0 / 29 | 0 / 29 |
 | Căn cứ là văn bản hạn chế | — | 0 | 0 |
 
-`CHANGELOG.md` không ghi ngày và máy của lần đo; cột thứ hai là nhật ký của lần chạy ngày 22/10 (không nằm trong repo).
+Cột đầu lấy từ `CHANGELOG.md` mục [1.0.0] ở commit d7b4def (`git show d7b4def:CHANGELOG.md`; số thêm vào ở 58a4b39),
+commit cuối trước khi #348 rút gọn CHANGELOG: bản hiện tại không còn các số này. Mục đó không ghi ngày và máy của lần
+đo; cột thứ hai là nhật ký của lần chạy ngày 22/10 (không nằm trong repo).
 Cột thứ ba là bước `make do-giao-viec` của 3 run ở mục "Cách đọc số đo": mọi số trừ độ trễ và số văn bản của dòng thật
 trùng nhau ở cả ba lần, ổn định qua 3 lần. So với lần 22/10, sai số hạn giảm từ 1,3 xuống 0,9 ngày, lệch ≤ 1 ngày tăng
 từ 20 lên 23 / 29, cả 29 gợi ý mang độ tin cậy cao: **chưa rõ nguyên nhân**. Mã bỏ phiếu (`suggest.py`, `advisor.py`)
@@ -457,3 +463,4 @@ PostgreSQL, Keycloak, Meilisearch, Ollama không qua bộ lọc. Danh sách đ�
 | Tác tử có danh tính riêng, chỉ ghi được ba loại dòng sổ; người ghi và thuê ước ép từ phiên, gửi lên bị từ chối | `db/metadata/databases/default/tables/core_audit_log.yaml` |
 | Không có mô hình vẫn chạy đủ; svc-files dò Ollama mỗi 60 giây, bật / tắt profile không phải khởi động lại | `docread/summarize.py`, `assist/ai.py` |
 | Mọi mô hình chỉ nhận chữ của văn bản không hạn chế, đã che thông tin cá nhân | các mục F4.1–F4.4 ở trên |
+| Mặc định không chữ nào gửi mô hình rời máy chủ. Chỉ khi đặt `MOC_ASK_API=openai` (#430): bước viết câu trả lời F4.2 gửi câu hỏi và tối đa 4 đoạn căn cứ, đã che, tới máy chủ chuẩn OpenAI ở `MOC_ASK_API_URL`; khóa API nằm trong két | `.env.example`, `svc_files/config.py`, `assist/ai.py`, `assist/grounding.py` (`MAX_SOURCES`) |

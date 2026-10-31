@@ -138,7 +138,8 @@ make do-so-lieu-sau           # in bảng bốn chỉ số, ghi out/so-lieu-sau.
 
 Lệnh thoát 1 khi không đủ 5 văn bản đến có số ký hiệu để tìm, hoặc một lần tìm không thấy văn bản cần tìm trong 20 kết
 quả đầu; JSON vẫn được ghi trước khi thoát. Thiếu dữ liệu cho (a), (b) không phải lỗi, chỉ in "chưa có dữ liệu".
-Chưa có bước CI chạy lệnh này. Các khóa của `out/so-lieu-sau.json`:
+CI chạy lệnh này trên dữ liệu mẫu (phần `ai` của job `chay-thu`, sau màn giao việc), chỉ để kiểm lệnh chạy được: số
+đó không phải số đo (đầu tệp). Các khóa của `out/so-lieu-sau.json`:
 
 | Khóa | Nội dung |
 |---|---|
