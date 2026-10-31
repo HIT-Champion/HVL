@@ -96,14 +96,14 @@ của ba câu, đúng mức đã kiểm:
 
 | Câu hỏi | Hiện trạng | Nguồn |
 |---|---|---|
-| 1. Máy 8 GB | Khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình; **chưa chạy thử trên máy 8 GB thật** (chi tiết dưới bảng) | README mục "Yêu cầu hệ thống"; [`trien-khai.md`](trien-khai.md) §1, §7, §8; [`du-thi/hoi-dap-hoi-dong.md`](du-thi/hoi-dap-hoi-dong.md) §9 |
+| 1. Máy 8 GB | Khoảng 4,6 GiB RAM khi chạy bản 1.3.0, chưa bật mô hình; **chưa chạy thử trên máy 8 GB thật** (chi tiết dưới bảng) | README mục "Yêu cầu hệ thống"; [`trien-khai.md`](trien-khai.md) §1, §7, §8; [`du-thi/hoi-dap-hoi-dong.md`](du-thi/hoi-dap-hoi-dong.md) §9 |
 | 2. Cài dưới một giờ | **Chưa đo** với người ngoài đội trên máy sạch | `ROADMAP.md`, giai đoạn 5 |
 | 3. Không dịch vụ trả phí bắt buộc | Đạt | [`trien-khai.md`](trien-khai.md) §5, §5b |
 
-- **Câu 1.** `make up` bật profile `core` và `app` (19 dịch vụ, 18 chạy liên tục). README ghi khoảng 3,2 GB (đo từ trước
-  khi thêm `app-ca-nhan`, `app-tai-lieu-api`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB
-  đĩa. Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
-  cần máy 16 GB.
+- **Câu 1.** `make up` bật profile `core` và `app` (19 dịch vụ, 18 chạy liên tục). Đo bằng `docker stats` trên bản
+  online 1.3.0 ngày 31/10/2026: khoảng 4,6 GiB, chưa bật mô hình; số đo cũ 3,2–3,5 GB lấy từ trước khi thêm vài dịch
+  vụ. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa. Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch
+  vụ `ollama` trong `docker-compose.yml`) thêm khoảng 3,2 GiB khi đã nạp hai mô hình mặc định, cần máy 16 GB.
 - **Câu 2.** Cài từ mã nguồn bằng `make env`, `make up`, `make seed`; `make install PREFIX=…` cài ra ngoài thư mục mã
   nguồn (F1.8).
 - **Câu 3.** Mô hình chạy tại chỗ; Cloudflare Tunnel chỉ là một cách lên mạng (profile `tunnel`, tắt mặc định), máy có

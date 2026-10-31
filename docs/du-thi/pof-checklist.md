@@ -10,7 +10,8 @@ khi đã chạy lệnh kiểm tra và thấy kết quả sạch.
 **Lần kiểm gần nhất:** 26/10/2026, trên `develop` 62bff8d; riêng ô "Không phát hành kèm gói" kiểm lại trên
 399d8af. Ô ✅ đã kiểm bằng lệnh, CI hay trang GitHub ghi ở cột Bằng chứng; CI của 62bff8d xanh cả 14 job:
 <https://github.com/HIT-Champion/Signet/actions/runs/40315747559>. Ô ☐ chưa đạt, ghi lý do và issue. Số commit, PR,
-issue là số lúc kiểm. Mục "Rà soát cuối cùng" làm lại trên bản phát hành cuối, trước 17:00 06/12/2026.
+issue là số lúc kiểm. Ngày 31/10/2026, sau khi gắn thẻ v1.3.0 (b2ec73d), kiểm lại ô `reuse lint` và các ô phát hành;
+ô khác giữ kết quả 26/10. Mục "Rà soát cuối cùng" làm lại trên bản phát hành cuối, trước 17:00 06/12/2026.
 
 ---
 
@@ -38,7 +39,7 @@ git shortlog -sn                                            # đóng góp có nh
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
 | ✅ | Giấy phép được OSI phê duyệt | `LICENSE` — Apache-2.0; GitHub nhận đúng Apache-2.0 (`gh api repos/HIT-Champion/Signet/license`) | điều kiện loại trừ |
-| ✅ | Ghi giấy phép trong **từng tệp mã** | Header Apache-2.0 đầu mỗi tệp; tệp không chèn được header (JSON, ảnh, PDF, tài liệu) khai trong `REUSE.toml`. `./scripts/license-header.sh check` sạch; `reuse lint` (5.0.2): 753/753 tệp có bản quyền và giấy phép, đạt REUSE 3.3 | −5 |
+| ✅ | Ghi giấy phép trong **từng tệp mã** | Header Apache-2.0 đầu mỗi tệp; tệp không chèn được header (JSON, ảnh, PDF, tài liệu) khai trong `REUSE.toml`. `./scripts/license-header.sh check` sạch; `reuse lint` (5.0.2): 967/967 tệp có bản quyền và giấy phép, đạt REUSE 3.3 | −5 |
 | ✅ | Không xung đột giấy phép giữa các thành phần | `DEPENDENCIES.md`, mục kiểm tra tương thích; `make license-audit` kiểm mọi gói kể cả gói gián tiếp trong SBOM, ngoại lệ có lý do ở `.github/license-exceptions.json`; CI chạy trên mọi PR, xanh ở job "Giấy phép" của 62bff8d | −5 |
 | ✅ | Có thông báo về **mục đích** của giấy phép | `NOTICE`, mục "Mục đích của giấy phép" | −5 |
 | ✅ | Có **bản sao toàn văn** giấy phép | `LICENSE` (11 KB, toàn văn Apache-2.0) | −5 |
@@ -58,7 +59,7 @@ head -3 LICENSE        # xác nhận là toàn văn, không phải link
 |---|---|---|---|
 | ✅ | Có ≥ 1 release **trước thời điểm nộp bài** | Trang Releases của repo: 6 bản v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1, v1.3.0 | −5 |
 | ✅ | Phát hành **theo phiên bản** (SemVer) | Thẻ `v0.1.0`, `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.3.0`; `CHANGELOG.md` theo SemVer 2.0.0 | −3 |
-| ✅ | Dùng **định dạng mở** cho gói phát hành | `.tar.gz` — **tuyệt đối không** `.zip`, `.rar`, `.arj`. Mỗi bản kèm gói `.tar.gz` tự sinh và `.sha256`, không tải lên gói nén nào khác; v1.1.0 thêm SBOM `.cdx.json` | −3 |
+| ✅ | Dùng **định dạng mở** cho gói phát hành | `.tar.gz` — **tuyệt đối không** `.zip`, `.rar`, `.arj`. Mỗi bản kèm gói `.tar.gz` tự sinh và `.sha256`, không tải lên gói nén nào khác; từ v1.1.0 mỗi bản còn kèm SBOM `.cdx.json` và `.sha256` của nó | −3 |
 
 > ⚠️ GitHub **tự động** đính kèm cả `Source code (zip)` và `Source code (tar.gz)` vào mỗi release.
 > Không xóa được phần tự động này, nên phải **chủ động tải lên gói `.tar.gz` do mình sinh ra**

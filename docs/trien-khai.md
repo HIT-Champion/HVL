@@ -27,7 +27,7 @@ bước 6.
 
 | Thứ cần | Tối thiểu | Ghi chú |
 |---|---|---|
-| Máy chủ | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 40 GB đĩa | Cả hệ thống dùng khoảng 3,5 GB RAM khi chạy (đo lúc diễn tập, chưa bật mô hình); các image khoảng 2,3 GB, lúc dựng cần thêm chỗ cho image nền và bộ đệm. Bật mô hình ngôn ngữ (profile `ai`, F4.1–F4.2) thì cần 16 GB |
+| Máy chủ | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 40 GB đĩa | Profile mặc định dùng khoảng 4,6 GiB RAM khi chạy (đo bản 1.3.0 bằng `docker stats` ngày 31/10/2026, chưa bật mô hình); các image khoảng 2,3 GB, lúc dựng cần thêm chỗ cho image nền và bộ đệm. Bật mô hình ngôn ngữ (profile `ai`, F4.1–F4.2) thì Ollama thêm khoảng 3,2 GiB, cần 16 GB |
 | Tên miền | một bản ghi A trỏ về IP máy chủ | vd `moc.example.vn`; có IPv6 thì thêm bản ghi AAAA. Let's Encrypt cần cổng 80 và 443 mở. Cloudflare Tunnel (mục 5b): không cần IP công khai, tên miền dùng nameserver của Cloudflare |
 | Tài khoản | SSH vào được, có `sudo` | Các bước cài phần nền cần `sudo`; Signet chạy bằng người dùng `moc` |
 

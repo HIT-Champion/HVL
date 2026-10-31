@@ -144,7 +144,12 @@ tương ứng.
 **Ghi chú:**
 
 - Hasura: **bắt buộc dùng thẻ `-ce`**. Thẻ không có hậu tố `-ce` chứa thành phần Enterprise độc quyền.
-- Meilisearch: chỉ dùng `getmeili/meilisearch` (MIT). Bản enterprise mang giấy phép BUSL-1.1.
+- Meilisearch: chỉ dùng `getmeili/meilisearch`, bản community (MIT). Từ khi có Enterprise Edition, kho nguồn ghi
+  `SPDX-License-Identifier: MIT AND BUSL-1.1`: phần BUSL-1.1 là các module `enterprise_edition`, chỉ biên dịch khi bật
+  feature `enterprise` (`#[cfg(feature = "enterprise")]` trong `crates/meilisearch-types/src/lib.rs` và
+  `crates/index-scheduler/src/scheduler/mod.rs`). Workflow `publish-docker-images.yml` của v1.54.3 dựng
+  `getmeili/meilisearch` với edition `community`, không thêm `--features enterprise`; bản có cờ đó đăng riêng thành
+  `getmeili/meilisearch-enterprise`, Signet không dùng. Kiểm 31/10/2026.
 - Centrifugo: chỉ dùng bản mã nguồn mở. Bản PRO là phần mềm thương mại.
 - Flowable: từ bản 7 chỉ còn bản REST, không có giao diện — phù hợp yêu cầu "lõi không giao diện".
 
@@ -302,6 +307,10 @@ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục
 **Ghi chú:**
 
 - Grafana: chỉ dùng `grafana/grafana` (AGPL-3.0). `grafana/grafana-enterprise` là bản độc quyền.
+- Scorpio Broker: compose ghim `java-6.0.2`; thẻ này chỉ có trên Docker Hub (03/07/2026), GitHub chưa có thẻ tương ứng,
+  nên giấy phép đối chiếu với nhánh `development-quarkus`, nơi phát triển dòng 6.x: BSD-3-Clause ở bản phát hành 6.0.1
+  (commit `5967583`) và ở đầu nhánh lúc kiểm 31/10/2026. Nhánh `master` cũ (mã 2019) còn BSD-4-Clause, có điều khoản
+  quảng cáo, không thuộc danh sách OSI; Signet không dùng mã nhánh đó. Profile `iot` tắt mặc định.
 - Parseable: bản 3.x chỉ phát hành trên Quay (`quay.io/parseablehq/parseable`); `parseable/parseable` trên Docker Hub
   dừng ở 2.8.0 (29/05/2026).
 - Marquez: bản phát hành gần nhất là 0.51.1 (03/2025), mã nguồn vẫn có commit năm 2026 nhưng nhịp chậm.
@@ -457,5 +466,7 @@ demo của đội, hoặc là lựa chọn của đơn vị cài đặt:
 - **API viết câu trả lời chuẩn OpenAI (#430):** tắt mặc định. Giao thức mở, đích có thể là máy chủ nguồn mở của đơn vị
   (vLLM Apache-2.0, llama.cpp MIT); gửi tới dịch vụ đám mây là quyết định của đơn vị, và chỉ câu hỏi cùng các đoạn căn
   cứ đã che thông tin cá nhân rời máy ([`docs/van-hanh.md`](docs/van-hanh.md), mục Trợ lý hỏi đáp qua API ngoài).
+  Khi bật, tên, phiên bản và giấy phép của mô hình phía đích do đơn vị chọn và tự chịu trách nhiệm; bản dự thi giữ
+  mặc định, dùng Ollama tại chỗ.
 - **Nơi tải về:** image từ Docker Hub, Quay.io; trọng số mô hình từ thư viện của Ollama, nguồn gốc là Hugging Face (mục
   Trí tuệ nhân tạo).
