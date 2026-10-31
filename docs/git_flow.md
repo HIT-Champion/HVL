@@ -47,7 +47,7 @@ hành (chuyển mục CHANGELOG) làm bằng một PR vào `develop`, rồi PR t
 |---|---|---|---|
 | `develop` | **Nhánh mặc định**: mã mới nhất, **luôn chạy được** | Không ai push trực tiếp | Squash merge từ PR |
 | `main` | Chỉ các bản đã phát hành; mỗi commit gộp trên `main` mang một thẻ | Không ai push trực tiếp | Merge commit từ PR phát hành (mục 6) |
-| `deploy` | Cho máy chủ bật reconciler GitOps: đúng phiên bản máy đó chạy. Chưa tạo, vì bản online của đội nâng bằng gói (mục 7) | Backend | Theo thẻ phát hành (mục 7) |
+| `deploy` | Cho máy chủ bật reconciler GitOps theo nhánh: đúng phiên bản máy đó chạy. Chưa tạo, vì bản online của đội theo thẻ phát hành trên `main` (mục 7) | Backend | Theo thẻ phát hành (mục 7) |
 | `<loại>/<issue>-<mô-tả>` | Nhánh làm việc tách từ `develop`, sống **≤ 3 ngày** | Người làm issue | Commit, push thoải mái |
 | `hotfix/X.Y.Z` | Sửa gấp một lỗi của bản đã phát hành, tách từ `main` | Người sửa | PR vào `main`, rồi gộp ngược vào `develop` |
 | Thẻ `vX.Y.Z` | Bản phát hành, gắn trên `main` | Backend | `make release` (mục 6); không sửa, không xóa được |
@@ -383,12 +383,19 @@ gh pr create --base develop --title "chore(release): gộp ngược v1.1.1 vào 
 
 ## 7. Đưa lên server (nhánh `deploy`)
 
-Có hai cách. Bản online của đội (signet.htechcs.com) dùng cách thứ nhất: tải gói của thẻ trên trang Release rồi chạy
-`scripts/nang_cap.sh nang` (`trien-khai.md` mục 7). Cách này sao lưu trước, kiểm sau khi nâng và lùi về được. Máy đó
-không bật reconciler nên repo chưa có nhánh `deploy`.
+Có ba cách, cách nào cũng đi qua `scripts/nang_cap.sh nang` hoặc `install.sh` của đúng thẻ:
 
-Cách thứ hai dành cho máy chủ bật reconciler GitOps (`van-hanh.md` mục GitOps): reconciler kéo nhánh `deploy` mỗi 60
-giây. Chỉ Backend (@Vanvuong2005827) đẩy nhánh này.
+1. **Theo thẻ phát hành** — bản online của đội (signet.htechcs.com) dùng cách này từ 31/10 (#344). Reconciler chạy mỗi
+   phút bằng cron của người dùng `moc` (máy Windows qua WSL2 không có systemd, `trien-khai.md` mục 7), đặt
+   `MOC_GITOPS_BRANCH=main`, `MOC_GITOPS_FOLLOW=release`, `MOC_GITOPS_MODE=nang-cap`. Thẻ `vX.Y.Z` mới trên `main` là
+   bản online tự nâng: sao lưu, nâng, kiểm (có smoke), lỗi sau khi sao lưu thì tự lùi về bản trước (`van-hanh.md` mục
+   GitOps). Người phát hành không làm gì thêm sau khi đẩy thẻ; job "Kiểm bản online qua HTTPS" sau Release kiểm lại từ
+   bên ngoài. Smoke tạo văn bản thử trên bản online ở mỗi lần nâng. Bảo trì tay thì tắt dòng cron trước (`crontab -e`,
+   thêm `#`).
+2. **Nâng tay** — tải gói của thẻ trên trang Release rồi chạy `scripts/nang_cap.sh nang` (`trien-khai.md` mục 7): sao
+   lưu trước, kiểm sau khi nâng, lùi về được. Bản online dùng cách này tới `v1.4.0`.
+3. **Nhánh `deploy`** — cho máy chủ bật reconciler GitOps theo nhánh (`van-hanh.md` mục GitOps): reconciler kéo nhánh
+   `deploy` mỗi 60 giây. Chỉ Backend (@Vanvuong2005827) đẩy nhánh này. Repo chưa có nhánh `deploy`.
 
 ```bash
 git fetch origin
