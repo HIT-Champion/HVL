@@ -177,6 +177,7 @@ flowchart LR
   GW -->|"/ca-nhan, /ca-nhan/*"| CN
   GW -->|"/tai-lieu-api, /tai-lieu-api/*"| TL
   GW -->|"/bang-tin/*, /nghi-phep/* — route thêm lúc cài"| APP
+  GW -->|"/lich-giang/* — route thêm lúc cài"| T3
   APP -->|"token, GraphQL: chỉ qua cổng"| GW
   T3 -->|"token: chỉ qua cổng, API quy trình chung"| GW
   GW -.->|"/tu-dong, /tu-dong/* · WebSocket"| NR
