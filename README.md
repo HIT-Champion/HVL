@@ -2,7 +2,7 @@
 
 ![Signet — Văn phòng điện tử nguồn mở, tự triển khai, tự chủ dữ liệu](docs/anh/signet-banner.png)
 
-**English:** [README.en.md](README.en.md)
+🇻🇳 **Tiếng Việt** | 🇬🇧 [English](README.en.md)
 
 > **Lõi nền tảng nguồn mở, tự cài, đóng dấu tin cậy lên mọi thứ đi qua nó** — kèm ứng dụng đầu tiên chạy trên lõi:
 > **Văn phòng điện tử** quản lý văn bản đến, văn bản đi theo Nghị định 30/2020/NĐ-CP.
