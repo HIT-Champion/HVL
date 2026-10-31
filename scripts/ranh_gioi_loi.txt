@@ -1,0 +1,58 @@
+# Cạnh lõi → Văn phòng điện tử đã biết (docs/architecture.md §4.4), do scripts/ranh_gioi_loi.py tìm ra.
+# Test scripts/tests/test_ranh_gioi_loi.py so danh sách này với mã: cạnh mới thì đỏ, cạnh đã gỡ mà còn dòng thì đỏ.
+# Gỡ được một chỗ dính thì xóa dòng của nó trong cùng PR; không thêm dòng mới trừ khi PR nói rõ vì sao chưa tránh được.
+# Nhóm theo thứ tự tách dự kiến (§4.7 bước 3, #324), mỗi nhóm một hoặc vài PR nhỏ.
+
+# 1. Import: app.py, config.py của hai dịch vụ dựng phần Văn phòng ngay cả khi MOC_OFFICE_ENABLED=false.
+import svc_files/app.py -> svc_files/office/
+import svc_files/app.py -> svc_files/office/hasura.py
+import svc_workflow/app.py -> svc_workflow/files.py
+import svc_workflow/app.py -> svc_workflow/office/api.py
+import svc_workflow/app.py -> svc_workflow/ot.py
+import svc_workflow/config.py -> svc_workflow/sla.py
+import svc_workflow/config.py -> svc_workflow/suggest.py
+
+# 2. CSDL: hàm của core đọc bảng office; trigger nối hai schema; cột in văn bản đi nằm trên core.tenants.
+csdl ham core.app_events_publish -> office.documents
+csdl ham core.audit_overview -> office.case_file_documents
+csdl ham core.audit_overview -> office.case_files
+csdl ham core.file_texts_skip_restricted -> office.document_files
+csdl ham core.file_texts_skip_restricted -> office.documents
+csdl trigger office.document_events -> core.app_events_publish
+csdl cot core.tenants.head_title <- 1792281600500_outgoing
+csdl cot core.tenants.parent_name <- 1792281600500_outgoing
+csdl cot core.tenants.place_name <- 1792281600500_outgoing
+# Che nội dung văn bản hạn chế trong thông báo: phải còn tác dụng sau mọi bước tách (mặc định từ chối).
+csdl trigger core.notifications -> office.notifications_restricted
+
+# 3. Metadata và quyền tệp: bộ lọc quyền của core.files đi qua office.document_files; sổ kiểm toán lọc bằng hàm office.
+metadata core_files.yaml -> office.document_files
+metadata core_audit_log.yaml -> office.audit_log_visible
+metadata core_audit_log.yaml -> office.audit_overview_seen
+metadata core_audit_log.yaml -> office.documents
+
+# 4. Vai trò: bốn vai trò văn thư viết cứng trong CSDL, quyền Hasura của bảng core và mã dùng chung.
+csdl rang-buoc core.users.role -> clerk,director,manager,staff
+vai-tro core_app_catalog.yaml -> clerk,director,manager,staff
+vai-tro core_audit_anchors.yaml -> director
+vai-tro core_audit_log.yaml -> director
+vai-tro core_files.yaml -> clerk,director,manager,staff
+vai-tro core_lineage_events.yaml -> clerk,director
+vai-tro core_notifications.yaml -> clerk,director,manager,staff
+vai-tro core_tenants.yaml -> clerk,director,manager,staff
+vai-tro core_users.yaml -> clerk,director,manager,staff
+vai-tro svc_files/assist/scope.py -> clerk,director,manager,staff
+vai-tro svc_files/imports/runner.py -> clerk
+vai-tro svc_workflow/directory.py -> clerk,director,manager,staff
+vai-tro svc_workflow/hasura.py -> clerk,director,manager
+vai-tro svc_workflow/notify.py -> clerk,director,manager,staff
+vai-tro svc_workflow/subscriptions.py -> clerk,director,manager,staff
+vai-tro svc_workflow/tu_dong.py -> clerk,director,manager,staff
+
+# 5. Nguồn tìm kiếm và sự kiện: tìm kiếm, lô nạp, robot Node-RED đọc thẳng office.documents; loại sự kiện, loại
+#    lô nạp cố định.
+du-lieu svc_files/hasura.py -> office.documents
+du-lieu svc_files/imports/store.py -> office.documents
+du-lieu svc_workflow/tu_dong.py -> office.documents
+csdl rang-buoc core.app_events.kind -> office.document.issued,office.document.received,office.document.registered
+csdl rang-buoc core.import_jobs.kind -> incoming

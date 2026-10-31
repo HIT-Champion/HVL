@@ -451,7 +451,8 @@ hai phần rõ rệt thì xếp từng phần; `__init__.py` chỉ có chú thí
 Sau `9147e0f` có thêm bốn route công khai: `/api/verify/ca.pem` của #158, nộp lưu và xem tệp phòng đọc của #124 là của
 Văn phòng; `/api/verify/anchor-key.pem` của #158 là của lõi (khóa công khai ký mốc neo sổ kiểm toán, cùng nhóm với
 `anchors.py`). Thêm nữa có Action `otSensorMap` của IT/OT (#183) và `imageclean.py` (#150); §4.4 và §4.7 đếm theo mã
-hiện tại.
+hiện tại. Nhóm của mọi mô-đun theo mã hiện tại nằm ở `NHOM` trong
+[`scripts/ranh_gioi_loi.py`](../scripts/ranh_gioi_loi.py) (#484); test buộc mô-đun mới phải được xếp nhóm.
 
 | Nhóm | `svc-files` | `svc-workflow` | Route công khai của `svc-files` (16) | CSDL |
 |---|---|---|---|---|
@@ -526,7 +527,7 @@ hiện tại.
 | `office/api.py` | Văn phòng | Lớp `Office` theo khuôn `Part`: gắn `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN văn bản, sáu vòng định kỳ của Văn phòng (#302) |
 | `apps/` (`bpmn.py`, `forms.py`, `bundle.py`, `deploy.py`, `auth.py`, `api.py`) | Lõi | Quy trình của ứng dụng cắm bằng manifest (#301): kiểm BPMN theo danh sách trắng và form JSON Schema, triển khai lên Flowable với tiền tố `<tên>.`, API chung `/api/workflow/<tên>/…` chỉ nhận token của client `app-<tên>`. Không biết ứng dụng cụ thể nào, luôn bật, không theo `MOC_OFFICE_ENABLED` |
 | `alerts.py`, route `POST /ops/alerts` | Lõi | Cảnh báo vận hành Alertmanager gửi sang (#284) → thông báo `ops.alert` cho vai trò `tenant_admin` của mọi đơn vị, không gắn văn bản; phần chung, gắn cả khi tắt Văn phòng |
-| `tu_dong.py`, route `POST /actions/tu-dong/{name}` | Lõi | Action `notifyFromFlow` của robot flow Node-RED (vai trò Hasura `tu_dong`, #366) → thông báo `flow.message` cho người của đơn vị robot theo vai trò; kèm văn bản thì chỉ `director`, `clerk`; cùng khóa không báo lại |
+| `tu_dong.py`, route `POST /actions/tu-dong/{name}` | Dáng nghiệp vụ | Kiểm kê #484: kèm văn bản thì đọc `office_documents_by_pk`, vai trò văn thư viết cứng. Action `notifyFromFlow` của robot flow Node-RED (vai trò Hasura `tu_dong`, #366) → thông báo `flow.message` cho người của đơn vị robot theo vai trò; kèm văn bản thì chỉ `director`, `clerk`; cùng khóa không báo lại |
 | `parts.py` | Lõi | Khuôn `Part` (`install`, `jobs`, `aclose`) để gắn một phần nghiệp vụ; vòng định kỳ, triển khai BPMN có thử lại, định dạng lỗi Hasura Action; không biết phần cụ thể nào |
 | `app.py`, `config.py` | Trộn | `create_app` dựng phần chung (danh bạ, thông báo: hai vòng định kỳ) và quy trình của ứng dụng (`apps/`, #301); chỉ dựng và gắn phần Văn phòng khi `MOC_OFFICE_ENABLED` bật (#302). Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
 
@@ -547,14 +548,23 @@ CSDL và metadata Hasura:
 - `core.notifications`: `document_id` là id văn bản (không khóa ngoại).
 - `core.file_texts`: hàm `core.file_texts_skip_restricted` đọc `office.documents`, `office.document_files`.
 - `core.import_jobs`, `core.import_rows`: `kind` chỉ nhận `incoming`.
-- `core.audit_overview` (cột nào hiện trên màn Sổ kiểm toán): viết cứng tên cột, hành động của Văn phòng; 9 migration
-  định nghĩa lại hàm này, từ `1792281600700_audit_anchors` tới `1792281602800_import_jobs`, phần lớn là của Văn phòng.
+- `core.audit_overview` (cột nào hiện trên màn Sổ kiểm toán): viết cứng tên cột, hành động của Văn phòng; 10 migration
+  định nghĩa lại hàm này, từ `1792281600700_audit_anchors` tới `1792281604100_assistant_route`, phần lớn là của Văn
+  phòng.
 
 </details>
 
 ### 4.4. Chỗ dính đã biết
 
-Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git grep`:
+Danh sách phải gỡ trước khi tách (§4.7). Kiểm kê tự động trên mã hiện tại: `python3 scripts/ranh_gioi_loi.py` đọc mã
+Python của hai dịch vụ, migration và metadata Hasura, in mọi chỗ lõi → Văn phòng theo năm mặt (import, dữ liệu, CSDL,
+metadata, vai trò); danh sách đã biết ở [`scripts/ranh_gioi_loi.txt`](../scripts/ranh_gioi_loi.txt), nhóm theo thứ
+tự tách. `make test` (CI) là chốt chặn lùi: chỗ dính mới thì đỏ, chỗ đã gỡ mà danh sách còn cũng đỏ, nên danh sách
+chỉ ngắn dần; mô-đun nhóm lõi không được có chỗ dính nào (#484). Kiểm kê #484 thêm bốn chỗ ngoài những gì đã viết dưới
+đây: trigger `notifications_restricted` trên `core.notifications` chạy hàm `office.notifications_restricted` (che nội
+dung văn bản hạn chế trong thông báo, phải còn tác dụng sau mọi bước tách); `tu_dong.py` đọc `office.documents` khi
+robot báo kèm văn bản; `config.py` của `svc-workflow` import `sla.py`, `suggest.py` của Văn phòng; quyền Hasura của
+tám bảng `core` và bảy mô-đun dùng chung viết cứng vai trò văn thư.
 
 - **Mã.** Theo `docs/api/openapi/svc-files.json` có 20 route công khai — 2 lõi, 8 dáng nghiệp vụ, 10 Văn phòng — cộng
   3 route nội bộ đều của Văn phòng. Đã gỡ ở #302. Bước 1 của §4.7: mô-đun dáng nghiệp vụ không còn gọi vào gói
@@ -577,7 +587,7 @@ Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git g
 - **CSDL.** Hàm `core.file_texts_skip_restricted` nằm ở schema `core` mà đọc `office.documents`,
   `office.document_files`; trigger `core.app_events_publish()` trên `office.document_events` đọc `office.documents`, và
   `core.app_events.kind` chỉ nhận ba loại `office.document.*` (migration `1792281603200_app_registry`); migration
-  `1792281600500_outgoing` của Văn phòng thêm ba cột vào `core.tenants`; 9 migration định nghĩa lại
+  `1792281600500_outgoing` của Văn phòng thêm ba cột vào `core.tenants`; 10 migration định nghĩa lại
   `core.audit_overview` mỗi khi thêm loại dòng sổ; `core.import_jobs.kind` chỉ nhận `incoming`.
 - **Metadata Hasura.** `core_files.yaml`, `core_audit_log.yaml` trỏ sang `office` — ngược với quy tắc đặt cho ứng dụng
   mới: "không thêm quan hệ vào metadata của lõi" ([`them-ung-dung.md`](them-ung-dung.md) §3, bước 6).
@@ -646,6 +656,9 @@ Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.5.0`, chưa x
    `make demo-ca-nhan` vẫn xanh. **Đạt ở #302**: `MOC_OFFICE_ENABLED=false`, kiểm bằng `make demo-tat-van-phong` trong
    CI.
 5. Ứng dụng thứ ba có tìm kiếm và thông báo cho dữ liệu của mình mà không đọc bảng `office`.
+
+Tiêu chí 1, 2, 3, 5 đo được bằng [`scripts/ranh_gioi_loi.txt`](../scripts/ranh_gioi_loi.txt): đạt khi các nhóm dòng
+tương ứng của tệp đó trống (#484).
 
 **Bước**, mỗi bước một pull request, luồng chính (smoke, e2e) giữ xanh:
 
