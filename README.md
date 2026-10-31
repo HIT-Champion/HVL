@@ -1,6 +1,6 @@
 # Signet
 
-![Signet — Văn phòng điện tử nguồn mở](docs/anh/signet-banner.png)
+![Signet — Văn phòng điện tử nguồn mở, tự triển khai, tự chủ dữ liệu](docs/anh/signet-banner.png)
 
 **English:** [README.en.md](README.en.md)
 
