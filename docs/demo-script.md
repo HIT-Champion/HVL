@@ -969,11 +969,12 @@ chạy không tải được tệp hay cổng ngắt vài giây:
 
 **Máy chạy bản online tắt, treo hoặc khởi động lại:**
 
-- Windows khởi động lại xong, tài khoản Windows của máy phải **đăng nhập**: chưa ai đăng nhập thì Signet chưa lên. Lúc
-  đăng nhập, một tác vụ Task Scheduler chạy `wsl.exe -d Ubuntu-24.04 -u root -- /usr/local/sbin/signet-khoi-dong.sh`,
-  script này chạy `service ssh start`, `service cron start`, `service docker start`. Docker lên thì chạy lại mọi
-  container (`restart: unless-stopped`), két tự mở khóa; cron lại chạy reconciler mỗi phút. Cách dựng máy không có
-  systemd: [`trien-khai.md`](trien-khai.md) mục 7, đoạn "Máy không có systemd".
+- Windows khởi động lại xong, tài khoản Windows của máy phải **đăng nhập**: chưa ai đăng nhập thì Signet chưa lên.
+  Tác vụ Task Scheduler lúc đăng nhập hiện chỉ bật SSH của Ubuntu; Docker và cron **chưa tự bật**. Mở Ubuntu-24.04
+  trên máy đó (hoặc SSH vào) rồi chạy `sudo /usr/local/sbin/signet-khoi-dong.sh`: script chạy `service ssh start`,
+  `service cron start`, `service docker start`. Docker lên thì chạy lại mọi container (`restart: unless-stopped`),
+  két tự mở khóa; cron lại chạy reconciler mỗi phút. Cách dựng máy không có systemd: [`trien-khai.md`](trien-khai.md)
+  mục 7, đoạn "Máy không có systemd".
 - Trong WSL, ở `/opt/moc`: `docker compose ps` tới khi không còn dịch vụ nào `starting` hay `unhealthy` (ClamAV nạp
   chữ ký khoảng một phút); thiếu container hay còn `unhealthy` thì `python3 scripts/reconcile.py --heal-only`.
 - Vài phút chưa lên: máy dự phòng, hoặc video.

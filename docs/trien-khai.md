@@ -328,9 +328,12 @@ phút thêm một dòng: xoay vòng bằng logrotate, hoặc dùng `>` thay `>>`
 * * * * * cd /opt/moc && python3 scripts/reconcile.py >> $HOME/reconcile.log 2>&1
 ```
 
-WSL không tự chạy cron khi khởi động: thêm `service cron start` vào `command` của mục `[boot]` trong `/etc/wsl.conf`
-(đã có lệnh thì nối bằng `;`). Bảo trì hay nâng tay thì tắt dòng cron trước (`crontab -e`, thêm `#`), như tắt timer:
-`nang_cap.sh` chỉ tự kiểm được timer systemd.
+WSL không tự chạy cron, Docker khi khởi động. WSL bản Microsoft Store đọc mục `[boot]` của `/etc/wsl.conf`: thêm
+`service cron start; service docker start` vào `command` (đã có lệnh thì nối bằng `;`). WSL đi kèm Windows 10 (nhân
+5.10.16) bỏ qua mục này: `ps -p 1` vẫn ra `init` dù đặt `systemd=true`. Khi đó cho một tác vụ Task Scheduler lúc
+đăng nhập Windows chạy `wsl.exe -d <bản phân phối> -u root -- service cron start` (và `service docker start`), hoặc
+chạy tay sau mỗi lần Windows khởi động lại. Bảo trì hay nâng tay thì tắt dòng cron trước (`crontab -e`, thêm `#`),
+như tắt timer: `nang_cap.sh` chỉ tự kiểm được timer systemd.
 
 **Nâng cấp tay** (không dùng GitOps): dừng timer reconciler nếu có (`sudo systemctl stop moc-reconcile.timer`), lấy mã
 nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git fetch --tags && git checkout vX.Y.Z` trong `~/Signet`), rồi
