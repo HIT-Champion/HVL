@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Thêm
+- Bản thật tự nâng khi có bản phát hành trên `main`: sao lưu, kiểm, lỗi thì tự lùi (`MOC_GITOPS_FOLLOW=release`, #344).
+
 ### Bảo mật
 - Nâng pypdf 6.21.4 trong `svc-files` (bảy GHSA: PDF dị dạng làm treo, ngốn bộ nhớ); nâng nuxt, node-forge, joi (#461).
 
