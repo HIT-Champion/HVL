@@ -33,4 +33,3 @@ suốt được cắt sát rồi đặt giữa, chừa lề để khung tròn kh
 | `ntfy.png` | ntfy | <https://github.com/binwiederhier/ntfy>, tệp `web/public/static/images/ntfy.png` |
 | `sms-gateway.png` | SMS Gateway for Android | Avatar của tổ chức <https://github.com/android-sms-gateway> |
 | `node-red.png` | Node-RED | <https://github.com/node-red/node-red>, tệp `packages/node_modules/@node-red/editor-client/src/images/node-red-icon.svg` |
-| `dokuwiki.png` | DokuWiki | Avatar của tổ chức <https://github.com/dokuwiki> |
