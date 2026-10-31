@@ -12,6 +12,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Ứng dụng ngành Đổi, bù lịch giảng (`apps/lich-giang`): giảng viên đề nghị đổi lịch, dạy bù; trưởng bộ môn rồi lãnh
   đạo khoa duyệt; cắm bằng `moc app install` (#482).
 
+### Thay đổi
+- Trang đăng nhập: logo nổi bật hơn, bố cục mềm và cân đối hơn, vừa màn hình điện thoại và laptop (#480).
+
 ### Sửa lỗi
 - Thanh bên không cắt mục đang chọn; lịch hạn vừa khung laptop khi phóng to hoặc mở menu (#465).
 

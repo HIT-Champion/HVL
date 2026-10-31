@@ -20,30 +20,38 @@
  * Giao diện "Lịch hạn" (#291), phủ lên css/styles.css của keycloak.v2: chỉ đổi màu, phông, bố cục, ô nhập, nút, logo;
  * template, biểu mẫu, bản dịch của theme cha giữ nguyên. Cùng bảng màu với Văn phòng điện tử
  * (apps/office/app/assets/css/main.css, apps/office/DESIGN.md): khối lục bảo sâu #0b5a47 là mảng tối duy nhất, như
- * thanh bên của ứng dụng; trang trắng, chữ mực lục đậm; lục bảo #0b6b53 cho nút chính, liên kết, viền focus; đỏ chỉ cho
- * lỗi. Ô nhập và nút bo 8px, thẻ bo 14px; phông Be Vietnam Pro tự phục vụ (@font-face ở
- * resources/fonts/be-vietnam-pro/be-vietnam-pro.css của gói npm @fontsource/be-vietnam-pro, OFL-1.1, nạp trước tệp
- * này theo theme.properties; #305). Chỉ chế độ sáng (darkMode=false trong theme.properties). PatternFly 5 khai biến
- * toàn cục trong :where(:root) (độ ưu tiên 0) nên :root ở đây thắng. Không @import, không tải gì ngoài máy chủ
- * Keycloak.
+ * thanh bên của ứng dụng; chữ mực lục đậm; lục bảo #0b6b53 cho nút chính, liên kết, viền focus; đỏ chỉ cho lỗi.
+ * Bản #480 lấy logo làm điểm nhấn: biểu tượng trên ô vàng bơ (img/signet.svg, trùng từng byte với biểu tượng tab của
+ * ứng dụng) và chữ "Signet" cỡ lớn trên khối lục bảo có chuyển sắc nhẹ và chữ S mờ phía sau; thẻ đăng nhập trắng bo
+ * 20px, đổ bóng ngả lục trên nền giấy chấm mờ. Thang bo góc: thẻ 20px, ô nhập, nút, hộp thông báo 10px. Phông Be
+ * Vietnam Pro tự phục vụ (@font-face ở resources/fonts/be-vietnam-pro/be-vietnam-pro.css của gói npm
+ * @fontsource/be-vietnam-pro, OFL-1.1, nạp trước tệp này theo theme.properties; #305). Chỉ chế độ sáng
+ * (darkMode=false trong theme.properties). PatternFly 5 khai biến toàn cục trong :where(:root) (độ ưu tiên 0) nên
+ * :root ở đây thắng. Không @import, không ảnh hay phông ngoài máy chủ Keycloak, không hoạt ảnh.
  */
 
 /* Tỉ lệ tương phản WCAG 2.2 AA ghi cạnh màu: chữ ≥ 4,5:1, viền ô nhập và viền focus ≥ 3:1 trên đúng nền của nó */
 :root {
   color-scheme: light;
   --signet-field: #0b5a47;         /* khối lục bảo; chữ trắng 8,2:1 */
+  --signet-field-glow: #11654f;    /* góc trên trái của khối, sáng hơn một bậc */
+  --signet-field-deep: #07463a;    /* góc dưới phải, tối hơn một bậc */
   --signet-field-ink: #cfe7dc;     /* chữ phụ trên khối lục bảo 6,3:1 */
+  --signet-butter: #eee3bc;        /* ô vàng bơ của logo, chỉ dùng làm nét nhấn cạnh logo */
   --signet-ink: #10201b;           /* 16,9:1 trên trắng */
   --signet-label: #36463f;         /* 10:1 */
-  --signet-muted: #4d5f56;         /* 6,8:1 */
+  --signet-muted: #4d5f56;         /* 6,8:1; 6,4:1 trên nền giấy */
   --signet-edge: #d6e1dc;          /* viền thẻ, đường kẻ: trang trí, không phải viền điều khiển */
   --signet-paper: #f5f9f7;
+  --signet-wash: #f1f6f3;          /* nền trang quanh thẻ */
+  --signet-dot: #cfddd6;           /* chấm trang trí trên nền trang */
   --signet-active: #e6f2ec;
   --signet-control: #7a8d84;       /* viền ô nhập 3,5:1 */
   --signet-control-hover: #56685f;
   --signet-emerald: #0b6b53;       /* nút chính (chữ trắng 6,5:1), liên kết, viền focus 6,5:1 */
   --signet-emerald-dark: #095a46;  /* rê chuột 8,2:1 */
   --signet-red: #9f2019;           /* viền, chữ lỗi 7,8:1 */
+  --signet-shade: 11 74 58;        /* sắc của bóng đổ: lục bảo tối thay cho đen */
   --signet-ease: cubic-bezier(.16, 1, .3, 1);
   --signet-font: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
   /* PatternFly đặt lại Color--100, primary-color--100, link--Color bằng bản --dark-* trong ô nhập nên đổi cả hai bộ.
@@ -73,14 +81,18 @@
   --pf-v5-global--danger-color--200: #861a14;
   --pf-v5-global--info-color--100: #4d5f56;
   --pf-v5-global--info-color--200: #10201b;
-  --pf-v5-global--BorderRadius--sm: 8px;
+  --pf-v5-global--BorderRadius--sm: 10px;
   --pf-v5-global--FontFamily--text: var(--signet-font);
   --pf-v5-global--FontFamily--heading: var(--signet-font);
 }
 
-/* keycloak.v2 phủ ảnh nền tối lên .login-pf body: trang trắng như vùng làm việc của ứng dụng */
+/* keycloak.v2 phủ ảnh nền tối lên .login-pf body: nền giấy lục rất nhạt, chấm mờ cách 22px và vầng sáng ở góc trên
+   phải để phần quanh thẻ không phẳng trơn. Chỉ là trang trí: chữ không nằm trực tiếp trên nền này */
 html, .login-pf body {
-  background: #fff;
+  background:
+    radial-gradient(circle, var(--signet-dot) 1px, transparent 1.6px) 0 0 / 22px 22px,
+    radial-gradient(70% 60% at 100% 0%, #e1eee7 0%, transparent 70%),
+    var(--signet-wash);
   color: var(--signet-ink);
   font-family: var(--signet-font);
   font-synthesis: none;
@@ -91,8 +103,9 @@ button, input, select, textarea { font: inherit; }
 ::selection { background: #b7dccb; color: #10201b; }
 .pf-v5-c-login :focus-visible { outline: 2px solid var(--signet-emerald); outline-offset: 3px; }
 
-/* Bố cục: khối lục bảo bên trái cao hết trang (đúng chỗ thanh bên của ứng dụng sau khi đăng nhập), thẻ đăng nhập
-   trắng giữa phần còn lại. Thứ tự trên trang giữ như HTML của theme cha: đầu trang rồi thẻ */
+/* Bố cục: khối lục bảo bên trái cao hết trang (đúng chỗ thanh bên của ứng dụng sau khi đăng nhập), chiếm khoảng
+   hai phần năm bề ngang để logo có chỗ thở; thẻ đăng nhập giữa phần còn lại. Thứ tự trên trang giữ như HTML của theme
+   cha: đầu trang rồi thẻ */
 .pf-v5-c-login {
   display: block;
   min-height: 100dvh;
@@ -100,7 +113,7 @@ button, input, select, textarea { font: inherit; }
 }
 .pf-v5-c-login__container {
   display: grid;
-  grid-template-columns: clamp(300px, 36vw, 520px) minmax(0, 1fr);
+  grid-template-columns: clamp(340px, 42vw, 680px) minmax(0, 1fr);
   grid-template-areas: "header main";
   width: 100%;
   max-width: none;
@@ -110,101 +123,137 @@ button, input, select, textarea { font: inherit; }
   gap: 0;
 }
 
-/* Đầu trang: chữ S trắng, displayName của realm ("Signet") và dòng phụ như thanh bên của ứng dụng; chữ thường thay vì
-   chữ hoa giãn cách của theme cha */
+/* Đầu trang: khối lục bảo chuyển sắc nhẹ từ góc trên trái sáng hơn xuống góc dưới phải tối hơn, chữ S lớn mờ 5% tràn
+   ra mép dưới phải. overflow: clip (không phải hidden) để cắt chữ S mà không biến khối thành vùng cuộn, nhờ vậy cụm
+   logo bên trong vẫn dính giữa màn khi trang cài TOTP dài phải cuộn */
 .pf-v5-c-login__header {
   grid-area: header;
-  display: flex;
-  align-items: center;
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  display: block;
   min-width: 0;
   margin: 0;
-  padding: 48px clamp(32px, 4vw, 64px);
-  background: var(--signet-field);
+  padding: 0 clamp(40px, 7vw, 120px);
+  background:
+    radial-gradient(110% 70% at 0% 0%, var(--signet-field-glow) 0%, transparent 62%),
+    radial-gradient(90% 60% at 100% 100%, var(--signet-field-deep) 0%, transparent 72%),
+    var(--signet-field);
   color: #fff;
 }
+.pf-v5-c-login__header::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -34%;
+  bottom: -20%;
+  width: min(86%, 560px);
+  aspect-ratio: 1;
+  background-color: rgb(255 255 255 / .045);
+  -webkit-mask: url("../img/signet-symbol.svg") center / contain no-repeat;
+  mask: url("../img/signet-symbol.svg") center / contain no-repeat;
+  pointer-events: none;
+}
 .pf-v5-c-login__header :focus-visible { outline-color: #fff; }
+
+/* Cụm logo xếp dọc, căn trái: biểu tượng trên ô vàng bơ, displayName của realm ("Signet") cỡ lớn, vạch vàng bơ ngắn
+   rồi dòng phụ. Cụm cao bằng màn hình và dính ở đỉnh nên luôn nằm giữa phần đang nhìn thấy. Chữ thường thay vì chữ
+   hoa giãn cách của theme cha */
 #kc-header-wrapper {
+  position: sticky;
+  top: 0;
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-items: start;
   width: auto;
   height: auto;
+  min-height: 100dvh;
   margin: 0;
-  padding: 0;
+  padding: 64px 0 72px;
   color: #fff !important;
   font-family: inherit;
-  font-size: 32px;
+  font-size: clamp(44px, 4.4vw, 64px);
   font-weight: 700;
-  letter-spacing: -.03em;
-  line-height: 1.15;
+  letter-spacing: -.04em;
+  line-height: 1.05;
   text-align: left;
   text-transform: none;
   white-space: normal;
   overflow-wrap: anywhere;
 }
-/* logo Liền mạch (img/signet-symbol.svg) dùng làm mặt nạ, tô trắng trên nền lục bảo */
+/* Logo chính thức nguyên bản (apps/office/public/brand/README.md: không kéo giãn, không thêm bóng, không đổi màu
+   nét); khoảng trống dưới logo hơn một phần tư chiều cao của nó */
 #kc-header-wrapper::before {
   content: "";
-  grid-row: 1 / span 2;
-  width: 48px;
-  height: 48px;
-  background-color: #fff;
-  -webkit-mask: url("../img/signet-symbol.svg") center / contain no-repeat;
-  mask: url("../img/signet-symbol.svg") center / contain no-repeat;
+  width: clamp(64px, 5.6vw, 84px);
+  aspect-ratio: 1;
+  margin-bottom: clamp(24px, 2.4vw, 36px);
+  background: url("../img/signet.svg") center / contain no-repeat;
 }
 /* dòng phụ theo ngôn ngữ của trang (<html lang>), cùng chữ với app.tagline của ứng dụng: "Văn phòng điện tử",
    "e-Office". Viết bằng mã thoát để không phụ thuộc bảng mã Keycloak gửi kèm CSS */
 #kc-header-wrapper::after {
   content: "V\0103n ph\00F2ng \0111i\1EC7n t\1EED";
-  grid-column: 2;
-  margin-top: 4px;
+  margin-top: 20px;
+  padding-top: 18px;
+  background: linear-gradient(var(--signet-butter), var(--signet-butter)) left top / 40px 2px no-repeat;
   color: var(--signet-field-ink);
-  font-size: 16px;
-  font-weight: 400;
+  font-size: clamp(17px, 1.4vw, 20px);
+  font-weight: 500;
   letter-spacing: 0;
   line-height: 1.4;
 }
 #kc-header-wrapper:lang(en)::after { content: "e-Office"; }
 
-/* Thẻ đăng nhập: trắng, viền mảnh, không bóng như .card của ứng dụng */
+/* Thẻ đăng nhập: trắng, viền lục rất mảnh, bóng hai lớp ngả lục (một lớp sát cho cạnh, một lớp rộng mềm cho độ
+   nổi), cùng hướng sáng từ trên xuống */
 .pf-v5-c-login .pf-v5-c-login__main {
   grid-area: main;
+  position: relative;
   align-self: center;
   justify-self: center;
   width: min(440px, 100% - 48px);
   min-width: 0;
-  margin: 48px 0;
+  margin: 56px 0;
   background: #fff;
-  border: 1px solid var(--signet-edge);
-  border-radius: 14px;
-  box-shadow: none;
+  border: 1px solid rgb(var(--signet-shade) / .09);
+  border-radius: 20px;
+  box-shadow:
+    0 1px 2px rgb(var(--signet-shade) / .06),
+    0 10px 24px -8px rgb(var(--signet-shade) / .12),
+    0 32px 64px -24px rgb(var(--signet-shade) / .2);
 }
-/* keycloak.v2 kẻ vạch xanh 4px ở cạnh trên đầu thẻ: bỏ. Tiêu đề dài (trang cài TOTP, bản tiếng Anh) xuống dòng
-   trong phần của nó, ô chọn ngôn ngữ luôn ở góc phải như theme cha */
+/* keycloak.v2 kẻ vạch xanh 4px ở cạnh trên đầu thẻ: bỏ. Tiêu đề ngắn ("Đăng nhập") cùng hàng với ô chọn ngôn ngữ ở
+   góc phải như theme cha; tiêu đề dài không vừa một hàng cạnh ô chọn (trang cài TOTP) thì wrap-reverse đẩy ô chọn lên
+   hàng trên, vẫn ở góc phải, tiêu đề xuống hàng dưới dùng hết bề ngang thay vì bị ngắt giữa từ */
 .pf-v5-c-login__main-header {
   display: flex;
+  flex-wrap: wrap-reverse;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 32px 36px 0;
+  padding: 40px 40px 0;
   border: 0;
 }
 #kc-page-title {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   color: var(--signet-ink);
   font-family: inherit;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 600;
-  letter-spacing: -.02em;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
+  letter-spacing: -.025em;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
-.pf-v5-c-login__main-header-utilities { flex: 0 0 auto; max-width: 160px; margin: 0; }
-.pf-v5-c-login__main-header-utilities select { min-height: 42px; font-size: 14px; }
-.pf-v5-c-login__main-body { padding: 24px 36px 36px; }
+.pf-v5-c-login__main-header-utilities { flex: 0 0 auto; max-width: 160px; margin: 0 0 0 auto; }
+.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control { min-height: 40px; }
+.pf-v5-c-login__main-header-utilities select { font-size: 14px; }
+.pf-v5-c-login__main-body { padding: 28px 40px 40px; }
 .pf-v5-c-login__main-footer { background: transparent; color: var(--signet-muted); font-size: 14px; }
 .pf-v5-c-login__main-footer-band { padding: 20px 0 0; border-top: 1px solid var(--signet-edge); text-align: left; }
 #kc-form-options, #kc-info, #kc-info-wrapper { color: var(--signet-muted); font-size: 14px; }
@@ -223,7 +272,7 @@ button, input, select, textarea { font: inherit; }
 }
 
 /* Biểu mẫu: nhãn 14px đậm vừa trên ô, chữ trong ô 16px (điện thoại không phóng to khi chạm) */
-.pf-v5-c-form { --pf-v5-c-form--GridGap: 20px; }
+.pf-v5-c-form { --pf-v5-c-form--GridGap: 22px; }
 .pf-v5-c-form__group-label { padding-bottom: 8px !important; }
 .pf-v5-c-form__label, .pf-v5-c-form__label-text { color: var(--signet-label); font-size: 14px; font-weight: 500; }
 .pf-v5-c-form__helper-text { margin-top: 8px; }
@@ -231,23 +280,23 @@ button, input, select, textarea { font: inherit; }
 .pf-v5-c-check__label { color: var(--signet-ink); font-size: 14px; }
 input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
 
-/* Ô nhập: viền đủ bốn cạnh (theme cha chỉ gạch dưới), cao 44px; đang nhập thì viền lục bảo dày 2px. Khoảng đệm đặt
-   qua biến của PatternFly để chỗ cho biểu tượng lỗi, mũi tên chọn ngôn ngữ vẫn tính đúng */
+/* Ô nhập: viền đủ bốn cạnh (theme cha chỉ gạch dưới), cao 48px; đang nhập thì viền lục bảo dày 2px kèm quầng lục
+   nhạt. Khoảng đệm đặt qua biến của PatternFly để chỗ cho biểu tượng lỗi, mũi tên chọn ngôn ngữ vẫn tính đúng */
 .pf-v5-c-form-control {
-  --pf-v5-c-form-control--inset--base: 12px;
-  --pf-v5-c-form-control--PaddingTop: 9px;
-  --pf-v5-c-form-control--PaddingBottom: 9px;
+  --pf-v5-c-form-control--inset--base: 14px;
+  --pf-v5-c-form-control--PaddingTop: 11px;
+  --pf-v5-c-form-control--PaddingBottom: 11px;
   --pf-v5-c-form-control--FontSize: 16px;
   --pf-v5-c-form-control--after--BorderBottomWidth: 0;
-  --pf-v5-c-form-control__icon--PaddingTop: 9px;
-  --pf-v5-c-form-control__toggle-icon--PaddingTop: 9px;
+  --pf-v5-c-form-control__icon--PaddingTop: 11px;
+  --pf-v5-c-form-control__toggle-icon--PaddingTop: 11px;
   --pf-v5-c-form-control__toggle-icon--PaddingLeft: 4px;
   --pf-v5-c-form-control__toggle-icon--PaddingRight: 0;
   --pf-v5-c-form-control__select--PaddingLeft: 12px;
   --pf-v5-c-form-control__select--PaddingRight: 36px;
-  min-height: 44px;
+  min-height: 48px;
   border: 1px solid var(--signet-control);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
   transition: border-color 160ms, box-shadow 160ms;
 }
@@ -258,7 +307,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
 .pf-v5-c-form-control.pf-m-error { border-color: var(--signet-red); }
 .pf-v5-c-form-control:focus-within {
   border-color: var(--signet-emerald);
-  box-shadow: 0 0 0 1px var(--signet-emerald);
+  box-shadow: 0 0 0 1px var(--signet-emerald), 0 0 0 4px rgb(11 107 83 / .14);
 }
 .pf-v5-c-form-control > :is(input, select, textarea) {
   border-radius: inherit;
@@ -281,7 +330,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
   --pf-v5-c-input-group__item--MarginLeft: 0;
   gap: 0;
   border: 1px solid var(--signet-control);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
   transition: border-color 160ms, box-shadow 160ms;
 }
@@ -289,11 +338,11 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
 .pf-v5-c-input-group:has(.pf-m-error) { border-color: var(--signet-red); }
 .pf-v5-c-input-group:focus-within {
   border-color: var(--signet-emerald);
-  box-shadow: 0 0 0 1px var(--signet-emerald);
+  box-shadow: 0 0 0 1px var(--signet-emerald), 0 0 0 4px rgb(11 107 83 / .14);
 }
 .pf-v5-c-input-group .pf-v5-c-form-control,
 .pf-v5-c-input-group .pf-v5-c-form-control:focus-within {
-  min-height: 42px;
+  min-height: 46px;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -303,9 +352,9 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 42px;
-  padding: 0 12px;
+  min-width: 48px;
+  min-height: 46px;
+  padding: 0 14px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -317,12 +366,12 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
 /* viền focus của nút vẽ vào trong, không đè lên viền nhóm */
 .pf-v5-c-input-group .pf-v5-c-button.pf-m-control:focus-visible { outline-offset: -4px; }
 .pf-v5-c-input-group > .pf-v5-c-input-group__item:first-child > * {
-  border-start-start-radius: 7px;
-  border-end-start-radius: 7px;
+  border-start-start-radius: 9px;
+  border-end-start-radius: 9px;
 }
 .pf-v5-c-input-group > .pf-v5-c-input-group__item:last-child > * {
-  border-start-end-radius: 7px;
-  border-end-end-radius: 7px;
+  border-start-end-radius: 9px;
+  border-end-end-radius: 9px;
 }
 /* chú thích của nút đăng nhập lại: theme cha đặt sang phải nút, tràn khỏi thẻ và màn điện thoại; đưa lên trên */
 .kc-login-tooltip .kc-tooltip-text {
@@ -348,21 +397,26 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
   border-color: var(--signet-ink) transparent transparent;
 }
 
-/* Nút chính: lục bảo, chữ trắng, nhấn thì lún 1px; viền trong suốt để chế độ tương phản cao vẫn thấy khung nút */
+/* Nút chính: lục bảo, chữ trắng, cao 48px; rê chuột thì sẫm lại và bóng ngả lục, nhấn thì lún 1px; viền trong suốt
+   để chế độ tương phản cao vẫn thấy khung nút */
 .pf-v5-c-button.pf-m-primary {
-  min-height: 44px;
-  padding: 9px 16px;
+  min-height: 48px;
+  padding: 11px 18px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--signet-emerald);
   color: #fff;
   font-family: inherit;
   font-size: 16px;
   font-weight: 600;
+  box-shadow: 0 1px 2px rgb(var(--signet-shade) / .18);
   transition: background-color 160ms, box-shadow 160ms, transform 180ms var(--signet-ease);
 }
 .pf-v5-c-button.pf-m-primary::after { border: 0; }
-.pf-v5-c-button.pf-m-primary:hover { background: var(--signet-emerald-dark); box-shadow: 0 3px 8px #10201b14; }
+.pf-v5-c-button.pf-m-primary:hover {
+  background: var(--signet-emerald-dark);
+  box-shadow: 0 6px 16px -6px rgb(var(--signet-shade) / .45);
+}
 .pf-v5-c-button.pf-m-primary:active { transform: translateY(1px) scale(.99); }
 .pf-v5-c-button.pf-m-primary:disabled {
   color: #526459;
@@ -374,10 +428,10 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
    Nút không có lớp kiểu nào (kcButtonDefaultClass của theme cha để trống) cũng theo kiểu này */
 .pf-v5-c-button.pf-m-secondary,
 .pf-v5-c-login__main .pf-v5-c-button:not([class*="pf-m-"]) {
-  min-height: 44px;
-  padding: 9px 16px;
+  min-height: 48px;
+  padding: 11px 18px;
   border: 1px solid var(--signet-control);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
   color: #22312b;
   font-family: inherit;
@@ -401,7 +455,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
 .pf-v5-c-alert {
   padding: 12px 14px;
   border: 1px solid var(--signet-edge);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--signet-paper);
   box-shadow: none;
   font-size: 14px;
@@ -413,8 +467,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
 
 /* Chọn thiết bị OTP (ô chọn của theme cha), cài TOTP: viền như ô nhập, ô đang chọn viền lục bảo trên nền chọn thay
    cho vạch dưới và cú nhấc lên 6px của PatternFly */
-.pf-v5-c-tile { --pf-v5-c-tile--m-selected--TranslateY: 0; border-radius: 8px; cursor: pointer; }
-.pf-v5-c-tile::before { border-color: var(--signet-control); border-radius: 8px; }
+.pf-v5-c-tile { --pf-v5-c-tile--m-selected--TranslateY: 0; border-radius: 10px; cursor: pointer; }
+.pf-v5-c-tile::before { border-color: var(--signet-control); border-radius: 10px; }
 .pf-v5-c-tile::after { display: none; }
 .pf-v5-c-tile.pf-m-selected { background: var(--signet-active); }
 .pf-v5-c-tile.pf-m-selected::before { border: 2px solid var(--signet-emerald); }
@@ -423,26 +477,56 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
 #kc-totp-secret-key { overflow-wrap: anywhere; }
 #kc-totp-secret-qr-code { max-width: 100%; height: auto; }
 
-/* Máy tính bảng dọc, điện thoại: khối lục bảo thành dải ngang trên đầu trang, thẻ ở dưới */
+/* Màn laptop thấp (1366×768 phóng 125% còn khoảng 513px chiều cao): bớt lề trên dưới để thẻ không phải cuộn */
+@media (min-width: 900px) and (max-height: 620px) {
+  .pf-v5-c-login .pf-v5-c-login__main { margin: 24px 0; }
+  .pf-v5-c-login__main-header { padding-top: 28px; }
+  .pf-v5-c-login__main-body { padding-bottom: 28px; }
+  #kc-header-wrapper { padding-block: 32px; }
+}
+
+/* Máy tính bảng dọc, điện thoại: khối lục bảo thành dải ngang trên đầu trang, cụm logo nằm ngang giữa dải; thẻ ở dưới,
+   kéo lên đè mép dải 28px cho hai phần liền một khối */
 @media (max-width: 899px) {
   .pf-v5-c-login__container {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     grid-template-areas: "header" "main";
   }
-  .pf-v5-c-login__header { padding: 16px 24px; }
-  #kc-header-wrapper { column-gap: 12px; font-size: 22px; }
-  #kc-header-wrapper::before { width: 36px; height: 36px; }
-  #kc-header-wrapper::after { margin-top: 2px; font-size: 14px; }
-  .pf-v5-c-login .pf-v5-c-login__main { align-self: start; margin: 40px 0; }
+  .pf-v5-c-login__header { padding: 0 24px; }
+  .pf-v5-c-login__header::before { right: -60px; bottom: -90px; width: 260px; }
+  #kc-header-wrapper {
+    position: static;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    align-items: center;
+    column-gap: 16px;
+    min-height: 0;
+    padding: 32px 0 60px;
+    font-size: 30px;
+  }
+  #kc-header-wrapper::before { grid-row: 1 / span 2; width: 52px; margin: 0; }
+  #kc-header-wrapper::after {
+    grid-column: 2;
+    margin-top: 4px;
+    padding-top: 0;
+    background: none;
+    font-size: 15px;
+  }
+  .pf-v5-c-login .pf-v5-c-login__main { align-self: start; margin: -28px 0 48px; }
 }
-/* Điện thoại (390px): thẻ bỏ viền, liền mép với lề 16px như trang của ứng dụng; không cuộn ngang */
+/* Điện thoại (390px): thẻ cách mép 16px như trang của ứng dụng, bo 16px; không cuộn ngang */
 @media (max-width: 540px) {
-  .pf-v5-c-login__header { padding: 14px 16px; }
-  .pf-v5-c-login .pf-v5-c-login__main { width: 100%; margin: 0; border: 0; border-radius: 0; }
-  .pf-v5-c-login__main-header { padding: 24px 16px 0; }
-  .pf-v5-c-login__main-body { padding: 20px 16px 32px; }
-  #kc-page-title { font-size: 22px; }
+  .pf-v5-c-login__header { padding: 0 16px; }
+  /* dải hẹp quá, chữ S mờ sẽ nằm dưới chữ "Signet": bỏ */
+  .pf-v5-c-login__header::before { display: none; }
+  #kc-header-wrapper { column-gap: 14px; padding: 24px 0 52px; font-size: 26px; }
+  #kc-header-wrapper::before { width: 44px; }
+  #kc-header-wrapper::after { font-size: 14px; }
+  .pf-v5-c-login .pf-v5-c-login__main { width: calc(100% - 32px); margin: -28px 0 32px; border-radius: 16px; }
+  .pf-v5-c-login__main-header { padding: 28px 20px 0; }
+  .pf-v5-c-login__main-body { padding: 22px 20px 28px; }
+  #kc-page-title { font-size: 24px; }
   .pf-v5-c-login__main-header-utilities select { font-size: 16px; }
 }
 
@@ -455,7 +539,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
   .pf-v5-c-button.pf-m-primary:active { transform: none; }
 }
 
-/* Chế độ tương phản cao: nền khối lục bảo thành màu hệ thống, logo vẽ bằng màu chữ của hệ thống */
+/* Chế độ tương phản cao: logo giữ ô vàng bơ của nó (đọc được trên mọi màu nền hệ thống), bỏ chữ S mờ trang trí */
 @media (forced-colors: active) {
-  #kc-header-wrapper::before { forced-color-adjust: none; background-color: CanvasText; }
+  #kc-header-wrapper::before { forced-color-adjust: none; }
+  .pf-v5-c-login__header::before { display: none; }
 }
