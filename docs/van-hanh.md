@@ -968,11 +968,11 @@ python3 scripts/moc.py tu-dong robot remove CNTT  # gỡ robot; token đã cấp
 - **Kênh ngoài:** `flow.message` đi chuông và cả email, webhook, SMS, Zalo khi `MOC_NOTIFY_*_KINDS` để trống (mọi
   loại); danh sách văn bản sắp hạn mang theo nhiều trích yếu. Muốn tin của flow chỉ ở chuông thì liệt kê các loại
   khác vào `MOC_NOTIFY_*_KINDS`, bỏ `flow.message`.
-- **Hai flow mẫu** ([`platform/tu-dong/flow-mau.json`](../platform/tu-dong/flow-mau.json), tab "Signet — flow mẫu",
-  để tắt): (1) 07:00 hằng ngày gom văn bản đến chưa xong có hạn trong 3 ngày tới, báo lãnh đạo đơn vị một tin; (2) mỗi
+- **Hai flow mẫu** ([`platform/tu-dong/flow-mau.json`](../platform/tu-dong/flow-mau.json), tab "Signet — flow mẫu"):
+  (1) 07:00 hằng ngày gom văn bản đến chưa xong có hạn trong 3 ngày tới, báo lãnh đạo đơn vị một tin; (2) mỗi
   phút tìm văn bản Hỏa tốc vừa vào sổ, báo lãnh đạo mỗi văn bản một tin, bấm vào mở văn bản. Dùng: trình soạn → menu
   ☰ → Import → chọn tệp; mở tab, điền `ROBOT_ID`, `ROBOT_SECRET` (biến bí mật, mã hóa bằng `MOC_TU_DONG_SECRET`)
-  trong phần Environment của tab; bật tab, Deploy. Một đơn vị một robot: muốn chạy cho đơn vị khác thì nhân bản tab,
+  trong phần Environment của tab, rồi Deploy. Một đơn vị một robot: muốn chạy cho đơn vị khác thì nhân bản tab,
   điền robot của đơn vị đó.
 
 ## Hội tụ IT/OT

@@ -1164,6 +1164,9 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
 | `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, văn bản hạn chế thì người gọi phải đọc được nó (403 `restricted`), kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
 | `otSensorMap` (query) | `clerk`, `staff`, `manager`, `director` — các vai trò đọc được dự thảo "Báo cáo sự cố" | Sơ đồ cảm biến OT (F3.10): đọc context broker NGSI-LD ở tenant của đơn vị trong biến phiên (thực thể `TemperatureSensor`, lịch sử 10 lần đo gần nhất), trả số đo mới nhất, mã phòng (`room`), ngưỡng và cờ chất lượng — `stale` (quá `MOC_OT_STALE_MIN` phút không có số đo), `out_of_range` (không phải số hoặc ngoài −55…125 °C), `duplicate_time` (số đo mới nhất trùng `observedAt` với lần đo khác), `future_time` (`observedAt` muộn hơn giờ máy chủ quá 2 phút; khi đó `stale` xét theo lúc broker nhận số đo). Chỉ đọc, không ghi CSDL; chưa bật broker thì `status` = `off` / `unavailable`, không lỗi |
+| `myChannels` (query) | `clerk`, `staff`, `manager`, `director`, `tenant_admin` | Kênh SMS, Zalo bản cài đã cấu hình cho thông báo, kèm trạng thái của người gọi; rỗng khi chưa cấu hình kênh nào (#365) |
+| `setMyChannel(channel, enabled)` | `clerk`, `staff`, `manager`, `director`, `tenant_admin` | Người gọi bật, tắt kênh SMS hoặc Zalo cho thông báo của mình; bật Zalo khi chưa liên kết thì nhận mã để nhắn cho bot (#365) |
+| `notifyFromFlow(roles, title, text, document_id, key)` | `tu_dong` (robot của flow Node-RED) | Báo người trong đơn vị của robot theo vai trò, thông báo `flow.message`; cùng `key` thì không báo lại (#366) |
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
 cấp số hai lần. `completeTask` chạy theo thứ tự: kiểm quyền và dữ liệu → nhận việc trong Flowable (người khác
@@ -1193,7 +1196,7 @@ Nhóm ứng viên trong Flowable (Flowable không biết người dùng Keycloak
 |---|---|---|---|---|
 | `van-ban-den` | `vbden.chiDao` | `director` | `direct` · `file` (chỉ lưu) | `direct`: `instruction`, đúng một trong `lead_department_id` / `lead_user_id`, `supports[]` (phòng), `due_on`; `file`: `note` |
 | | `vbden.phanCong` | `manager` của phòng chủ trì | `assign` · `self` | `user_id`, `note` |
-| | `vbden.xuLy` | Người được giao | `done` | `result_note` (`reply_document_id` khi có văn bản đi — Phase 2) |
+| | `vbden.xuLy` | Người được giao | `done` | `result_note`. Văn bản đi trả lời văn bản đến ghi cột `reply_to_id` lúc soạn, không qua việc này |
 | `van-ban-di` | `vbdi.duyetPhong` | `manager` của phòng soạn | `approve` · `return` | `note` (bắt buộc khi `return`) |
 | | `vbdi.duyetDonVi` | `director` được chọn làm người ký | `approve` · `return` | `note` (bắt buộc khi `return`) |
 | | `vbdi.chinhSua` | Người soạn, khi bị trả lại | — (hoàn thành bằng `submitOutgoing`) | — |

@@ -166,7 +166,7 @@ logs-down: env-ready ## Tắt log tập trung: 9 dịch vụ về json-file (t�
 logs-tra: $(ENV_FILE) ## Tra log tập trung theo mã yêu cầu (header X-Request-Id, câu "đã ghi nhật ký với mã …"): make logs-tra ID=<mã> [PHUT=60]
 	@python3 scripts/log_tap_trung.py tra "$(ID)" --phut "$(or $(PHUT),60)"
 
-demo-log-tap-trung: $(ENV_FILE) ## Màn log tập trung (F3.14): một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → svc-files; Parseable trả dòng của cả ba cùng mã, sổ kiểm toán cùng mã; không lộ token; docker logs vẫn đọc được
+demo-log-tap-trung: $(ENV_FILE) ## Màn log tập trung (F3.14): một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → Hasura, svc-files; Parseable trả dòng của cả bốn cùng mã, sổ kiểm toán cùng mã; không lộ token; docker logs vẫn đọc được
 	@python3 scripts/demo.py log-tap-trung
 
 wiki-env: $(ENV_FILE)

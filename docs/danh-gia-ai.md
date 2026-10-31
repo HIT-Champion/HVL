@@ -25,7 +25,7 @@ Ba nguyên tắc chung:
 | Mã | Tác tử (danh tính) · mã nguồn | Mô hình, công cụ | Không bật `ai` | Đo lại | Kết quả chính |
 |---|---|---|---|---|---|
 | F4.1 | `moc-doc-reader` · `services/svc-files/src/svc_files/docread/` | Quy tắc thể thức NĐ 30, pypdf, Tesseract `vie`; Qwen3-1.7B chỉ viết trích yếu | Đủ sáu ô, trích yếu theo quy tắc | `make do-doc-van-ban` | 22 văn bản mẫu: số ký hiệu đúng 20/22, ngày ban hành 22/22, 0 ô "chắc chắn" sai (22/10/2026; trùng ở 3 lần chạy CI ngày 26/10/2026) |
-| F4.2 | `moc-assistant` · `services/svc-files/src/svc_files/assist/` | Meilisearch tìm lai, Qwen3-Embedding-0.6B, Qwen3-1.7B | Tìm từ khóa, trả câu trích nguyên văn | `make do-hoi-dap` | 19 câu: recall@3 16/16, từ chối đúng 3/3, 0 nguồn bị cấm; câu trả lời của mô hình qua kiểm 16/16 (23/10/2026, bản online) |
+| F4.2 | `moc-assistant` · `services/svc-files/src/svc_files/assist/` | Meilisearch tìm lai, Qwen3-Embedding-0.6B, Qwen3-1.7B | Tìm từ khóa, trả câu trích nguyên văn | `make do-hoi-dap` | 54 câu (19 câu tra cứu văn bản): recall@3 16/16, từ chối đúng 3/3, 0 nguồn bị cấm (30/10/2026, CI, không bật `ai`); câu trả lời của mô hình qua kiểm 16/16 (19 câu, 23/10/2026, bản online) |
 | F4.3 | `moc-assigner` · `services/svc-workflow/src/svc_workflow/advisor.py`, `suggest.py` | Bỏ phiếu kNN có trọng số trên phần truy xuất của F4.2; **không** mô hình sinh | Chạy đủ (tìm từ khóa) | `make do-giao-viec` | 29 văn bản lịch sử, bỏ một ra: top-1 29/29 (gốc so sánh 55 %), 0 căn cứ là văn bản hạn chế (22/10/2026) |
 | F4.4 | Bộ lọc, không phải tác tử · `services/svc-files/src/svc_files/pii.py` | Nhận dạng theo cấu trúc bằng `re`, chỉ thư viện chuẩn Python | Luôn bật | `make do-che-pii` | 81 063 ký tự kho mẫu: 0 chỗ che nhầm; 18/18 đột biến mã bị test bắt (28/10/2026) |
 
@@ -281,10 +281,10 @@ của chúng chỉ in ra, không làm đỏ.
 - Trước khi máy chủ tự gán trích dẫn, cùng mô hình chỉ qua kiểm 0 / 19 (viết đúng nội dung nhưng không ghi `[n]`) —
   vì vậy trích dẫn do máy chủ gán theo bằng chứng (README svc-files).
 
-**Chưa đo.** Chấm câu trả lời bằng người (hiện chỉ kiểm từ khóa và trích dẫn); bộ câu hỏi lớn hơn 19 câu, trên kho
-thật; so `qwen3:1.7b` với `qwen3:4b` (`MOC_ASK_MODEL`); tỉ lệ mô hình làm theo lệnh chèn trong văn bản — cách đo: thêm
-văn bản mẫu chứa lệnh chèn vào `scripts/hoi_dap_mau.py` cùng câu hỏi nhắm vào nó, chạy `do-hoi-dap` với `ai`. Trên dữ
-liệu thật câu hỏi không được lưu; tỉ lệ `no_evidence`, `model_rejected` đếm được từ `diff` của các dòng sổ
+**Chưa đo.** Chấm câu trả lời bằng người (hiện chỉ kiểm từ khóa và trích dẫn); bộ câu tra cứu văn bản lớn hơn 19
+câu, trên kho thật; so `qwen3:1.7b` với `qwen3:4b` (`MOC_ASK_MODEL`); tỉ lệ mô hình làm theo lệnh chèn trong văn bản —
+cách đo: thêm văn bản mẫu chứa lệnh chèn vào `scripts/hoi_dap_mau.py` cùng câu hỏi nhắm vào nó, chạy `do-hoi-dap` với
+`ai`. Trên dữ liệu thật câu hỏi không được lưu; tỉ lệ `no_evidence`, `model_rejected` đếm được từ `diff` của các dòng sổ
 `assistant.answered` (có `status`, `warnings`, số nguồn được trích).
 
 **Giới hạn.** Ngưỡng và hằng số kiểm chỉnh trên kho mẫu nhỏ; kiểm theo từ không bắt được câu sai mà dùng đúng chữ của
@@ -403,8 +403,8 @@ theo "dãy số đủ dài". `services/svc-workflow/src/svc_workflow/pii.py` là
 
 - *Che nhầm* trên mọi chữ của kho mẫu, đọc như bản chạy thật (lớp chữ và bố cục PDF, TSV OCR có sẵn): 22 văn bản đến,
   6 văn bản hỏi đáp, 1 248 chuỗi nhãn, câu hỏi, lịch sử giao việc — phải 0 chỗ bị che (`tests/test_pii_corpus.py`).
-- *Bắt đúng* trên bộ định dạng tổng hợp (`tests/test_pii.py`): 95 chỗ dương tính trong 84 chuỗi, 80 chuỗi âm tính khó
-  (giấy tờ, ngày, tiền, UUID, mã số thuế, đầu số chưa cấp, dãy số nhỏ của bảng…), 1 144 ca đột biến dữ liệu vào —
+- *Bắt đúng* trên bộ định dạng tổng hợp (`tests/test_pii.py`): 109 chỗ dương tính trong 96 chuỗi, 87 chuỗi âm tính khó
+  (giấy tờ, ngày, tiền, UUID, mã số thuế, đầu số chưa cấp, dãy số nhỏ của bảng…), 1 291 ca đột biến dữ liệu vào —
   số theo README svc-files.
 - *Đột biến mã:* 18 bản sửa hỏng có chủ đích của `pii.py`, mỗi bản phải bị ít nhất một test bắt
   (`tests/test_pii_mutation.py`).

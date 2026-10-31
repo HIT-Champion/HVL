@@ -303,7 +303,7 @@ khoảng 7,5 phút đó thì thư đang chờ vẫn đi; quá thời gian đó t
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 461 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
+.venv/bin/python -m pytest        # 1 215 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa

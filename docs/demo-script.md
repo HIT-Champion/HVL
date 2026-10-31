@@ -562,14 +562,16 @@ hai phút, không cần mô hình ngôn ngữ (bước 6 chỉ chạy khi đã b
 6. Ollama có mô hình sinh → hỏi lại một câu ở chế độ `generate`: in câu trả lời của mô hình, nguồn, thời gian; sổ có
    hai dòng cùng mã lượt hỏi (extract rồi generate). Không có thì in "chưa bật mô hình — trả lời bằng câu trích".
 
-**Đo — `make do-hoi-dap`:** hỏi mọi câu trong `seed/hoi-dap/cau-hoi.json` (19 câu: 16 câu có đáp án — gồm 88/CTSV,
-131/ĐT-ĐH của `make seed` và công văn đi cử giảng viên dự hội thảo đã phát hành —, 2 câu không có đáp án trong kho, 1
-câu bị cấm theo quyền), mỗi câu bằng đúng tài khoản ghi trong tệp, qua APISIX. In bảng markdown: trạng thái, 3 nguồn đầu, đúng / sai
-(nguồn đáp án — cùng số ký hiệu, cùng trang — nằm trong 3 nguồn đầu; câu âm: không được trả lời), có từ khóa đáp án
-trong câu trích, thời gian; tổng recall@3, tỉ lệ từ chối đúng, p50 / p95. Có mô hình thì hỏi thêm `generate`: tỉ lệ câu
-trả lời của mô hình qua kiểm, chứa từ khóa, trích đúng nguồn, mô hình trả lời câu lẽ ra từ chối. **Thoát 1** khi bất kỳ
-lượt nào có nguồn bị cấm (danh sách cấm của câu, văn bản hạn chế ở mọi câu) hoặc recall@3 dưới 80 % (ngưỡng chốt lại
-sau lần đo đầu trên bản cài). Số đo thật ghi ở `services/svc-files/README.md`.
+**Đo — `make do-hoi-dap`:** hỏi mọi câu trong `seed/hoi-dap/cau-hoi.json` (54 câu; 19 câu tra cứu văn bản giữ từ trước
+để so số đo: 16 câu có đáp án — gồm 88/CTSV, 131/ĐT-ĐH của `make seed` và công văn đi cử giảng viên dự hội thảo đã
+phát hành —, 2 câu không có đáp án trong kho, 1 câu bị cấm theo quyền; các câu còn lại theo loại của bộ định tuyến,
+hai đường dữ liệu và nguồn công khai, xem `docs/danh-gia-ai.md`), mỗi câu bằng đúng tài khoản ghi trong tệp, qua APISIX.
+In bảng markdown: trạng thái, 3 nguồn đầu, đúng / sai (nguồn đáp án — cùng số ký hiệu, cùng trang — nằm trong 3 nguồn
+đầu; câu âm: không được trả lời), có từ khóa đáp án trong câu trích, thời gian; tổng recall@3, tỉ lệ từ chối đúng, p50 /
+p95. Có mô hình thì hỏi thêm `generate`: tỉ lệ câu trả lời của mô hình qua kiểm, chứa từ khóa, trích đúng nguồn, mô hình
+trả lời câu lẽ ra từ chối. **Thoát 1** khi bất kỳ lượt nào có nguồn bị cấm (danh sách cấm của câu, văn bản hạn chế ở mọi
+câu) hoặc recall@3 dưới 80 % (ngưỡng chốt lại sau lần đo đầu trên bản cài). Số đo thật ghi ở
+`services/svc-files/README.md`.
 
 **Văn bản mẫu** (`seed/hoi-dap/`, ~135 KB): hoàn toàn hư cấu — "Trường Đại học Mẫu", người ký "Nguyễn Văn A", chân
 trang mỗi trang "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật", số ký hiệu đuôi `-ĐHM` không trùng dữ liệu
@@ -991,7 +993,8 @@ chạy không tải được tệp hay cổng ngắt vài giây:
 
 **Một bước demo báo lỗi:**
 
-- Lệnh dừng ở bước sai, in tên bước, thoát 1. Chạy lại ngay được: mỗi màn chạy lại bao nhiêu lần cũng được.
+- Lệnh dừng ở bước sai, in tên bước, thoát 1. Chạy lại ngay được: mỗi màn chạy lại bao nhiêu lần cũng được, trừ
+  `nong-lanh` (đầu tệp).
 - Dịch vụ chết hay `unhealthy`: `make ps` (bản cài: `docker compose ps`), rồi một lượt tự phục hồi
   `python3 scripts/reconcile.py --heal-only`; xem lỗi bằng `docker compose logs --tail 50 <dịch vụ>`.
 - Vẫn lỗi: bỏ màn đó, mở lượt CI xanh của đúng commit đang chạy — các job "Chạy thử: luong-chinh", "Chạy thử: ai",

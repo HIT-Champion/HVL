@@ -4,7 +4,8 @@ Vai trò `tenant_admin`, thường là cán bộ CNTT của đơn vị. Tài kho
 thực hai bước.
 
 Quản trị đơn vị không đọc nội dung văn bản. Vì vậy menu không có Hộp việc, Văn bản đến, Văn bản đi, Hồ sơ công việc,
-Sổ đăng ký, và không có chuông thông báo. Nếu gõ thẳng địa chỉ các trang đó, hệ thống đưa bạn về Sổ kiểm toán. Không
+Sổ đăng ký. Chuông thông báo vẫn có: cảnh báo vận hành của hệ thống (Alertmanager) gửi về chuông của quản trị đơn vị
+(#284). Nếu gõ thẳng địa chỉ các trang đó, hệ thống đưa bạn về Sổ kiểm toán. Không
 gian cá nhân và Bảng tin cũng không mở được với tài khoản này.
 
 Menu gồm: Tìm kiếm, Sổ kiểm toán, Ứng dụng, Góp ý. Nút **Góp ý** và nút đổi ngôn ngữ trên thanh trên cùng dùng như
