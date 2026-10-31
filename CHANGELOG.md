@@ -8,7 +8,13 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
-### Thêm
+## [1.4.0] - 2026-10-31
+
+Bản online tự nâng khi có bản phát hành trên `main`: reconciler theo thẻ `vX.Y.Z` mới nhất, nâng bằng
+`scripts/nang_cap.sh` (sao lưu, kiểm), lỗi sau khi sao lưu thì tự lùi về bản trước; tắt mặc định. Vá bảy cảnh báo bảo
+mật của pypdf công bố 30/10. Nâng tại chỗ từ `v1.3.0` bằng `scripts/nang_cap.sh nang`.
+
+### Đã thêm
 - Bản thật tự nâng khi có bản phát hành trên `main`: sao lưu, kiểm, lỗi thì tự lùi (`MOC_GITOPS_FOLLOW=release`, #344).
 
 ### Bảo mật

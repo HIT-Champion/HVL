@@ -10,7 +10,7 @@ phụ thuộc, không phải lịch: phần lớn việc của cả bốn không
 Alertmanager, Node-RED, DokuWiki, tiếng Anh, truy vết phân tán) và đêm 29–30/10 (hai nguồn dữ liệu công khai, trợ lý
 hỏi đáp chọn đường trả lời và đếm việc, văn bản của người hỏi, tùy chọn API mô hình ngoài) ở `v1.3.0` (30/10,
 bản cho vòng trường, mục [1.3.0] của [`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ
-ra ở `v1.4.0` (03/12, bản nộp chấm).
+ra ở `v1.5.0` (03/12, bản nộp chấm).
 Mã tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và
 hạn chế đã biết của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
 
@@ -187,8 +187,8 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
 ## Sau vòng trường
 
 Việc còn thiếu thật theo `docs/muc-hoan-thien.md`, xếp theo ưu tiên, kèm lý do. Không gắn ngày: kế hoạch chỉ có hai
-mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.4.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
-Việc nào chưa xong trước 26/11 thì để sau `v1.4.0`.
+mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.5.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
+Việc nào chưa xong trước 26/11 thì để sau `v1.5.0`.
 
 1. **Đơn vị chạy thử thật** (F2.11, F4.6): đo cột "trước" của số đo §8, nhận góp ý của người ngoài đội. Mọi số đo hiện
    tính trên dữ liệu mẫu; chưa có đơn vị dùng thật thì chưa biết sản phẩm giải đúng bài toán đến đâu.
