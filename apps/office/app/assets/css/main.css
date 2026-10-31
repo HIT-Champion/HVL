@@ -1085,6 +1085,12 @@
 .sg-scrim-leave-active { transition: opacity 140ms ease; }
 .sg-scrim-enter-from, .sg-scrim-leave-to { opacity: 0; }
 
+/* Màn vừa mở thanh bên còn hẹp hơn laptop: chia hai tuần thành hai hàng để vẫn thấy đủ ngày, không cuộn ngang. */
+@media (min-width: 901px) and (max-width: 1050px) {
+  .sg-shell:not(.is-collapsed) .sg-calendar-days { grid-template-columns: repeat(7, minmax(min-content, 1fr)); }
+  .sg-shell:not(.is-collapsed) .sg-day { min-height: 64px; }
+}
+
 @media (max-width: 1200px) {
   .sg-topbar { padding-inline: 28px; }
   .moc-sheet { padding: 28px 28px 48px; }

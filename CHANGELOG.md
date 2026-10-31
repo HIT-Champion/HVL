@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Sửa lỗi
+- Thanh bên không cắt mục đang chọn; lịch hạn vừa khung laptop khi phóng to hoặc mở menu (#465).
+
 ### Bảo mật
 - Nâng pypdf 6.21.4 trong `svc-files` (bảy GHSA: PDF dị dạng làm treo, ngốn bộ nhớ); nâng nuxt, node-forge, joi (#461).
 
