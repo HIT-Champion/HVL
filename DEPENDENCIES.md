@@ -43,6 +43,11 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
   bản trước commit 3a1666c (18/10, "fix(security): sign the login cookie") không ký cookie đăng nhập, ai biết email
   của một người làm được cookie đăng nhập thay người đó; b709c33 thêm bản sửa kèm theo (bỏ cookie bị từ chối trước khi
   DokuWiki đọc). Tác giả không công bố mã GHSA, OSV-Scanner không đọc plugin tải trong Dockerfile.
+  31/10/2026 (#461): pypdf 6.21.4 (28/10) trong `svc-files`, vá bảy GHSA công bố 30/10 (PDF cố tình làm hỏng gây
+  vòng lặp vô hạn hay ngốn bộ nhớ); nuxt 4.6.3 (27/10, vá GHSA-9v7c-q64q-vv33 và ba GHSA của máy chủ phát triển) và
+  node-forge 1.4.1 (27/10, mười một GHSA) cho `apps/office`, joi 17.13.9 (28/10, GHSA-4528-x5fx-h6hg) cho `website/`,
+  đều chỉ chạy lúc dựng. Khóa npm sinh lại với `npm install --package-lock-only --before=<giờ ra bản vá>`, nên không
+  gói kéo theo nào mới hơn bản vá.
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -149,7 +154,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 
 | Thành phần | Phiên bản | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| [Nuxt](https://nuxt.com) | 4.6.2 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
+| [Nuxt](https://nuxt.com) | 4.6.3 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
 | [Vue](https://vuejs.org) | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
 | [oidc-client-ts](https://github.com/authts/oidc-client-ts) | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep`, `app-tai-lieu-api` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | [Swagger UI](https://github.com/swagger-api/swagger-ui) (`swagger-ui-dist`) | 5.33.2 | Apache-2.0 | Trang Tài liệu API `/tai-lieu-api/` (`app-tai-lieu-api`, #357): đọc và gọi thử API lõi, API Văn phòng điện tử từ OpenAPI. Dùng nguyên `swagger-ui-bundle.js`, `swagger-ui.css` của gói, kèm `LICENSE`, `NOTICE`; bản dựng sẵn đã gồm các thư viện swagger-ui dùng: React, Redux, Immutable và đa số còn lại MIT, swagger-client Apache-2.0, DOMPurify MPL-2.0 hoặc Apache-2.0, sha.js, ieee754 BSD-3-Clause, zenscroll Unlicense (đều được OSI phê duyệt). Gói kéo theo `@scarf/scarf` 1.4.0 (Apache-2.0), chỉ có bước postinstall gửi số liệu sử dụng: cài bằng `npm ci --ignore-scripts` nên không chạy, không vào image. Trang không gọi CDN | npm, ghim trong `package-lock.json` của `apps/tai-lieu-api` | 3 |
@@ -198,7 +203,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | [Pillow](https://python-pillow.github.io) | 13.0 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
 | [Pyphen](https://github.com/Kozea/Pyphen) | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Signet dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | [segno](https://github.com/heuer/segno) | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
-| [pypdf](https://github.com/py-pdf/pypdf) | 6.21.2 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
+| [pypdf](https://github.com/py-pdf/pypdf) | 6.21.4 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
 | [pytest](https://pytest.org) | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | [jsonschema](https://github.com/python-jsonschema/jsonschema) (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
 | [DuckDB](https://duckdb.org) | 1.5.6 | MIT | Nộp lưu hồ sơ (F3.8, `svc-files`): ghi bảng văn bản, giao việc, dòng thời gian thành Parquet (nén zstd) và đọc lại cho phòng đọc. Một wheel nhúng, không kéo thêm gói Python, không chạy máy chủ riêng | pip | 3 |

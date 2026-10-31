@@ -85,7 +85,7 @@ Centrifugo                      v6.9.7          Apache-2.0              Đẩy t
 
 TẦNG 2 — ỨNG DỤNG WEB
 ===========================================================================================================================================================================
-Nuxt                            4.6.2           MIT                     Khung ứng dụng web                        https://nuxt.com
+Nuxt                            4.6.3           MIT                     Khung ứng dụng web                        https://nuxt.com
 Vue                             3.5             MIT                     Thư viện giao diện                        https://vuejs.org
 oidc-client-ts                  3.5.0           Apache-2.0              Đăng nhập OIDC                            https://github.com/authts/oidc-client-ts
 Swagger UI (swagger-ui-dist)    5.33.2          Apache-2.0              Trang Tài liệu API /tai-lieu-api/         https://github.com/swagger-api/swagger-ui
@@ -120,7 +120,7 @@ Pyphen                          0.18            GPL-2.0+ / LGPL-2.1+ /  Ngắt t
                                                 theo MPL-1.1
 segno                           1.6             BSD-3-Clause            Mã QR in trên văn bản phát hành, dẫn tới  https://github.com/heuer/segno
                                                                         cổng xác thực
-pypdf                           6.21.2          BSD-3-Clause            Đọc lớp chữ của PDF đính kèm để tìm theo  https://github.com/py-pdf/pypdf
+pypdf                           6.21.4          BSD-3-Clause            Đọc lớp chữ của PDF đính kèm để tìm theo  https://github.com/py-pdf/pypdf
                                                                         nội dung
 pytest                          9.1             MIT                     Test đơn vị và tích hợp                   https://pytest.org
 jsonschema (+ referencing,      4.26            MIT                     svc-workflow kiểm lại dữ liệu form theo   https://github.com/python-jsonschema/jsonschema

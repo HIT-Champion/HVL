@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Bảo mật
+- Nâng pypdf 6.21.4 trong `svc-files` (bảy GHSA: PDF dị dạng làm treo, ngốn bộ nhớ); nâng nuxt, node-forge, joi (#461).
+
 ## [1.3.0] - 2026-10-30
 
 Bản cho vòng trường 01/11. Hai nguồn dữ liệu công khai có bản chụp trong repo, trang Trạng thái báo tuổi dữ liệu:
