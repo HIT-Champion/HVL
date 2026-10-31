@@ -52,7 +52,7 @@ from . import data, vi
 ROUTES = ("van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi", "viec_cua_toi", "dem_van_ban")
 DATA_ROUTES = ("viec_cua_toi", "dem_van_ban")
 # đường không tìm đoạn, không gọi mô hình: trả lời ngay, cả ở lượt generate (không chờ lượt sinh)
-DIRECT_ROUTES = ("gioi_thieu", "ngoai_pham_vi", *DATA_ROUTES)
+DIRECT_ROUTES = ("ngoai_pham_vi", *DATA_ROUTES)
 DEFAULT_REASON = "mac-dinh"
 FALLBACK_REASON = "luoi-an-toan"
 FALLBACK_MAX_TERMS = 8
@@ -81,12 +81,13 @@ DOC_WORDS_RE = re.compile(
     r"giay moi|to trinh|so ky hieu|hoc bong|hoc phi|hoc phan|sinh vien|giang vien|dieu \d+|khoan \d+)\b")
 
 # Ngôi thứ hai: người hỏi gọi trợ lý
-_YOU = r"(?:ban|em|tro ly(?: nay| ao| hoi dap| ai)?|signet|he thong nay|may)"
+_YOU = r"(?:ban|em|e|a|tro ly(?: nay| ao| hoi dap| ai)?|signet|he thong nay|may)"     # e, a: em, anh viết tắt
 
 _INTRO: tuple[tuple[str, str, re.Pattern[str]], ...] = (
     ("xin-chao", "vi", re.compile(rf"^(?:xin chao|chao)(?: {_YOU})?(?: a| nhe| oi)?$")),
     # chào tiếng Anh gọi trợ lý bằng tiếng Việt ("hello em"), gọi trống ("em ơi"): vẫn là câu chào tiếng Việt
-    ("xin-chao", "vi", re.compile(r"^(?:hello|hi|hey|alo) (?:ban|em|tro ly)(?: oi| a| nhe)?$|^(?:ban|em|tro ly) oi$")),
+    ("xin-chao", "vi", re.compile(
+        r"^(?:hello|hi|hey|alo) (?:ban|em|e|a|tro ly)(?: oi| a| nhe)?$|^(?:ban|em|e|tro ly) oi$")),
     ("cam-on", "vi", re.compile(rf"^cam on(?: {_YOU})?(?: nhieu| nhe| a)*$")),
     ("lam-duoc-gi", "vi", re.compile(
         rf"^{_YOU} (?:co the |biet |lam duoc |giup duoc |ho tro duoc )?(?:lam|giup|ho tro)(?: duoc)?"

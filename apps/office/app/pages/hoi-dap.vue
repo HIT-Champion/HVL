@@ -22,7 +22,8 @@ import { ApiError } from '~/composables/useApi'
 import type { AskBody, AskResult, AskSource } from '~/composables/useApi'
 import {
   ASK_ROLES, MAX_QUESTION, SCOPE_PARAM, SUGGEST_GROUPS, blocks, canView, citeLabel, cleanQuestion, fallbackSuggestions,
-  hasMask, inAssistant, needsGenerate, pageUrl, previousFor, scopeOf, searched, sourceAnchor, tidy,
+  hasMask, inAssistant, isIntro, needsGenerate, pageUrl, plainIntro, previousFor, scopeOf, searched, sourceAnchor,
+  tidy,
 } from '~/utils/answer'
 
 // Hỏi đáp trên kho văn bản (F4.2). Trợ lý moc-assistant (svc-files) chỉ tìm trong các văn bản người hỏi được xem,
@@ -177,7 +178,7 @@ function body(turn: Turn, mode: 'extract' | 'generate'): AskBody {
 
 // Dòng "Đã hiểu là câu hỏi về: …" của một lượt: chỉ khi svc-files có bộ định tuyến (trả route); mã lý do để ở title
 const understood = (res: AskResult) =>
-  (res.route ? t('assist.understood', { route: t(`assist.route.${res.route}`) }) : '')
+  (res.route && !isIntro(res) ? t('assist.understood', { route: t(`assist.route.${res.route}`) }) : '')
 const outOfScope = (res: AskResult) => res.route === 'ngoai_pham_vi'
 
 function onKey(e: KeyboardEvent) {
@@ -582,7 +583,7 @@ onBeforeUnmount(() => {
                   <AnswerText
                     :text="blocks(turn.result).model!.text" :sources="turn.result.sources" :ask="turn.result.ask_id"
                   />
-                  <p class="sg-answer-note">
+                  <p v-if="!isIntro(turn.result)" class="sg-answer-note">
                     <svg
                       class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                       stroke-width="2" aria-hidden="true"
@@ -614,9 +615,13 @@ onBeforeUnmount(() => {
                   :id="`trich-${turn.key}`" class="sg-answer" :class="{ 'is-quote': blocks(turn.result).model }"
                   data-testid="ask-extract"
                 >
-                  <h3 class="sg-answer-label">{{ t('assist.extractTitle') }}</h3>
+                  <h3 :class="isIntro(turn.result) ? 'sr-only' : 'sg-answer-label'">{{ t('assist.extractTitle') }}</h3>
+                  <!-- giới thiệu trợ lý: chữ soạn sẵn hiện như tin nhắn, không ngoặc trích, không [n] -->
+                  <p v-if="isIntro(turn.result)" class="whitespace-pre-line">
+                    {{ plainIntro(blocks(turn.result).extract!.text) }}
+                  </p>
                   <AnswerText
-                    :text="blocks(turn.result).extract!.text" :sources="turn.result.sources"
+                    v-else :text="blocks(turn.result).extract!.text" :sources="turn.result.sources"
                     :ask="turn.result.ask_id"
                   />
                 </section>
@@ -681,7 +686,8 @@ onBeforeUnmount(() => {
 
                 <!-- nguồn: mỗi nguồn một dòng gọn, "Chi tiết" mở đoạn trích -->
                 <section
-                  v-if="turn.result.sources.length" class="sg-sources" :aria-labelledby="`nguon-${turn.key}`"
+                  v-if="turn.result.sources.length && !isIntro(turn.result)" class="sg-sources"
+                  :aria-labelledby="`nguon-${turn.key}`"
                 >
                   <h3 :id="`nguon-${turn.key}`" class="sg-sources-title">
                     {{ t('assist.source.title') }} <span class="tabular-nums">({{ turn.result.sources.length }})</span>

@@ -14,7 +14,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""POST /api/documents/ask qua bộ định tuyến (#423): gioi_thieu, ngoai_pham_vi không tìm văn bản, không gọi mô hình;
+"""POST /api/documents/ask qua bộ định tuyến (#423): gioi_thieu, ngoai_pham_vi không tìm văn bản; gioi_thieu chỉ gọi mô
+hình ở lượt generate, ngoai_pham_vi không bao giờ;
 huong_dan trả lời từ hướng dẫn sử dụng; câu nối tiếp ghép với ``previous``; sổ kiểm toán, nhật ký ghi đường mà không
 có chữ câu hỏi. Dùng lại fixture ``asking`` của test_assist_api.py."""
 
@@ -25,7 +26,7 @@ import pathlib
 
 import pytest
 
-from assist_fakes import CHAT_MODEL, FakeOllama, ollama
+from assist_fakes import CHAT_MODEL, FakeOllama, good_answer, ollama
 from test_assist_api import D88, ask, asking, demo  # noqa: F401 (asking là fixture)
 
 GUIDES = str(pathlib.Path(__file__).resolve().parents[3] / "docs" / "huong-dan")
@@ -38,7 +39,7 @@ def routed(env, question: str, **body) -> dict:
 
 
 @pytest.mark.parametrize("mode", ["extract", "generate"])
-def test_what_can_you_do_answers_from_the_intro_without_search_or_model(asking, mode):
+def test_what_can_you_do_answers_from_the_intro_without_search(asking, mode):
     fake = FakeOllama()
     env = asking(passages=demo(), ai=ollama(fake))
     fake.requests.clear()
@@ -51,8 +52,28 @@ def test_what_can_you_do_answers_from_the_intro_without_search_or_model(asking, 
     assert first["kind"] == "guide" and first["document_id"] is None and first["cited"] is True
     assert first["path"].endswith("gioi_thieu/vi.md#lam-duoc-gi") and first["type_name"] == "Giới thiệu trợ lý"
     assert rest and not any(s["cited"] for s in rest)
-    assert env.retriever.calls == [] and fake.requests == []         # không tìm, không nhúng, không gọi mô hình
+    assert env.retriever.calls == []                                 # không tìm, không nhúng
+    # generate: mô hình được hỏi, câu trả lời giả có số "3,2" không có trong tệp giới thiệu → bị loại, giữ câu trích,
+    # không cảnh báo
+    assert [r.url.path for r in fake.requests] == ([] if mode == "extract" else ["/api/chat"])
     assert body["semantic"] is False and body["warnings"] == []
+
+
+def test_the_model_writes_the_intro_answer_within_the_assistant_scope(asking):
+    hello = "Chào bạn! Tôi giúp bạn tra nội dung văn bản, cách dùng Signet và việc của bạn."
+    fake = FakeOllama(reply=good_answer(hello))
+    env = asking(passages=demo(), ai=ollama(fake))
+    fake.requests.clear()
+    body = routed(env, "hello e", mode="generate")
+    assert (body["route"], body["route_reason"], body["status"]) == ("gioi_thieu", "kw:xin-chao", "answered")
+    assert body["answer"] == {"text": hello, "source": "model", "model": CHAT_MODEL}
+    assert body["extract"]["text"].startswith("“Tôi là trợ lý hỏi đáp của Signet") and body["warnings"] == []
+    (chat,) = fake.requests
+    sent = json.loads(chat.content)
+    assert sent["messages"][0]["content"].startswith("Bạn là trợ lý hỏi đáp của Signet")
+    assert "Phạm vi của bạn" in sent["messages"][0]["content"]
+    assert sent["messages"][1]["content"].count("<nguon ") == 2                 # mục chính và một mục kèm
+    assert env.retriever.calls == []
 
 
 def test_greetings_and_english_get_the_matching_intro(asking):
@@ -187,9 +208,10 @@ def test_a_short_unclear_question_without_evidence_gets_the_intro_not_no_evidenc
     body = routed(env, "bạn có thể giups gì cho tôi?", mode=mode)
     assert (body["route"], body["route_reason"], body["status"]) == ("gioi_thieu", "luoi-an-toan", "answered")
     assert body["answer"]["text"].startswith("“Tôi chưa hiểu rõ câu này") and body["answer"]["model"] is None
-    assert body["sources"][0]["path"].endswith("gioi_thieu/vi.md#chua-ro")
+    assert body["sources"][0]["path"].endswith("gioi_thieu/vi.md#chua-ro") and body["warnings"] == []
     assert len(env.retriever.calls) == 1                                   # đã tìm một lần, không ra đoạn nào
-    assert not any("/api/chat" in str(r) for r in fake.requests)          # không gọi mô hình viết
+    # generate: mô hình được hỏi viết lời đáp; câu giả có số không có trong nguồn → bị loại, giữ câu trích
+    assert ("/api/chat" in [r.url.path for r in fake.requests]) == (mode == "generate")
     (event,) = env.hasura.agent_events
     assert (event["diff"]["route"], event["diff"]["route_reason"]) == ("gioi_thieu", "luoi-an-toan")
 

@@ -37,7 +37,8 @@ Không có đoạn nào → ``no_evidence``, không gọi mô hình; giống h�
 đọc.
 
 Bộ định tuyến (route.py, #423) chọn đường sau bước 2, trước khi tốn gì thêm: ``gioi_thieu`` trả mục của tệp Giới thiệu
-trợ lý, ``ngoai_pham_vi`` trả câu cố định — cả hai không tìm, không gọi mô hình, cả ở ``generate``; ``huong_dan`` tìm
+trợ lý (lượt ``generate``: mô hình viết lời đáp từ các mục đó, lời dặn nêu phạm vi trợ lý; không đạt thì vẫn là
+câu trích), ``ngoai_pham_vi`` trả câu cố định — cả hai không tìm; ``ngoai_pham_vi`` không gọi mô hình; ``huong_dan`` tìm
 trong kho hướng dẫn sử dụng (guide.py) thay cho bước 4–5, rồi câu trích và mô hình như văn bản — kho không có mục nào
 khớp thì đi như ``van_ban`` (mã lý do ``khong-khop-huong-dan``); ``van_ban`` như trên. Hai đường dữ liệu (#441, data.py)
 ``viec_cua_toi``, ``dem_van_ban`` đếm thẳng trong CSDL qua Hasura bằng token người hỏi, trả câu có số, ``data`` và
@@ -63,6 +64,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 import uuid
 from collections.abc import Callable
@@ -89,6 +91,8 @@ log = logging.getLogger("svc_files")
 MAX_QUESTION = 500          # ký tự sau chuẩn hóa
 EMBED_TIMEOUT_S = 5.0       # nhúng câu hỏi; quá thì tìm theo từ khóa
 MODEL_MIN_S = 5.0           # còn ít hơn thế trong hạn tổng thì không hỏi mô hình
+INTRO_MODEL_TIMEOUT_S = 6.0     # lời đáp gioi_thieu: quá hạn thì giữ câu trích của tệp Giới thiệu, không cảnh báo
+INTRO_SOURCES = 2               # số mục giới thiệu gửi mô hình: mục chính và một mục kèm, lời dặn ngắn để viết nhanh
 SAVE_RESERVE_S = 3.0        # để dành cho bước ghi sổ cuối yêu cầu
 HOLD_S = 5.0                # lời gọi Ollama xong thì vòng nhúng nền còn nhường thêm chừng này giây (_holding)
 RETRY_AFTER = "10"
@@ -266,10 +270,10 @@ class Assistant:
         model_text: str | None = None
         model: str | None = None
         masked = 0                  # số chỗ đã che trong chữ gửi mô hình viết câu trả lời
-        if body.mode == "generate" and passages and chosen.name in ("van_ban", "huong_dan"):
+        if body.mode == "generate" and passages and chosen.name in ("van_ban", "huong_dan", "gioi_thieu"):
             model_text, model, warning, masked = await self._generate(asked, passages, quoted.best, deadline,
-                                                                      request_id)
-            if warning:
+                                                                      request_id, intro=chosen.name == "gioi_thieu")
+            if warning and chosen.name != "gioi_thieu":     # lời chào không đạt thì câu trích là đủ, không báo
                 warnings.append(warning)
             if model_text:
                 cited = grounding.citations(model_text)
@@ -390,8 +394,10 @@ class Assistant:
         return found
 
     async def _generate(self, question: str, passages: list[Passage], best: dict[str, tuple[int, int]],
-                        deadline: float, request_id: str) -> tuple[str | None, str | None, str | None, int]:
-        """(câu trả lời đã kiểm, mô hình đã gọi, cảnh báo, số chỗ đã che trong chữ gửi mô hình)."""
+                        deadline: float, request_id: str, *, intro: bool = False,
+                        ) -> tuple[str | None, str | None, str | None, int]:
+        """(câu trả lời đã kiểm, mô hình đã gọi, cảnh báo, số chỗ đã che trong chữ gửi mô hình). ``intro``: đường
+        ``gioi_thieu`` — lời dặn nêu phạm vi trợ lý (``grounding.SYSTEM_INTRO``), kiểm bằng ``validate_intro``."""
         if not self.ai.chat_available:
             return None, None, "model_unavailable", 0
         left = deadline - self._clock()
@@ -401,15 +407,18 @@ class Assistant:
         # gốc (câu trích nguyên văn), sources() đổi sang toạ độ bản che. Mô hình đọc và validate kiểm cùng một bản che
         masker = pii.Masker()
         asked = masker.mask(question).text
-        srcs = grounding.sources(passages, best, max_chars=self.settings.ask_context_chars, masker=masker)
+        srcs = grounding.sources(passages[:INTRO_SOURCES] if intro else passages, best,
+                                 max_chars=self.settings.ask_context_chars, masker=masker)
+        limit = min(self.settings.ask_model_timeout_s, INTRO_MODEL_TIMEOUT_S if intro else math.inf)
         with self._holding():
-            result = await self.ai.chat(grounding.messages(srcs, asked), format=grounding.FORMAT,
+            system = grounding.SYSTEM_INTRO if intro else grounding.SYSTEM
+            result = await self.ai.chat(grounding.messages(srcs, asked, system=system), format=grounding.FORMAT,
                                         options=grounding.OPTIONS,
-                                        timeout_s=min(self.settings.ask_model_timeout_s, left - SAVE_RESERVE_S))
+                                        timeout_s=min(limit, left - SAVE_RESERVE_S))
         model = self.ai.chat_model
         if result.content is None:
             return None, model, result.warning or "model_unavailable", masker.total
-        verdict = grounding.validate(result.content, srcs, asked)
+        verdict = (grounding.validate_intro if intro else grounding.validate)(result.content, srcs, asked)
         if verdict.text:
             return verdict.text, model, None, masker.total
         if verdict.declined:

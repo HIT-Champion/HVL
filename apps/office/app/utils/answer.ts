@@ -146,16 +146,27 @@ export const DATA_LINKS: readonly string[] = ['/', '/van-ban-den', '/van-ban-di'
 export const ROUTES: readonly AskRoute[] = ['van_ban', 'gioi_thieu', 'huong_dan', 'ngoai_pham_vi', 'viec_cua_toi',
   'dem_van_ban']
 
-/** Đường có tìm đoạn trong kho (văn bản, giới thiệu trợ lý, hướng dẫn sử dụng): có nguồn, có thể nhờ mô hình viết.
- *  Máy chủ chưa có bộ định tuyến (không có route) thì mọi câu là văn bản như trước. */
+/** Đường có tìm đoạn trong kho văn bản hay hướng dẫn sử dụng: hiện chip cách tìm. Giới thiệu trợ lý (lời chào, câu
+ *  chưa rõ ý) hiện như một tin nhắn, không chip. Máy chủ chưa có bộ định tuyến (không có route) thì mọi câu là văn bản
+ *  như trước. */
 export function searched(route: AskRoute | undefined): boolean {
-  return route === undefined || route === 'van_ban' || route === 'gioi_thieu' || route === 'huong_dan'
+  return route === undefined || route === 'van_ban' || route === 'huong_dan'
 }
 
-/** Đường có lượt mô hình viết câu trả lời: văn bản và hướng dẫn sử dụng. Giới thiệu trợ lý chỉ trả câu trích của tệp
- *  "Giới thiệu trợ lý", không có lượt generate. */
+/** Đường có lượt mô hình viết câu trả lời: văn bản, hướng dẫn sử dụng và giới thiệu trợ lý (mô hình viết lời đáp từ
+ *  tệp "Giới thiệu trợ lý"; không đạt thì giữ chữ soạn sẵn). */
 export function generates(route: AskRoute | undefined): boolean {
-  return route === undefined || route === 'van_ban' || route === 'huong_dan'
+  return route === undefined || route === 'van_ban' || route === 'huong_dan' || route === 'gioi_thieu'
+}
+
+/** Lời đáp của đường giới thiệu trợ lý hiện như tin nhắn: không nhãn "Câu trích nguyên văn", không danh sách nguồn. */
+export function isIntro(res: Pick<AskResult, 'route'>): boolean {
+  return res.route === 'gioi_thieu'
+}
+
+/** Câu trích của tệp Giới thiệu trợ lý (“…” [1]) thành chữ thường để hiện như tin nhắn. */
+export function plainIntro(text: string): string {
+  return text.replace(/^“([\s\S]*)”\s*\[\d+\]$/u, '$1')
 }
 
 // Gợi ý ở trang trống, chia theo loại câu; mỗi câu đã thử qua bộ định tuyến của svc-files ra đúng đường của nhóm. Thứ
