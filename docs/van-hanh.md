@@ -327,6 +327,31 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
 
   Đầu nhánh `deploy` phải là commit do người trong danh sách ký: đưa bản lên bằng `git merge --no-ff -S` thay cho
   `--ff-only` (`docs/git_flow.md` mục 7) — commit gộp trên GitHub mang chữ ký OpenPGP của GitHub, không được nhận.
+- **Bản thật: nâng có sao lưu, lỗi thì tự lùi** (`MOC_GITOPS_MODE=nang-cap`, #344): commit mới trên `deploy` không cài
+  lại thẳng bằng `install.sh` mà đi đúng đường nâng tay `scripts/nang_cap.sh nang` của commit đó (dựng image khi trang
+  còn chạy, sao lưu, dừng, cài, realm, kiểm dữ liệu, dịch vụ, smoke). Lỗi trước khi sao lưu thì bản cũ vẫn chạy. Lỗi
+  sau đó, kể cả kiểm trượt, thì reconciler tự `nang_cap.sh lui` về commit trước (mã nguồn lấy bằng `git archive` ra
+  `.git/moc-lui` của bản sao, cùng `.env` lúc trước) và khôi phục lượt sao lưu vừa lấy: dữ liệu ghi vào trong lúc
+  kiểm bị mất. Commit lỗi không thử lại, đợi commit mới. Đầu ra lần nâng, lùi gần nhất ở `moc-nang-cap.log` trong thư
+  mục `.git` của bản sao. Phiên bản ghi vào bản cài (`/api/status`) là thẻ cùng cây với commit `deploy vX.Y.Z`, không
+  phải `X.Y.Z-1-g…`. Lượt đầu tiên mà bản đang chạy đúng thẻ ở đầu `deploy` (cây trùng) thì chỉ ghi nhận, không dừng
+  trang để cài lại. Nên bật cùng `MOC_GITOPS_ALLOWED_SIGNERS`.
+- **Có bản phát hành là tự nâng** (`MOC_GITOPS_FOLLOW=release`, đặt `MOC_GITOPS_BRANCH=main`): reconciler áp thẻ
+  `vX.Y.Z` mới nhất có trên `main` thay cho đầu nhánh. Commit trên `main` chưa gắn thẻ, bản thử `-rc`, thẻ chưa vào
+  `main` đều không tự lên. Đặt `MOC_GITOPS_ALLOWED_SIGNERS` thì kiểm chữ ký của thẻ (`git verify-tag`), vì commit gộp
+  trên `main` do GitHub ký OpenPGP: người phát hành gắn thẻ bằng `git tag -s` với khóa SSH trong danh sách. Không đặt
+  thì ai đẩy được thẻ `v*` lên GitHub là đưa được bản lên máy chủ: giới hạn bằng ruleset cho thẻ.
+
+```bash
+# bản thật: mỗi bản phát hành trên main tự nâng, có sao lưu, lỗi thì tự lùi
+git clone -b main https://github.com/HIT-Champion/Signet.git /opt/moc-src
+printf '%s\n' MOC_GITOPS_DIR=/opt/moc-src MOC_GITOPS_BRANCH=main MOC_GITOPS_FOLLOW=release \
+  MOC_GITOPS_MODE=nang-cap >> /opt/moc/.env
+python3 /opt/moc/scripts/reconcile.py          # lượt đầu: nhận bản đang chạy nếu đúng thẻ mới nhất
+
+# hoặc cổng ký nhánh deploy: người phát hành đưa từng thẻ lên (khóa ký có trong allowed_signers của máy chủ)
+git switch deploy && git merge -S --no-ff vX.Y.Z -m "deploy vX.Y.Z" && git push origin deploy
+```
 
 ## Quét mã độc (ClamAV)
 

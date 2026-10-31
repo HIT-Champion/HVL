@@ -377,6 +377,34 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
   The head of the `deploy` branch must be a commit signed by someone on the list: bring a release in with
   `git merge --no-ff -S` instead of `--ff-only` (`docs/git_flow.md` section 7) — a merge commit made on GitHub carries
   GitHub's OpenPGP signature and is not accepted.
+- **Production: upgrade with a backup, roll back on failure** (`MOC_GITOPS_MODE=nang-cap`, #344): a new commit on
+  `deploy` is not reinstalled straight away with `install.sh`; it goes through the manual upgrade path of that commit,
+  `scripts/nang_cap.sh nang` (build while the site is still up, backup, stop, install, realm, data, service and smoke
+  checks). A failure before the backup leaves the old version running. A failure after it, a failed check included,
+  makes the reconciler run `nang_cap.sh lui` back to the previous commit (its source extracted with `git archive` into
+  `.git/moc-lui` of the clone, with the `.env` from before) and restore the backup it had just taken: data written
+  during the checks is lost. The failed commit is not retried; the reconciler waits for the next one. The output of the
+  latest upgrade and rollback is in `moc-nang-cap.log` inside the clone's `.git` directory. The version written into
+  the installation (`/api/status`) is the tag whose tree matches the `deploy vX.Y.Z` commit, not `X.Y.Z-1-g…`. On the
+  first run, when the running installation already matches the tag at the head of `deploy` (same tree), the reconciler
+  only records it and does not stop the site to reinstall. Enable it together with `MOC_GITOPS_ALLOWED_SIGNERS`.
+- **Every release upgrades production** (`MOC_GITOPS_FOLLOW=release` with `MOC_GITOPS_BRANCH=main`): the reconciler
+  applies the newest `vX.Y.Z` tag reachable from `main` instead of the branch head. Untagged commits on `main`, `-rc`
+  tags and tags not yet on `main` are never applied. With `MOC_GITOPS_ALLOWED_SIGNERS` set, the tag's signature is
+  checked (`git verify-tag`), because merge commits on `main` carry GitHub's OpenPGP signature: the releaser tags with
+  `git tag -s` using an SSH key on the list. Without it, anyone who can push a `v*` tag to GitHub can put a version on
+  the server: restrict that with a ruleset on tags.
+
+```bash
+# production: every release on main upgrades the site, with a backup and automatic rollback
+git clone -b main https://github.com/HIT-Champion/Signet.git /opt/moc-src
+printf '%s\n' MOC_GITOPS_DIR=/opt/moc-src MOC_GITOPS_BRANCH=main MOC_GITOPS_FOLLOW=release \
+  MOC_GITOPS_MODE=nang-cap >> /opt/moc/.env
+python3 /opt/moc/scripts/reconcile.py          # first run: adopts the running version if it is the newest tag
+
+# or the signed deploy-branch gate: the releaser brings each tag in (their key is in the server's allowed_signers)
+git switch deploy && git merge -S --no-ff vX.Y.Z -m "deploy vX.Y.Z" && git push origin deploy
+```
 
 ## Malware scanning (ClamAV)
 
