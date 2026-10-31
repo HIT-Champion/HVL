@@ -1,6 +1,6 @@
 # Kiến trúc Signet
 
-> Cập nhật 25/10/2026, theo nhánh `develop` sau bản `v1.0.0`. Tài liệu trả lời bốn câu: hệ thống gồm những gì, chạy thế
+> Cập nhật 31/10/2026, theo nhánh `develop` sau bản `v1.4.0`. Tài liệu trả lời bốn câu: hệ thống gồm những gì, chạy thế
 > nào, vì sao chọn như vậy, chỗ nào còn yếu. Mức hoàn thiện từng tính năng kèm bằng chứng:
 > [`muc-hoan-thien.md`](muc-hoan-thien.md) — lệch với tài liệu này thì `muc-hoan-thien.md` là bản đúng. Phiên bản, giấy
 > phép, thành phần đã loại: [`DEPENDENCIES.md`](../DEPENDENCIES.md). Cắm thêm ứng dụng:
@@ -331,7 +331,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Alertmanager gọi svc-workflow để cảnh báo thành thông báo cho quản trị đơn vị (#284); Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
 | Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 9 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
 | restic | 0.19.1 | Sao lưu mã hóa CSDL, tệp, két (`make backup`, `make restore`) | ⑥ | `scripts/backup.py` | F3.4 Hoàn thiện |
-| Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, hoặc thẻ `vX.Y.Z` mới nhất trên `main` khi `MOC_GITOPS_FOLLOW=release`; `MOC_GITOPS_MODE=nang-cap` nâng có sao lưu và smoke, lỗi thì tự lùi về bản trước (#344, #467); kiểm chữ ký commit hoặc thẻ nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS`. Hướng dẫn: `docs/van-hanh.md` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
+| Reconciler GitOps *(mã của đội)* | systemd timer hoặc cron | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, hoặc thẻ `vX.Y.Z` mới nhất trên `main` khi `MOC_GITOPS_FOLLOW=release`; `MOC_GITOPS_MODE=nang-cap` nâng có sao lưu và smoke, lỗi thì tự lùi về bản trước (#344, #467); kiểm chữ ký commit hoặc thẻ nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS`. Hướng dẫn: `docs/van-hanh.md` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
 | cloudflared | 2026.10.0 | Cloudflare Tunnel cho máy không có IP công khai (profile `tunnel`, tùy chọn) | — | dịch vụ `cloudflared` trong `docker-compose.yml` | F1.9 Hoàn thiện (tunnel chưa kiểm trong CI) |
 
 F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (Dùng được): bảng
@@ -1017,8 +1017,9 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   ([`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md) §0) áp cho ứng dụng mới; Văn phòng, ứng dụng đầu tiên, vẫn dính `core` ở
   hàm, cột, metadata, vai trò (§4.4).
 - **Hệ quả:** ít container hơn; chung kiểm token, máy khách Hasura, vai trò `service`, `agent`, sổ kiểm toán; lời gọi
-  giữa hai phần là gọi hàm. Đổi lại: chưa tắt hay thay được Văn phòng mà không sửa mã lõi; tìm kiếm, chữ PDF, trợ lý chỉ
-  phủ văn bản của Văn phòng; triển khai lại phần Văn phòng là khởi động lại cả dịch vụ lõi; còn những chỗ dính ở §4.4.
+  giữa hai phần là gọi hàm. Đổi lại: tắt được Văn phòng bằng cấu hình (`MOC_OFFICE_ENABLED=false`, #302, `make
+  demo-tat-van-phong` trong CI) nhưng chưa thay được nó mà không sửa mã lõi; tìm kiếm, chữ PDF, trợ lý chỉ phủ văn bản
+  của Văn phòng; triển khai lại phần Văn phòng là khởi động lại cả dịch vụ lõi; còn những chỗ dính ở §4.4.
   Ứng dụng thứ hai vẫn cắm được mà không sửa `services/` (§4.6). Hướng tách, tiêu chí, cái giá: §4.7 — việc sau
   `v1.5.0`.
 

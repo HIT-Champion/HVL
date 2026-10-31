@@ -127,7 +127,7 @@ mục 1.
 
 ### Trợ lý AI chạy tại chỗ
 
-AI trong Signet chỉ **gợi ý**, người quyết định; mọi thứ chạy trên máy chủ của tổ chức, không gửi dữ liệu ra ngoài.
+AI trong Signet chỉ **gợi ý**, người quyết định; mặc định mọi thứ chạy trên máy chủ của tổ chức, dữ liệu không ra ngoài.
 
 | Tác tử | Làm gì |
 |---|---|
@@ -137,8 +137,10 @@ AI trong Signet chỉ **gợi ý**, người quyết định; mọi thứ chạy
 | Che thông tin cá nhân | Số CCCD, điện thoại, email, tài khoản ngân hàng bị che trước khi tới mô hình và nhật ký; người có quyền đọc văn bản vẫn thấy số thật |
 
 Cả bốn chạy được **không cần mô hình ngôn ngữ**, nên CI, máy yếu, máy không có Internet đều chạy. Mô hình cục bộ
-(Ollama, Qwen3 1,7B, chạy trên CPU) viết trích yếu và câu trả lời: `make ai-model` rồi `make up-ai`. Số đo và giới hạn
-từng tác tử: [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
+(Ollama, Qwen3 1,7B, chạy trên CPU) viết trích yếu và câu trả lời: `make ai-model` rồi `make up-ai`. Riêng bước viết
+câu trả lời có thể gọi API ngoài chuẩn OpenAI thay Ollama (`MOC_ASK_API=openai`, tắt mặc định, #430); khi bật, câu hỏi
+và tối đa 4 đoạn văn bản làm căn cứ, đã che thông tin cá nhân, rời máy chủ. Số đo và giới hạn từng tác tử:
+[`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 
 ### Ảnh chụp màn hình
 
@@ -321,7 +323,7 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
-| `make test` | Test đơn vị của `svc-files`, `svc-workflow`, lệnh vận hành; kiểm form theo `schemas/` trên cùng bộ ca thử với máy chủ và CSDL; test của Không gian cá nhân và Bảng tin | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
+| `make test` | Test đơn vị của `svc-files`, `svc-workflow`, lệnh vận hành; test của Văn phòng điện tử, gồm kiểm form theo `schemas/` trên cùng bộ ca thử với máy chủ và CSDL; test của Không gian cá nhân, Bảng tin, Đơn nghỉ phép, ứng dụng Đổi, bù lịch giảng và trang Tài liệu API | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
 | `make smoke` | Đi trọn luồng văn bản đến, văn bản đi qua cổng APISIX; cổng xác thực, thông báo WebSocket, sổ kiểm toán; chặn dữ liệu sai, EICAR, đường quản trị; cách ly đơn vị; giới hạn tốc độ; két bí mật; reconciler; nộp lưu; giám sát; WAF chặn tải tấn công mà không chặn nhầm dữ liệu thật | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Trình duyệt thật (Playwright, trong container): form sai bị chặn trước khi gửi, thả tệp vào trang xác thực, hai người dùng cùng lúc nhận thông báo, sổ kiểm toán, dashboard, ký số | Như trên |
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii`, `do-so-lieu-sau` | Đo các tác tử AI trên bộ mẫu có đáp án (đúng / sai / trống từng trường, recall@3, độ phủ); số đo "sau" theo đặc tả §8 | Hệ thống đang chạy (`do-che-pii` không cần) |
@@ -364,7 +366,8 @@ nguyên bản (image chính thức, không sửa mã thượng nguồn).
 
 ```
 apps/                Văn phòng điện tử (office/, Nuxt 4) · Không gian cá nhân P.A.R.A (ca-nhan/) · Bảng tin đơn vị
-                     (bang-tin/, cắm bằng moc app install) · Tài liệu API bằng Swagger UI (tai-lieu-api/)
+                     (bang-tin/), Đơn nghỉ phép (nghi-phep/), Đổi, bù lịch giảng (lich-giang/): ba ứng dụng cắm bằng
+                     moc app install · Tài liệu API bằng Swagger UI (tai-lieu-api/)
 services/            svc-workflow/: Hasura Actions, quy trình BPMN, thông báo, nhắc hạn, gợi ý giao việc
                      svc-files/: tệp, kiểm dịch, tìm kiếm, dựng PDF, ký số, cổng xác thực, các tác tử AI
                      ot-sensor/: cảm biến nhiệt độ giả lập (profile iot-sim)

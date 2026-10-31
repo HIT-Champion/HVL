@@ -40,10 +40,12 @@ chỉ vào CSDL qua Action `receiveIncoming`, nên không đi vòng được l�
 
 ## Mã lỗi
 
-Lớp 1 và lớp 2 quy lỗi về `{trường: mã}` giống hệt nhau. Mã là tên từ khóa JSON Schema bị vi phạm (`required`,
-`type`, `minLength`, `maxLength`, `format`, `pattern`, `enum`, `not`, `additionalProperties`, `uniqueItems`,
-`maxItems`) hoặc từ khóa riêng (`x-moc-nfc`, `x-moc-date`). Một trường sai nhiều điều thì báo điều đứng trước trong danh sách này. svc-workflow thêm `duplicate`
-(trùng văn bản đã tiếp nhận) và `unknown` (loại văn bản, tệp không có). Lỗi trả trong `extensions.fields`:
+Lớp 1 và lớp 2 quy lỗi về `{trường: mã}` giống hệt nhau. Mã là tên từ khóa JSON Schema bị vi phạm hoặc từ khóa
+riêng (`x-moc-nfc`, `x-moc-date`). Một trường sai nhiều điều thì báo điều đứng trước theo thứ tự `type`, `required`,
+`additionalProperties`, `enum`, `format`, `pattern`, `minLength`, `maxLength`, `not`, `x-moc-nfc`, `uniqueItems`,
+`maxItems`, `x-moc-date` (`PRIORITY` trong `services/svc-workflow/src/svc_workflow/schemas.py`, cùng thứ tự trong
+`apps/office/app/utils/forms.ts`). svc-workflow thêm `duplicate` (trùng văn bản đã tiếp nhận) và `unknown` (loại văn
+bản, tệp không có). Lỗi trả trong `extensions.fields`:
 
 ```json
 {"errors": [{"message": "Dữ liệu văn bản đến chưa hợp lệ: summary, symbol",

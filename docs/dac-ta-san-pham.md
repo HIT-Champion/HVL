@@ -11,7 +11,7 @@
 
 ## 0. Tóm tắt
 
-Signet là một lõi **DX-OS Open-Core** (Tầng 1, không giao diện) cùng hai ứng dụng Tầng 2 chạy trên lõi.
+Signet là một lõi **DX-OS Open-Core** (Tầng 1, không giao diện) cùng các ứng dụng Tầng 2 chạy trên lõi.
 
 **Lõi** cung cấp 4 dịch vụ đề bắt buộc — định danh, cổng API, dữ liệu có cấu trúc và phi cấu trúc,
 quy trình — và một lớp **tin cậy** dùng chung: lõi "đóng dấu" lên mọi thứ đi qua nó.
@@ -37,11 +37,14 @@ không được làm sơ sài.
 - **Văn phòng điện tử** (`apps/office`, không gian [P]): quản lý văn bản và điều hành theo
   Nghị định 30/2020/NĐ-CP — tiếp nhận công văn đến, vào sổ, chỉ đạo, giao xử lý; soạn, trình, duyệt,
   cấp số và phát hành công văn đi; lập hồ sơ và nộp lưu.
-- **Cổng xác thực văn bản** (`apps/verify`, công khai): ai cầm một văn bản do hệ thống phát hành cũng
-  quét được mã QR, hoặc thả tệp PDF vào, để biết văn bản là thật và chưa bị sửa.
+- **Cổng xác thực văn bản** (công khai): ai cầm một văn bản do hệ thống phát hành cũng quét được mã QR,
+  hoặc thả tệp PDF vào, để biết văn bản là thật và chưa bị sửa. Bản dựng không tách ứng dụng `apps/verify`
+  riêng: cổng là trang `/xac-thuc` của `apps/office`, không cần đăng nhập, gọi `/api/verify/*`.
 
-Đơn vị chạy thử: văn thư văn phòng khoa (đang liên hệ). Dữ liệu mẫu: công văn, thông báo mà trường đã
-công bố công khai.
+Đơn vị chạy thử: dự kiến là văn thư văn phòng khoa; tới nay repo chưa ghi đơn vị chạy thử nào. Dữ liệu mẫu:
+kế hoạch là công văn, thông báo trường đã công bố công khai; bản dựng dùng 2 đơn vị, 18 văn bản đến và 7 văn
+bản đi giả lập (`scripts/seed_documents.py`) cộng 4 thông tư thật của Bộ GD&ĐT lấy từ Công báo
+(`seed/du-lieu-mo/`).
 
 ---
 
@@ -160,7 +163,7 @@ trước khi đưa vào slide**.
 | Người ngoài | không đăng nhập | Sinh viên, đối tác | Kiểm tra văn bản trên cổng xác thực |
 | Tác tử | tài khoản dịch vụ | — | Đọc văn bản đến, gợi ý giao việc, soạn nháp báo cáo sự cố; **không tự quyết** |
 
-TOTP bắt buộc cho `clerk`, `manager`, `director`. Tài khoản dùng thử cho giám khảo ở vai trò `staff`.
+TOTP bắt buộc cho `clerk`, `manager`, `director`, `tenant_admin`. Tài khoản dùng thử cho giám khảo ở vai trò `staff`.
 
 ---
 
@@ -179,10 +182,10 @@ TOTP bắt buộc cho `clerk`, `manager`, `director`. Tài khoản dùng thử c
 | F2.7 | Tìm kiếm theo số ký hiệu, trích yếu, cơ quan ban hành và nội dung PDF có lớp chữ |
 | F2.8 | Sổ đăng ký văn bản đến / đi theo năm; xuất PDF để in (NĐ 30, Điều 16, 22, Phụ lục IV) |
 | F2.9 | Khóa i18n Việt / Anh từ ngày đầu |
-| F2.10 | `make seed` qua API: ~50 văn bản ở nhiều trạng thái, văn bản đến lấy từ công văn đã công bố công khai |
+| F2.10 | `make seed` qua API: ~50 văn bản ở nhiều trạng thái, văn bản đến lấy từ công văn đã công bố công khai. Bản dựng: 25 văn bản giả lập ở nhiều trạng thái cộng 4 thông tư thật lấy từ Công báo (§0) |
 | F2.11 | Cộng đồng: đơn vị chạy thử dùng bản online, README tiếng Anh, người ngoài báo lỗi và góp ý qua issue, đội sửa |
-| F2.12 | **Sổ kiểm toán chuỗi băm** (trước là F3.5): mọi thay đổi vào chuỗi băm SHA-256; `dxos audit verify` chỉ ra dòng bị sửa; neo hash đầu chuỗi ra ngoài CSDL. Hash của mọi văn bản phát hành nằm trong chuỗi |
-| F2.13 | **Cổng xác thực văn bản** (trước là F3.6, `apps/verify`): quét QR hoặc nhập mã → số ký hiệu, ngày, cơ quan ban hành, trích yếu (nếu văn bản được đánh dấu công khai) và kết quả khớp. Thả tệp PDF vào → **trình duyệt tự tính SHA-256, không tải tệp lên** → so khớp. Văn thư dùng cùng chức năng khi tiếp nhận văn bản đến từ một hệ thống Signet khác (NĐ 30, Điều 21) |
+| F2.12 | **Sổ kiểm toán chuỗi băm** (trước là F3.5): mọi thay đổi vào chuỗi băm SHA-256; `moc audit verify` (`make audit`) chỉ ra dòng bị sửa; neo hash đầu chuỗi ra ngoài CSDL. Hash của mọi văn bản phát hành nằm trong chuỗi |
+| F2.13 | **Cổng xác thực văn bản** (trước là F3.6; trang `/xac-thuc` của `apps/office`): quét QR hoặc nhập mã → số ký hiệu, ngày, cơ quan ban hành, trích yếu (nếu văn bản được đánh dấu công khai) và kết quả khớp. Thả tệp PDF vào → **trình duyệt tự tính SHA-256, không tải tệp lên** → so khớp. Văn thư dùng cùng chức năng khi tiếp nhận văn bản đến từ một hệ thống Signet khác (NĐ 30, Điều 21) |
 
 ### 4.2. Should — Phase 3 (`v0.5.0`)
 
@@ -193,7 +196,7 @@ Mã F3.6 bỏ trống vì đã lên Must (F2.13).
 |---|---|
 | F3.5 | **Lịch sử thay đổi**: tab "Lịch sử" trên trang văn bản hiển thị diff từng lần sửa, đọc từ sổ kiểm toán (F2.12) |
 | F3.7 | **Văn bản hạn chế truy cập**: tệp lưu mã hóa (khóa dữ liệu bọc bằng OpenBao Transit), chỉ giải mã trong bộ nhớ của `svc-files` khi người trong danh sách được phép xem; xem có watermark tên người xem; nội dung không đưa vào chỉ mục tìm kiếm. Đúng năng lực *"giải mã an toàn tài liệu trên RAM"* của đề. **Không dùng cho bí mật nhà nước** |
-| F3.8 | **Lập hồ sơ và nộp lưu** (nguyên lý i): hồ sơ công việc đóng quá `DXOS_ARCHIVE_AFTER_DAYS` → gói lưu trữ (Parquet + PDF + manifest có băm) sang bucket `cold`; OLTP chỉ giữ bản ghi rút gọn để vẫn tìm và xác thực được; xem trong **phòng đọc ảo** (chỉ xem, watermark) |
+| F3.8 | **Lập hồ sơ và nộp lưu** (nguyên lý i): hồ sơ công việc đóng quá `MOC_ARCHIVE_AFTER_DAYS` → gói lưu trữ (Parquet + PDF + manifest có băm) sang bucket `cold`; OLTP chỉ giữ bản ghi rút gọn để vẫn tìm và xác thực được; xem trong **phòng đọc ảo** (chỉ xem, watermark) |
 | F3.10 | **IT/OT** (nguyên lý ii): cảm biến nhiệt độ phòng máy chủ vượt ngưỡng → tác tử dựng nháp "báo cáo sự cố" từ mẫu → đi vào luồng văn bản đi để trình lãnh đạo |
 | F3.11 | **Dashboard điều hành**: văn bản đến theo trạng thái, quá hạn theo phòng, thời gian xử lý trung bình, văn bản khẩn, văn bản đi theo tháng |
 | F3.12 | **Hai đơn vị trên một hệ thống**: phát hành văn bản cho đơn vị khác trong hệ thống → tự thành văn bản đến của đơn vị nhận, đã xác thực; dữ liệu hai bên vẫn cách ly |
@@ -224,7 +227,7 @@ Mã F3.6 bỏ trống vì đã lên Must (F2.13).
 
 ## 5. Hai ứng dụng trên một lõi
 
-| | `apps/office` | `apps/verify` |
+| | Văn phòng điện tử (`apps/office`) | Cổng xác thực (trang `/xac-thuc` của `apps/office`) |
 |---|---|---|
 | Người dùng | Cán bộ của đơn vị | Bất kỳ ai |
 | Đăng nhập | SSO Keycloak, TOTP theo vai trò | Không |

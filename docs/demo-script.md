@@ -3,13 +3,16 @@
 Đề thi (`du-thi/olp-2026-de-thi.md` §3.2) yêu cầu sản phẩm "được xây dựng dựa trên" 4 nguyên lý, kèm gợi ý bằng chứng
 cho từng nguyên lý. Mỗi màn dưới đây:
 
-- chạy bằng **một lệnh** trên hệ thống đang chạy (`make up`, `make seed`), xong trong **dưới một phút**;
+- chạy bằng **một lệnh** trên hệ thống đang chạy (`make up`, `make seed`), phần lớn xong **dưới một phút**; màn nào
+  lâu hơn (tới khoảng hai phút) thì ghi thời gian ở mục của màn đó;
 - in từng bước kèm dấu ✓, sai bước nào thì dừng và nói rõ bước đó (thoát 1);
 - chạy lại được nhiều lần, mỗi lần chỉ thêm dữ liệu riêng của lần chạy (vd một tệp sạch chưa gắn văn bản và vài dòng
   sổ kiểm toán). Trừ `nong-lanh`: mỗi lần nộp lưu tối đa ba văn bản mẫu đã xong sang kho lạnh, không đảo ngược được;
   hết văn bản thì màn báo chạy `make seed`. `pha-he` gọi `nong-lanh` khi chưa có lượt nộp lưu nào.
 
 Trên máy chủ đã `make install`, chạy `python3 scripts/demo.py <màn>` trong thư mục cài, thay cho `make demo-<màn>`.
+Bốn màn không nằm trong `demo.py` mà có script riêng: `scripts/demo_ca_nhan.py`, `demo_tat_van_phong.py`,
+`demo_tu_dong.py`, `demo_wiki.py`.
 
 Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao diện ở bên kia (đường dẫn in ở cuối mỗi màn).
 
@@ -84,7 +87,8 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 
 **Trên giao diện:**
 
-- *Bất kỳ ai*: mở trang xác thực, nhập mã tra cứu của văn bản vừa nộp lưu → vẫn "Văn bản khớp".
+- *Bất kỳ ai*: mở trang xác thực, nhập mã tra cứu của văn bản vừa nộp lưu → vẫn "Văn bản có thật, do đơn vị dưới
+  đây phát hành".
 - *Lãnh đạo khoa*: **Sổ kiểm toán** → tab **Văn bản**, dòng "Nộp lưu hồ sơ" kèm ký hiệu hồ sơ, băm gói, số văn bản,
   số tệp; tên hồ sơ không hiện.
 - *Lãnh đạo khoa*: **Điều hành** → phần **Văn bản đã nộp lưu (kho lạnh)** cuối trang: số hồ sơ, văn bản đến, văn bản
@@ -345,8 +349,8 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
 1. Một lượt `scripts/reconcile.py`: "đã khớp trạng thái khai báo, không có gì phải làm".
 2. Phá: `docker rm -f` container `svc-files` (mất hẳn, không phải chỉ dừng), `docker stop` container `centrifugo`.
    Văn thư tải tệp → cổng trả lỗi vì không tới được dịch vụ.
-3. Một lượt reconciler (trên máy chủ là systemd timer mỗi 60 giây, ở đây gọi ngay): in "dựng lại svc-files (không
-   còn container)", "chạy lại centrifugo (đã dừng: …)".
+3. Một lượt reconciler (trên máy chủ chạy mỗi phút: systemd timer trên máy Linux thường, cron trên bản online chạy
+   WSL2; ở đây gọi ngay): in "dựng lại svc-files (không còn container)", "chạy lại centrifugo (đã dừng: …)".
 4. Hai dịch vụ về `running (healthy)` (svc-files lấy lại bí mật từ két F3.2), văn thư tải tệp → `201`.
 
 **Phần GitOps** (chạy trong CI, bước "GitOps"; trên máy chủ xem `van-hanh.md` mục "GitOps và tự phục hồi"):
@@ -363,7 +367,7 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
 | Khai báo (declarative) | Toàn bộ hệ thống khai trong `docker-compose.yml` + cấu hình từng thành phần (realm Keycloak, metadata Hasura, cổng APISIX, cấu hình két); không bước dựng tay nào ngoài `.env` |
 | Có phiên bản, bất biến (versioned and immutable) | Trạng thái mong muốn là một commit git; image dựng theo commit (`MOC_VERSION` = `git describe`), tệp `VERSION` của bản cài ghi commit; lùi phiên bản = đẩy commit cũ lên `deploy` |
 | Tự kéo về (pulled automatically) | Reconciler trên máy chủ tự `git fetch`; không ai đẩy vào máy chủ, CI không cần quyền vào máy chủ |
-| Liên tục đối chiếu (continuously reconciled) | systemd timer mỗi 60 giây: so commit, so băm tệp đã cài, so container đang chạy với khai báo; lệch thì sửa |
+| Liên tục đối chiếu (continuously reconciled) | Mỗi phút một lượt (systemd timer; bản online chạy WSL2 dùng cron): so commit, so băm tệp đã cài, so container đang chạy với khai báo; lệch thì sửa |
 
 **Nếu giám khảo hỏi:**
 
@@ -586,7 +590,7 @@ số trang, câu trả lời đúng trang, siêu dữ liệu chỉ có Producer.
 (`qwen3-embedding:0.6b`, để tìm theo nghĩa); `make up-ai` chạy Ollama trong mạng nội bộ không ra Internet. svc-files
 tự nhúng các đoạn ở vòng nền rồi tìm lai (từ khóa + theo nghĩa); tắt Ollama thì tự về tìm theo từ khóa, không lỗi.
 
-**Trên giao diện** (`vanthu`, thanh bên → "Hỏi đáp văn bản"; hoặc nút "Hỏi trợ lý" ở Tìm kiếm): gõ "Điều kiện xét
+**Trên giao diện** (`vanthu`, thanh bên → "Hỏi đáp"; hoặc nút "Hỏi trợ lý" ở Tìm kiếm): gõ "Điều kiện xét
 học bổng khuyến khích học tập là gì?" → khối "Câu trích nguyên văn" có "3,2", nguồn "[1] 88/CTSV · tr. 1 · Phòng
 Công tác sinh viên", nút "Mở văn bản"; bật mô hình thì sau đó có thêm khối "Trả lời của trợ lý" ghi rõ "Do mô hình
 ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Bấm nhãn nguồn "88/CTSV · tr. 1" → tệp PDF mở ngay dưới danh sách
@@ -612,8 +616,8 @@ dòng hỏi đáp của tác tử, không có câu hỏi.
   Internet lúc chạy và không biết quyền của Signet — phần lọc, trích dẫn, kiểm đầu ra vẫn phải tự viết.
 - *"Lưu câu hỏi ở đâu?"* Không lưu: không bảng hội thoại, sổ chỉ có siêu dữ liệu; trang Hỏi đáp chỉ giữ trong bộ
   nhớ trình duyệt.
-- *"Còn gì chưa làm?"* Bản scan chỉ có chữ OCR của 3 trang đầu, có thể sai chữ, sai dấu (#253); mỗi câu hỏi độc lập,
-  chưa hỏi tiếp theo ngữ cảnh; tìm từ khóa chỉ xét 10 từ đầu câu hỏi; số đo trên văn bản giả, sạch hơn văn bản thật.
+- *"Còn gì chưa làm?"* Bản scan chỉ có chữ OCR của 3 trang đầu, có thể sai chữ, sai dấu (#253); tìm từ khóa chỉ xét
+  10 từ đầu câu hỏi; số đo trên văn bản giả, sạch hơn văn bản thật.
 
 ## Ngoài 4 nguyên lý: gợi ý giao việc — `make demo-giao-viec`
 
@@ -758,7 +762,8 @@ CA nội bộ không nằm trong danh sách tin cậy công cộng; đó là hà
 1. `vanthu` tải bản phát hành ở màn văn bản. Mở bằng Adobe Acrobat Reader hoặc Okular: thấy chữ ký chứng nhận của
    "Khoa Công nghệ thông tin", lý do "Phát hành văn bản <số ký hiệu>", trạng thái chưa tin
    cậy.
-2. Lấy chứng thư CA (trong thư mục mã nguồn hoặc thư mục cài):
+2. Lấy chứng thư CA: bấm "Tải chứng thư CA (minh họa)" trong khối chữ ký số ở `/xac-thuc/<mã>` (tệp `signet-ca.pem`,
+   trang in kèm vân tay SHA-256; dùng tên tệp này ở bước 3), hoặc trong thư mục mã nguồn hay thư mục cài:
    `docker compose exec -T openbao wget -qO- http://127.0.0.1:8200/v1/pki/ca/pem > moc-ca-noi-bo-MAU.pem` — so vân tay
    SHA-256 với dòng in ở bước 1.
 3. Adobe: Edit → Preferences → Signatures → Identities & Trusted Certificates → Trusted Certificates → Import, chọn tệp
@@ -793,11 +798,10 @@ lần đầu của đơn vị; cả màn 26–36 giây.
   ký số", vẫn kiểm bằng SHA-256.
 - *"Két cài trước F4.5?"* Két đó không có PKI nội bộ nên ký số tự tắt: phát hành như cũ, nhật ký svc-files có
   `office.signing.disabled`. Cài mới (và CI) thì có PKI ngay.
-- *"Còn gì chưa làm?"* Không dấu thời gian tin cậy, không thông tin kiểm dài hạn (LTV), không CRL/OCSP; cổng xác thực
-  chưa có nút tải chứng thư CA (lấy bằng lệnh ở trên); trang xác thực chưa tự báo "sửa sau khi ký" khi thả tệp (lệnh
-  kiểm báo, và tra theo băm phần đã ký thì cổng trả đúng văn bản); chưa có bước demo xin xuất khóa để thấy két từ chối;
-  két cài trước F4.5 chưa tự nâng cấp lên có PKI; chứng thư chưa tự cấp lại khi sắp hết hạn; mỗi đơn vị một khóa, chưa
-  ký theo từng người.
+- *"Còn gì chưa làm?"* Không dấu thời gian tin cậy, không thông tin kiểm dài hạn (LTV), không CRL/OCSP; trang xác
+  thực chưa tự báo "sửa sau khi ký" khi thả tệp (lệnh kiểm báo, và tra theo băm phần đã ký thì cổng trả đúng văn bản);
+  chưa có bước demo xin xuất khóa để thấy két từ chối; két cài trước F4.5 chưa tự nâng cấp lên có PKI; chứng thư chưa
+  tự cấp lại khi sắp hết hạn; mỗi đơn vị một khóa, chưa ký theo từng người.
 
 ## Ngoài 4 nguyên lý: che thông tin cá nhân — `make demo-che-pii`
 
@@ -925,8 +929,11 @@ trong danh sách của chuông); bấm vào mở trang `/trang-thai`.
 
 ## Phương án dự phòng
 
-Bản trình diễn chính là bản online <https://signet.htechcs.com>: laptop của đội chạy bản cài `/opt/moc`, ra Internet
-qua Cloudflare Tunnel (profile `tunnel`, [`trien-khai.md`](trien-khai.md) mục 5b). Hỏng thì lùi theo thứ tự **bản
+Bản trình diễn chính là bản online <https://signet.htechcs.com>: từ 31/10/2026 là bản cài `/opt/moc` trên một máy
+Windows qua WSL2 (Ubuntu 24.04, không có systemd), ra Internet qua Cloudflare Tunnel (profile `tunnel`,
+[`trien-khai.md`](trien-khai.md) mục 5b). Reconciler chạy mỗi phút bằng cron của người dùng `moc`, theo thẻ phát hành:
+thẻ mới thì tự sao lưu, nâng cấp, lỗi thì tự lùi về bản trước ([`git_flow.md`](git_flow.md) mục 7). Laptop chạy bản
+online tới 31/10 vẫn giữ bản cài `/opt/moc`, là máy lùi về của bản online. Hỏng thì lùi theo thứ tự **bản
 online → máy dự phòng chạy tại chỗ → video quay sẵn**, không gỡ lỗi trước hội đồng quá một phút. Trên bản cài, lệnh là
 `python3 scripts/…` và `docker compose …` trong `/opt/moc` (bản cài không có `Makefile`); trên máy dự phòng là `make …`
 trong thư mục mã nguồn. Kịch bản 5 phút ở [`dac-ta-san-pham.md`](dac-ta-san-pham.md) §7 có cột dự phòng cho từng màn.
@@ -946,8 +953,8 @@ chạy không tải được tệp hay cổng ngắt vài giây:
 
 **Mất Internet hoặc Cloudflare** (trang online không mở được, hoặc hiện trang lỗi của Cloudflare):
 
-- Chỉ mạng phòng thi hỏng: cho máy trình chiếu dùng 4G của điện thoại (phát Wi-Fi), mở lại bản online. Laptop chạy
-  bản online vẫn sống thì `cloudflared` tự nối lại khi mạng bên đó về, không phải làm gì trên laptop.
+- Chỉ mạng phòng thi hỏng: cho máy trình chiếu dùng 4G của điện thoại (phát Wi-Fi), mở lại bản online. Máy chạy bản
+  online vẫn sống thì `cloudflared` tự nối lại khi mạng bên đó về, không phải làm gì trên máy đó.
 - Không chờ được: sang máy dự phòng.
 
 **Máy dự phòng** (dựng từ hôm trước theo checklist): cùng bản phát hành, `MOC_PUBLIC_URL=http://localhost:8080`, đã
@@ -960,20 +967,25 @@ chạy không tải được tệp hay cổng ngắt vài giây:
 - Mã QR trên văn bản phát hành ở máy này trỏ về `localhost`, điện thoại của giám khảo không mở được: thay bằng mở
   `/xac-thuc` trên máy trình chiếu, nhập mã tra cứu hoặc thả tệp PDF vào.
 
-**Laptop chạy bản online tắt, treo hoặc khởi động lại:**
+**Máy chạy bản online tắt, treo hoặc khởi động lại:**
 
-- Khởi động lại được: Docker chạy lại mọi container (`restart: unless-stopped`) khi dịch vụ Docker bật cùng máy, két
-  tự mở khóa, không phải nhập gì. Trong `/opt/moc`: `docker compose ps` tới khi không còn dịch vụ nào `starting` hay
-  `unhealthy` (ClamAV nạp chữ ký khoảng một phút); thiếu container hay còn `unhealthy` thì
-  `python3 scripts/reconcile.py --heal-only`.
+- Windows khởi động lại xong, tài khoản Windows của máy phải **đăng nhập**: chưa ai đăng nhập thì Signet chưa lên.
+  Tác vụ Task Scheduler lúc đăng nhập hiện chỉ bật SSH của Ubuntu; Docker và cron **chưa tự bật**. Mở Ubuntu-24.04
+  trên máy đó (hoặc SSH vào) rồi chạy `sudo /usr/local/sbin/signet-khoi-dong.sh`: script chạy `service ssh start`,
+  `service cron start`, `service docker start`. Docker lên thì chạy lại mọi container (`restart: unless-stopped`),
+  két tự mở khóa; cron lại chạy reconciler mỗi phút. Cách dựng máy không có systemd: [`trien-khai.md`](trien-khai.md)
+  mục 7, đoạn "Máy không có systemd".
+- Trong WSL, ở `/opt/moc`: `docker compose ps` tới khi không còn dịch vụ nào `starting` hay `unhealthy` (ClamAV nạp
+  chữ ký khoảng một phút); thiếu container hay còn `unhealthy` thì `python3 scripts/reconcile.py --heal-only`.
 - Vài phút chưa lên: máy dự phòng, hoặc video.
 - Chỉ máy trình chiếu hỏng: bản online mở được từ bất kỳ máy nào có trình duyệt (máy của thành viên khác, máy của
   BTC); `giamkhao` không cần TOTP.
 
 **AI chậm hoặc không có:**
 
-- Câu trích nguyên văn hiện trước (dưới một giây, không cần mô hình), khối "Trả lời của trợ lý" tới sau: trên bản
-  online (đo 23/10/2026) mô hình viết mất p50 8,9 giây, p95 21,1 giây. Chờ lâu thì bấm "Dừng", trang giữ câu trích.
+- Câu trích nguyên văn hiện trước (dưới một giây, không cần mô hình), khối "Trả lời của trợ lý" tới sau: đo ngày
+  23/10/2026 trên laptop i5-12500H chạy bản online tới 31/10, mô hình viết mất p50 8,9 giây, p95 21,1 giây; máy
+  Windows chạy bản online hiện nay chưa đo. Chờ lâu thì bấm "Dừng", trang giữ câu trích.
 - Lần hỏi đầu sau một lúc không dùng chậm hơn vì phải nạp lại mô hình: Ollama chỉ giữ mô hình trong RAM 30 phút sau
   lần dùng cuối (`OLLAMA_KEEP_ALIVE`). Hỏi thử một câu trước màn AI.
 - Mô hình làm cả máy chậm, hay Ollama lỗi: `docker compose --profile ai stop ollama`; `svc-files` dò lại trong 60 giây
@@ -1011,6 +1023,10 @@ repo ([`git_flow.md`](git_flow.md)).
 ### T-1 ngày
 
 - [ ] Bản online chạy đúng bản phát hành sẽ trình bày (`cat /opt/moc/VERSION`); CI của commit đó xanh.
+- [ ] Tạm dừng tự nâng cấp để không lượt nâng cấp nào chạy trong buổi demo: trong WSL, `sudo crontab -u moc -e`, thêm
+      `#` trước dòng `reconcile.py`. Không đẩy thẻ phát hành mới trước buổi demo. Trong lúc dừng, tự phục hồi mỗi phút
+      cũng dừng: dịch vụ chết thì gọi tay `python3 scripts/reconcile.py --heal-only` (màn `tu-phuc-hoi` tự gọi lượt
+      này, không cần cron). Xong buổi trình diễn thì bỏ `#` để bật lại.
 - [ ] Trên bản online, trong `/opt/moc`: `python3 scripts/smoke.py`, `python3 scripts/moc.py audit verify`; chạy một
       lượt mỗi màn sẽ trình diễn (`python3 scripts/demo.py <màn>`) cho dữ liệu có sẵn; đo lại trợ lý bằng
       `python3 scripts/demo.py do-hoi-dap`.
@@ -1023,7 +1039,8 @@ repo ([`git_flow.md`](git_flow.md)).
       hỏi đáp, kiểm dịch, tự phục hồi. Chép vào máy trình chiếu và USB.
 - [ ] Điện thoại: ứng dụng xác thực đã thêm khóa của tài khoản mẫu (khóa do `make totp` in ra), giờ đặt tự động; một
       máy có 4G để phát Wi-Fi.
-- [ ] Laptop chạy bản online và máy trình chiếu: tắt chế độ ngủ, hoãn cập nhật hệ điều hành, cắm sạc.
+- [ ] Máy chạy bản online và máy trình chiếu: tắt chế độ ngủ, hoãn cập nhật hệ điều hành (máy Windows khởi động lại
+      thì phải có người đăng nhập, xem [phương án dự phòng](#phương-án-dự-phòng)); máy trình chiếu cắm sạc.
 
 ### T-1 giờ
 
@@ -1040,8 +1057,7 @@ repo ([`git_flow.md`](git_flow.md)).
 
 - [ ] Hỏi trợ lý một câu trên bản online để mô hình nằm sẵn trong RAM.
 - [ ] Mỗi tài khoản sẽ dùng (văn thư, lãnh đạo, `giamkhao`) mở trong một hồ sơ trình duyệt riêng hoặc một trình duyệt
-      khác — các cửa sổ ẩn danh dùng chung phiên đăng nhập; mở sẵn trang cần dùng, thêm tab `/xac-thuc` và "Hỏi đáp
-      văn bản".
+      khác — các cửa sổ ẩn danh dùng chung phiên đăng nhập; mở sẵn trang cần dùng, thêm tab `/xac-thuc` và "Hỏi đáp".
 - [ ] Terminal ở `/opt/moc` (máy dự phòng: thư mục mã nguồn), gõ sẵn lệnh của màn demo đầu tiên.
 - [ ] Tắt thông báo của hệ điều hành, phóng to chữ trình duyệt.
 - [ ] Nhắc nhau thứ tự lùi: bản online → máy dự phòng → video.

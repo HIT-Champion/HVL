@@ -135,7 +135,8 @@ works, the trust model and limits: [`docs/them-ung-dung.md`](docs/them-ung-dung.
 
 ### Local AI assistants
 
-AI in Signet only **suggests**; people decide. Everything runs on the organisation's own server and no data is sent out.
+AI in Signet only **suggests**; people decide. By default everything runs on the organisation's own server and no data
+is sent out.
 
 | Agent | What it does |
 |---|---|
@@ -145,14 +146,16 @@ AI in Signet only **suggests**; people decide. Everything runs on the organisati
 | Personal data masking | National ID numbers, phone numbers, emails and bank accounts are masked before they reach a model or the logs; people allowed to read the document still see the real numbers |
 
 All four work **without a language model**, so they run in CI, on weak machines and offline. A local model (Ollama,
-Qwen3 1.7B, on CPU) writes summaries and answers: `make ai-model`, then `make up-ai`. Measurements and limitations of
-each agent (Vietnamese): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
+Qwen3 1.7B, on CPU) writes summaries and answers: `make ai-model`, then `make up-ai`. The answer-writing step alone can
+call an external OpenAI-compatible API instead of Ollama (`MOC_ASK_API=openai`, off by default, #430); when it is on,
+the question and up to 4 supporting passages, with personal data masked, leave the server. Measurements and
+limitations of each agent (Vietnamese): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 
 ### Screenshots
 
 Taken automatically during the e2e run (`make e2e`), with fictional sample data. The interface is in Vietnamese by
-default; every page of the e-Office, the P.A.R.A personal space and the unit news board also has an English
-version.
+default; every page of the e-Office, the P.A.R.A personal space, the unit news board and the leave request app also
+has an English version.
 
 | The clerk uploads an incoming letter, the agent pre-fills the fields | Managers see where work is stuck | Recipients verify a document without signing in |
 |---|---|---|
@@ -191,8 +194,10 @@ choice: [`DEPENDENCIES.md`](DEPENDENCIES.md).
 | Gateway | Apache APISIX | 3.18.0 | Apache-2.0 | The only exposed entry point: JWT check at the edge, path allow-list, rate limits |
 | Gateway | Coraza, OWASP CRS (coraza-proxy-wasm) | 3.3.3, 4.14.0 (0.6.0) | Apache-2.0 | Web application firewall inside APISIX: inspects every request before the token check, attack payloads get 403 |
 | [H] | Keycloak | 26.7.5 | Apache-2.0 | Single sign-on, TOTP; roles, unit and department go into the token |
+| [H] | DokuWiki | 2026-07-14c | GPL-2.0 | Internal wiki, one space per unit, sign-in through Keycloak, optional (profile `wiki`) |
 | [P] | Flowable | 8.0.0 | Apache-2.0 | BPMN workflows for incoming and outgoing documents |
 | [P] | Centrifugo | 6.9.7 | Apache-2.0 | Instant notifications over WebSocket, one channel per person |
+| [P] | Node-RED | 5.0.8 | Apache-2.0 | Automation with flows that call the core through a unit's robot, optional (profile `tu-dong`) |
 | [D] | PostgreSQL | 16 | PostgreSQL | Main database, hash-chained audit log |
 | [D] | Hasura GraphQL Engine CE | 2.51.0 | Apache-2.0 | Generated GraphQL, row-level permissions by role and unit |
 | [D] | SeaweedFS | 4.48 | Apache-2.0 | S3-compatible file store, write-locked cold storage for archived records |
@@ -204,11 +209,12 @@ choice: [`DEPENDENCIES.md`](DEPENDENCIES.md).
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | NGSI-LD digital twins of sensors (profile `iot`) |
 | Operations | Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Apache-2.0, AGPL-3.0 | Monitoring of the API gateway and each component's status, internal network only; alerts reach the unit admins' notification bell |
 | Operations | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Centralised logs with personal data masked, optional (profile `logs`) |
+| Operations | Jaeger | 2.22.0 | Apache-2.0 | Distributed tracing across APISIX, `svc-files`, `svc-workflow`, optional (profile `trace`) |
 | Operations | restic | 0.19.1 | BSD-2-Clause | Encrypted backup of databases, files and the vault |
 
-Every license is OSI-approved. The GPL and AGPL components (ClamAV, PostGIS, Grafana, Parseable) run as independent
-services talking over the network, with no linked code, so they do not conflict with Apache-2.0. The license of every
-package, transitive ones included, is checked automatically with `make license-audit`.
+Every license is OSI-approved. The GPL and AGPL components (ClamAV, PostGIS, Grafana, Parseable, DokuWiki) run as
+independent services talking over the network, with no linked code, so they do not conflict with Apache-2.0. The
+license of every package, transitive ones included, is checked automatically with `make license-audit`.
 
 ## Building from source
 
@@ -321,13 +327,14 @@ Administrator tasks on a running installation are described in [`docs/van-hanh.e
 | [Monitoring](docs/van-hanh.en.md#monitoring) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
 | [Centralised logs](docs/van-hanh.en.md#centralised-logs): Vector + Parseable, searched by request id `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
 | [IT/OT convergence](docs/van-hanh.en.md#itot-convergence): NGSI-LD broker, sensors | `make demo-it-ot` |
+| [Public data](docs/van-hanh.en.md#public-data): snapshots of Ministry of Education and Training circulars from the Official Gazette, SHA-256 check, data age | `make du-lieu-mo` |
 | [Plugging in an application](docs/them-ung-dung.md#1-một-lệnh-moc-app-install) from a manifest, no core changes; removal keeps data | `python3 scripts/moc.py app install …`, `app list`, `app remove` |
 | [Web application firewall](platform/apisix/README.md#tường-lửa-ứng-dụng-web--waf-f315): block, log only or off; find a block by `X-Request-Id` | `MOC_WAF=On` · `DetectionOnly` · `Off` |
 | [Checking the audit log](db/README.md) outside the database | `make audit` |
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `make test` | Unit tests of `svc-files`, `svc-workflow` and the operations commands; form validation against `schemas/` with the same test cases as the server and database; tests of the personal space and the news board | Python + [uv](https://github.com/astral-sh/uv); Node 24 and `npm ci` in `apps/office` |
+| `make test` | Unit tests of `svc-files`, `svc-workflow` and the operations commands; tests of the e-Office, including form validation against `schemas/` with the same test cases as the server and database; tests of the personal space, the news board, the leave request app, the teaching schedule change app and the API docs page | Python + [uv](https://github.com/astral-sh/uv); Node 24 and `npm ci` in `apps/office` |
 | `make smoke` | The full incoming and outgoing document flows through APISIX; verification portal, WebSocket notifications, audit log; blocking bad data, EICAR, admin paths; unit isolation; rate limits; secrets vault; reconciler; archiving; monitoring; the WAF blocks attack payloads without blocking real data | A running system + `make seed` |
 | `make e2e` | A real browser (Playwright, in a container): bad forms blocked before sending, dropping a file on the verification page, two users notified at the same time, audit log, dashboard, digital signature | Same as above |
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii`, `do-so-lieu-sau` | Measure the AI agents on labelled samples (right / wrong / empty per field, recall@3, coverage); the "after" metrics of spec §8 | A running system (`do-che-pii` does not need one) |
@@ -374,7 +381,8 @@ software the core uses unmodified (official images, no changes to upstream code)
 
 ```
 apps/                e-Office (office/, Nuxt 4) · P.A.R.A personal space (ca-nhan/) · unit news board
-                     (bang-tin/, plugged in with moc app install) · Swagger UI API documentation (tai-lieu-api/)
+                     (bang-tin/), leave requests (nghi-phep/), teaching schedule changes (lich-giang/): three apps
+                     plugged in with moc app install · Swagger UI API documentation (tai-lieu-api/)
 services/            svc-workflow/: Hasura Actions, BPMN workflows, notifications, reminders, assignment suggestions
                      svc-files/: files, quarantine, search, PDF rendering, signing, verification portal, AI agents
                      ot-sensor/: simulated temperature sensor (profile iot-sim)

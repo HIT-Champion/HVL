@@ -1,10 +1,10 @@
 # Mô hình dữ liệu, Hasura Actions và định dạng sự kiện
 
-> **Bản nháp** cho việc 0.3 / issue #6 — lập ngày 15/10/2026, Backend rà và cùng chốt trong PR.
+> Lập ngày 15/10/2026 cho việc 0.3 / issue #6, đã chốt; nay đi cùng mã.
 > Phạm vi sản phẩm: [`dac-ta-san-pham.md`](dac-ta-san-pham.md). Nguồn sự thật giữa Flowable và PostgreSQL:
 > [`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md) §2.1.
-> Sau khi chốt, `db/migrations/` (#18) và `db/metadata/actions.*` (#15) làm theo tài liệu này; đổi mô hình
-> thì sửa tài liệu trong cùng PR.
+> `db/migrations/` (#18) và `db/metadata/actions.*` (#15) làm theo tài liệu này; đổi mô hình thì sửa tài liệu trong
+> cùng PR ([`db/README.md`](../db/README.md)).
 
 ---
 
@@ -17,9 +17,11 @@
 - **Keycloak là nguồn sự thật về người dùng.** Bảng nghiệp vụ chỉ lưu `sub` (kiểu `text`); phòng ban của
   người dùng đi trong JWT (`department_id`). `core.users` là **bản sao chỉ đọc** do `svc-workflow` đồng bộ
   từ Keycloak mỗi 15 giây, chỉ để chọn người được giao việc và hiện tên — không ai sửa qua GraphQL.
-- **Không xóa.** Văn bản bị hủy thì đổi trạng thái `cancelled`. Không vai trò nào có quyền `delete`
-  trên bảng nghiệp vụ. Ngoại lệ duy nhất là job nộp lưu (§2.4), và chỉ xóa sau khi đã ghi gói lưu trữ
-  có băm sang kho lạnh.
+- **Không xóa.** Văn bản bị hủy thì đổi trạng thái `cancelled`. Quyền `delete` chỉ có trên ba bảng nối:
+  `staff` gỡ tệp khỏi dự thảo văn bản đi của mình còn `draft`/`returned` (`office.document_files`, chỉ tệp nóng mình
+  tải lên, vai trò `draft`/`attachment`); `staff`, `manager` bỏ văn bản khỏi hồ sơ đang mở của phòng mình
+  (`office.case_file_documents`); `service` gỡ người khỏi danh sách được xem văn bản hạn chế (`office.document_acl`).
+  Ngoài ra chỉ job nộp lưu (§2.4) xóa, và chỉ xóa sau khi đã ghi gói lưu trữ có băm sang kho lạnh.
 - **Chỉ `svc-workflow` ghi cột `status`** (vai trò Hasura `service`). Người dùng đổi trạng thái qua Actions.
 - **Ràng buộc nằm trong CSDL** (`CHECK`, `UNIQUE`) — lớp thứ ba của Poka-yoke, sau form và Action handler. Cả
   ba lớp theo một JSON Schema dùng chung ở `schemas/` ([`schemas/README.md`](../schemas/README.md)).
@@ -104,11 +106,12 @@ create table core.notifications (           -- thông báo từng người (F2.5
   id           bigint generated always as identity primary key,
   tenant_id    uuid not null references core.tenants,
   user_id      text not null,                -- (tenant_id, user_id) → core.users
-  kind         text not null,                -- task.assigned | task.overdue | task.escalated | document.*
+  kind         text not null,                -- task.* | document.* | ot.alarm | ops.alert | flow.message (§5)
   key          text not null,                -- chống gửi trùng: unique (tenant_id, user_id, key)
   document_id  uuid,
   data         jsonb not null default '{}',  -- form_key, trích yếu, số ký hiệu… lúc gửi; câu chữ dựng ở giao diện
-  channels     text[] not null default '{}', -- kênh ngoài cần gửi: email, webhook (migration 1792281602600)
+  channels     text[] not null default '{}', -- kênh ngoài cần gửi: email, webhook, sms, zalo (migration 1792281602600,
+                                             -- 1792281603700)
   created_at   timestamptz not null default now(),
   read_at      timestamptz
 );
@@ -1058,10 +1061,11 @@ dùng: id, hai đơn vị, hai văn bản, trạng thái, mã tra cứu và băm
 giao; `file_id`, `next_attempt_at`, `notified_at` chỉ `service` đọc. Quan hệ sang văn bản của bên kia (`document`,
 `incoming`, `source`) trả null, vì quyền đọc văn bản lọc theo thuê ước: bên gửi không thấy tiến độ xử lý của bên nhận,
 bên nhận không đọc văn bản gốc — chỉ có tên đơn vị kia qua `to_unit` (bên gửi) / `from_unit` (bên nhận). Quan hệ trỏ
-về chính đơn vị mình trả null (`from_unit` ở bên gửi, `to_unit` ở bên nhận). `office.dispatch_units` cho bốn vai trò
-người dùng và `service` đọc mọi đơn vị trừ đơn vị trong phiên (`id <> X-Hasura-Tenant-Id`). Không vai trò nào thêm,
-xóa dòng `dispatches`; `service` (phiên bên gửi hoặc bên nhận) chỉ sửa `attempts`, `last_error`, `next_attempt_at`,
-`notified_at`; trạng thái chỉ đổi trong hàm `office.deliver_dispatch` (mutation chỉ cho `service`).
+về chính đơn vị mình trả null (`from_unit` ở bên gửi, `to_unit` ở bên nhận). `office.dispatch_units` cho năm vai trò
+người dùng (kể cả `tenant_admin`) và `service` đọc mọi đơn vị trừ đơn vị trong phiên (`id <> X-Hasura-Tenant-Id`).
+Không vai trò nào thêm, xóa dòng `dispatches`; `service` (phiên bên gửi hoặc bên nhận) chỉ sửa `attempts`,
+`last_error`, `next_attempt_at`, `notified_at`; trạng thái chỉ đổi trong hàm `office.deliver_dispatch` (mutation chỉ
+cho `service`).
 
 **Tác tử đọc văn bản đến** (F4.1, migration 1792281601900). Vai trò Hasura `agent` không có trong token người dùng:
 `svc-files` gọi bằng khóa quản trị kèm `X-Hasura-Role: agent`, `X-Hasura-Tenant-Id` (đơn vị của văn thư bấm đọc),
@@ -1509,6 +1513,8 @@ qua HTTP API nội bộ của Centrifugo:
 | `document.overdue` | Người xử lý, người giao việc, lãnh đạo đơn vị | Văn bản đến qua hạn giải quyết |
 | `ot.alarm` | Chuyên viên phụ trách cảm biến | Cảm biến vượt ngưỡng, hệ thống vừa dựng dự thảo báo cáo sự cố (F3.10); `data`: tên phòng, nhiệt độ, ngưỡng, trích yếu |
 | `document.incoming` | Văn thư đơn vị nhận (không có văn thư thì lãnh đạo đơn vị) | Có văn bản đến liên thông mới (F3.12); `data`: tóm tắt văn bản đến như các thông báo khác, kèm `from_name`; khóa `doc:<văn bản đến>:document.incoming` |
+| `ops.alert` | Mọi quản trị đơn vị (`tenant_admin`) của mọi đơn vị | Alertmanager báo một cảnh báo `firing` hoặc `resolved` (F3.13, #284); không gắn văn bản; `data`: trạng thái, tên luật, mức, câu `summary`, nhãn `component`, `route`, giờ bắt đầu (và kết thúc); khóa `ops.alert:<fingerprint>:<startsAt>:<status>` |
+| `flow.message` | Người đang hoạt động có vai trò trong `roles` của đơn vị robot; kèm văn bản thì chỉ `director`, `clerk` | Flow Node-RED gọi Action `notifyFromFlow` (#366); `data`: `title`, `text`, `robot`, tóm tắt văn bản nếu có; khóa `flow:<robot>:<key>` |
 
 Dashboard điều hành (F3.11) không dùng kênh realtime: số liệu tính lúc mở trang, có nút làm mới (§2.5).
 
@@ -1521,7 +1527,9 @@ Dashboard điều hành (F3.11) không dùng kênh realtime: số liệu tính l
 2. ~~Văn bản đi gửi nhiều đơn vị trong hệ thống~~ — F3.12 làm đúng như đã chọn: một văn bản đến cho mỗi đơn vị
    nhận (`source_id` trỏ về văn bản đi), qua hộp thư đi `office.dispatches` (§2.2, §4.2).
 3. `completeTask` dùng chung hay tách Action theo từng task — bản nháp chọn dùng chung, kiểm theo `formKey`.
-4. ~~Phạm vi Phase 1~~ — #18 làm toàn bộ §1 và §2.1–2.3, cùng trigger sổ kiểm toán. Còn `case_files`,
-   `case_file_documents` và các view ở §2.5 (Phase 2–3).
-5. Danh mục loại văn bản: #18 nạp 27 loại có tên viết tắt (NĐ 30, Phụ lục III) và `CV` (công văn); chưa có
+4. ~~Phạm vi Phase 1~~ — #18 làm toàn bộ §1 và §2.1–2.3, cùng trigger sổ kiểm toán. `case_files`,
+   `case_file_documents` (§2.4, F3.8, migration `1792281601300_case_files`) và các view ở §2.5 (từ F3.11, migration
+   `1792281601200_dashboard`) đã có.
+5. Danh mục loại văn bản: #18 nạp 27 loại có tên viết tắt (NĐ 30, Phụ lục III) và `CV` (công văn); #424 thêm `TT`
+   (Thông tư, cho văn bản đến từ nguồn công khai, migration `1792281604000_document_type_tt`): nay 29 loại. Chưa có
    thư công. Backend đối chiếu khi rà.

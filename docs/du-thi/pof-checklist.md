@@ -11,7 +11,8 @@ khi đã chạy lệnh kiểm tra và thấy kết quả sạch.
 399d8af. Ô ✅ đã kiểm bằng lệnh, CI hay trang GitHub ghi ở cột Bằng chứng; CI của 62bff8d xanh cả 14 job:
 <https://github.com/HIT-Champion/Signet/actions/runs/40315747559>. Ô ☐ chưa đạt, ghi lý do và issue. Số commit, PR,
 issue là số lúc kiểm. Ngày 31/10/2026, sau khi gắn thẻ v1.3.0 (b2ec73d), kiểm lại ô `reuse lint` và các ô phát hành;
-ô khác giữ kết quả 26/10. Mục "Rà soát cuối cùng" làm lại trên bản phát hành cuối, trước 17:00 06/12/2026.
+danh sách bản phát hành cập nhật theo thẻ v1.4.0 (57de64b, cùng ngày); ô khác giữ kết quả 26/10. Mục "Rà soát cuối
+cùng" làm lại trên bản phát hành cuối, trước 17:00 06/12/2026.
 
 ---
 
@@ -57,8 +58,8 @@ head -3 LICENSE        # xác nhận là toàn văn, không phải link
 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
-| ✅ | Có ≥ 1 release **trước thời điểm nộp bài** | Trang Releases của repo: 6 bản v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1, v1.3.0 | −5 |
-| ✅ | Phát hành **theo phiên bản** (SemVer) | Thẻ `v0.1.0`, `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.3.0`; `CHANGELOG.md` theo SemVer 2.0.0 | −3 |
+| ✅ | Có ≥ 1 release **trước thời điểm nộp bài** | Trang Releases của repo: 7 bản v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1, v1.3.0, v1.4.0 | −5 |
+| ✅ | Phát hành **theo phiên bản** (SemVer) | Thẻ `v0.1.0`, `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.3.0`, `v1.4.0`; `CHANGELOG.md` theo SemVer 2.0.0 | −3 |
 | ✅ | Dùng **định dạng mở** cho gói phát hành | `.tar.gz` — **tuyệt đối không** `.zip`, `.rar`, `.arj`. Mỗi bản kèm gói `.tar.gz` tự sinh và `.sha256`, không tải lên gói nén nào khác; từ v1.1.0 mỗi bản còn kèm SBOM `.cdx.json` và `.sha256` của nó | −3 |
 
 > ⚠️ GitHub **tự động** đính kèm cả `Source code (zip)` và `Source code (tar.gz)` vào mỗi release.
@@ -78,7 +79,7 @@ git push origin main --tags
 |---|---|---|---|
 | ✅ | Có hướng dẫn dịch từ mã nguồn | README, mục "Cài đặt từ mã nguồn"; `README.en.md`, mục "Building from source" | −5 |
 | ✅ | **Không** cấu hình bằng cách sửa tay tệp header | Mọi tham số nằm trong `.env`. CI job "Dựng từ mã nguồn", bước "Cấu hình được trước khi dựng, không sửa tệp mã" chỉ chạy `cp .env.example .env`; job `chay-thu` dựng toàn hệ thống từ `.env` do `make env` sinh | −5 |
-| ✅ | Cấu hình được **trước khi** dịch | `make env` (hay `cp .env.example .env`) rồi mới `make up` (README, bước 2 và 3) | −5 |
+| ✅ | Cấu hình được **trước khi** dịch | `make env` (hay `cp .env.example .env` rồi đổi mọi giá trị `change_me`: `make check`, `make up` từ chối giá trị mẫu) rồi mới `make up` (README, bước 2 và 3) | −5 |
 | ✅ | Dịch bằng **công cụ nguồn mở** | Docker Engine, Docker Compose, GNU Make, Git, Python 3 — đều là PMNM (README, mục "Yêu cầu hệ thống") | −5 |
 | ✅ | Chạy được **ngoài thư mục mã nguồn** | `make install PREFIX=/opt/moc` (README, mục "Cài ra ngoài thư mục mã nguồn"); CI job `chay-thu`, phần `cai-dat`, bước "Cài ra ngoài thư mục mã nguồn và chạy từ đó" xanh trên 62bff8d | −5 |
 
@@ -87,7 +88,7 @@ git push origin main --tags
 ```bash
 cd /tmp && rm -rf pof-test && mkdir pof-test && cd pof-test
 git clone <URL-repo> && cd Signet
-cp .env.example .env
+make env    # không dùng cp .env.example .env: make check, make up từ chối giá trị mẫu change_me
 make check && make build && make up
 # Hệ thống phải chạy được mà không cần sửa bất kỳ tệp mã nào.
 
@@ -123,7 +124,7 @@ git ls-files | grep -E '(vendor|third_party|node_modules)/' && echo "VI PHẠM" 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
 | ✅ | Có hệ thống ghi nhận lỗi (bug tracker) | GitHub Issues **đã bật** + mẫu báo lỗi + **có issue thật**: mẫu `bug_report.yml`, `feature_request.yml`; 161 issue, 141 đã đóng (28/10/2026) | −5 |
-| ✅ | Có lịch sử thay đổi (changelog) | `CHANGELOG.md` theo Keep a Changelog, có mục cho v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1, v1.3.0 và mục "Chưa phát hành" (CI job "Tài liệu" kiểm) | −5 |
+| ✅ | Có lịch sử thay đổi (changelog) | `CHANGELOG.md` theo Keep a Changelog, có mục cho v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1, v1.3.0, v1.4.0 và mục "Chưa phát hành" (CI job "Tài liệu" kiểm) | −5 |
 | ✅ | Có README và hướng dẫn | `README.md`, bản tiếng Anh `README.en.md`; xem nhanh và bản đồ tài liệu ở `docs/README.md` | −5 |
 
 > ⚠️ Bật Issues nhưng để trống trông như chưa dùng bao giờ. Trong quá trình phát triển, hãy mở
@@ -136,7 +137,7 @@ git ls-files | grep -E '(vendor|third_party|node_modules)/' && echo "VI PHẠM" 
 
 Làm trên bản phát hành cuối, trước 17:00 06/12/2026. Lần kiểm ở các bảng trên không thay cho mục này.
 
-- [ ] Clone repo vào máy sạch, chạy đủ chuỗi `clone → cp .env → make up` thành công
+- [ ] Clone repo vào máy sạch, chạy đủ chuỗi `clone → make env → make up` thành công
 - [ ] Mở repo bằng trình duyệt ẩn danh, xác nhận truy cập được không cần đăng nhập
 - [ ] Trang Releases có ≥ 1 bản phát hành kèm gói `.tar.gz` tự sinh, SBOM `.cdx.json` và `.sha256` của cả hai
 - [ ] `make license-check` sạch trên toàn bộ cây mã nguồn; `make sbom && make license-audit` đạt
