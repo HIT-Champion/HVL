@@ -38,7 +38,7 @@ import re
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -49,16 +49,17 @@ from .apps.api import AppWorkflow
 from .channels import Router
 from .config import Settings
 from .directory import Directory
-from .files import FilesClient
 from .flowable import FlowableClient
 from .hasura import HasuraClient
 from .notify import Notifier
-from .office.api import Office
 from .openbao import with_secrets
-from .ot import OtBridge
 from .parts import Part
 from .subscriptions import Channels
 from .tu_dong import FlowNotices
+
+if TYPE_CHECKING:    # chỉ cho chú thích kiểu; phần Văn phòng nạp trong create_app khi bật (#489)
+    from .files import FilesClient
+    from .ot import OtBridge
 
 log = logging.getLogger("svc_workflow")
 # Mã yêu cầu nhận từ X-Request-Id: cùng luật với bước tách mã của Vector và make logs-tra (log tập trung F3.14)
@@ -86,9 +87,9 @@ def create_app(
     hasura: HasuraClient | None = None,
     flowable: FlowableClient | None = None,
     directory: Directory | None = None,
-    files: FilesClient | None = None,
+    files: "FilesClient | None" = None,
     notifier: Notifier | None = None,
-    ot: OtBridge | None = None,
+    ot: "OtBridge | None" = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -102,8 +103,11 @@ def create_app(
     notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key, router=router)
     # Phần nghiệp vụ trên phần chung, gắn route theo thứ tự trong danh sách. Thêm một phần (route, việc nền riêng):
     # viết lớp theo khuôn parts.Part như office.api.Office, dựng ở đây rồi thêm vào parts
-    office = (Office.build(settings, hasura, flowable, notifier, files=files, ot=ot)
-              if settings.office_enabled else None)
+    # Văn phòng tắt thì không nạp mô-đun nào của nó (#489, docs/architecture.md §4.7)
+    office: Part | None = None
+    if settings.office_enabled:
+        from .office.api import Office
+        office = Office.build(settings, hasura, flowable, notifier, files=files, ot=ot)
     parts: list[Part] = [office] if office is not None else []
     # quy trình của ứng dụng cắm bằng manifest (#301, /api/workflow qua APISIX): luôn bật, không theo cờ Văn phòng
     parts.append(AppWorkflow.build(settings, flowable))

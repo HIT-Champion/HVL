@@ -24,7 +24,8 @@ vụ, không cần Docker; chỉ thư viện chuẩn.
 
 Mỗi chỗ dính là một cạnh, một dòng "<mặt> <nguồn> -> <đích>":
 
-    import    mô-đun ngoài nhóm Văn phòng import mô-đun của Văn phòng
+    import    mô-đun ngoài nhóm Văn phòng import mô-đun của Văn phòng lúc nạp (đầu tệp, thân lớp; khối
+              if TYPE_CHECKING không tính); import trong hàm chỉ được ở mô-đun trộn, là chỗ ráp khi cờ bật
     du-lieu   mô-đun ngoài nhóm Văn phòng gọi tên một bảng, view, hàm của schema office (SQL office.x hay GraphQL
               office_x…); tên sự kiện nhật ký như "office.assist.asked" không tính
     csdl      hàm, view của core đọc office; trigger nối core với office (trừ trigger sổ kiểm toán core.audit trên
@@ -82,6 +83,7 @@ NHOM: dict[str, str] = {
     # svc-workflow
     "svc_workflow/alerts.py": LOI, "svc_workflow/flowable.py": LOI, "svc_workflow/openbao.py": LOI,
     "svc_workflow/parts.py": LOI, "svc_workflow/pii.py": LOI, "svc_workflow/tracing.py": LOI,
+    "svc_workflow/thoi_gian.py": LOI,
     "svc_workflow/channels.py": DANG, "svc_workflow/directory.py": DANG, "svc_workflow/hasura.py": DANG,
     "svc_workflow/notify.py": DANG, "svc_workflow/schemas.py": DANG, "svc_workflow/subscriptions.py": DANG,
     "svc_workflow/tu_dong.py": DANG,                  # robot báo kèm văn bản: đọc office_documents_by_pk
@@ -168,27 +170,57 @@ def _office_refs(text: str, objects: set[str]) -> set[str]:
     return refs
 
 
-def _imports(module: str, path: pathlib.Path) -> set[str]:
-    """Mô-đun trong cùng gói mà mô-đun này import, dạng "svc_files/render.py" hoặc "svc_files/office/" (gói)."""
+def _is_type_checking(test: ast.expr) -> bool:
+    return (isinstance(test, ast.Name) and test.id == "TYPE_CHECKING") or (
+        isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING")
+
+
+def _import_nodes(tree: ast.Module) -> list[tuple[ast.Import | ast.ImportFrom, bool]]:
+    """Mọi lệnh import kèm cờ "chạy lúc nạp mô-đun": đầu tệp, thân lớp, khối if/try/with ở mức đó là có; thân hàm
+    (chạy khi gọi) là không; khối ``if TYPE_CHECKING:`` (chỉ cho chú thích kiểu) không tính."""
+    out: list[tuple[ast.Import | ast.ImportFrom, bool]] = []
+
+    def visit(nodes: list[Any], at_load: bool) -> None:
+        for node in nodes:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                out.append((node, at_load))
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                visit(node.body, False)
+            elif isinstance(node, ast.If) and _is_type_checking(node.test):
+                visit(node.orelse, at_load)
+            else:
+                for field in ("body", "orelse", "finalbody", "handlers"):
+                    child = getattr(node, field, None)
+                    if isinstance(child, list):
+                        visit(child, at_load)
+
+    visit(tree.body, True)
+    return out
+
+
+def _imports(module: str, path: pathlib.Path) -> list[tuple[list[str], bool]]:
+    """Mô-đun trong cùng gói mà mô-đun này import: mỗi tên là các ứng viên theo thứ tự ưu tiên ("svc_files/assist/
+    similar" cho ``from .assist import similar``, rồi "svc_files/assist"), kèm cờ chạy lúc nạp mô-đun."""
     pkg = module.split("/", 1)[0]
-    parent = pathlib.PurePosixPath(module).parent.parts[1:]
-    out = set()
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if not isinstance(node, ast.ImportFrom):
+    parent = list(pathlib.PurePosixPath(module).parent.parts[1:])
+    out = []
+    for node, at_load in _import_nodes(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                parts = alias.name.split(".")
+                if parts[0] == pkg and parts[1:]:
+                    out.append(([f"{pkg}/" + "/".join(parts[1:])], at_load))
             continue
         if node.level:
-            base = list(parent[:len(parent) - (node.level - 1)]) if node.level > 1 else list(parent)
+            base = parent[:len(parent) - (node.level - 1)] if node.level > 1 else parent
+            mod = [m for m in (node.module or "").split(".") if m]
         elif (node.module or "").split(".")[0] == pkg:
-            base = []
+            base, mod = [], (node.module or "").split(".")[1:]
         else:
             continue
-        mod = (node.module or "").split(".")
-        if not node.level:
-            mod = mod[1:]
-        targets = [base + [m for m in mod if m]] if node.module else [base + [a.name] for a in node.names]
-        for parts in targets:
-            if parts:
-                out.add(f"{pkg}/" + "/".join(parts))
+        for alias in node.names:
+            candidates = [base + mod + [alias.name]] + ([base + mod] if mod else [])
+            out.append(([f"{pkg}/" + "/".join(c) for c in candidates if c], at_load))
     return out
 
 
@@ -207,12 +239,13 @@ def code_edges(root: pathlib.Path, objects: set[str]) -> tuple[set[str], dict[st
     for module, path in mods.items():
         if groups[module] == VP:
             continue
-        for target in sorted(_imports(module, path)):
-            resolved = _resolve(target, mods)
+        for candidates, at_load in _imports(module, path):
+            resolved = next((r for r in (_resolve(c, mods) for c in candidates) if r), None)
             if resolved is None:
                 continue
             group = nhom_cua(resolved) if not resolved.endswith("/") else THU_MUC.get(resolved)
-            if group == VP:
+            # import trong hàm chỉ được ở mô-đun trộn: đó là chỗ ráp, chạy khi phần Văn phòng được bật
+            if group == VP and (at_load or groups[module] != TRON):
                 edges.add(f"import {module} -> {resolved}")
         text = "\n".join(_strings(path))
         for ref in sorted(_office_refs(text, objects)):

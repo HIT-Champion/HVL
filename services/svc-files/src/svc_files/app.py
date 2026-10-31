@@ -66,7 +66,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import UTC, date, datetime
 from functools import partial
-from typing import Annotated, BinaryIO, Literal, Protocol
+from typing import TYPE_CHECKING, Annotated, BinaryIO, Literal, Protocol
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -77,7 +77,6 @@ from starlette.datastructures import UploadFile
 from . import __version__, filetype, pii
 from .anchors import Anchorer, AnchorSigner, AnchorStore
 from .assist import api as assist_api
-from .assist import similar
 from .assist.ai import AiClient, make_ai
 from .assist.answer import Assistant
 from .assist.index import ChunkIndexer
@@ -93,8 +92,6 @@ from .imports.runner import Importer, IncomingHandler
 from .imports.spool import Spool
 from .imports.store import ImportStore
 from .ocr import run_ocr
-from .office import api as office_api
-from .office.hasura import OfficeHasura
 from .openbao import with_secrets
 from .sealed import SealError, Vault, VaultError, run_check_pdf, run_watermark, seal, unseal
 from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
@@ -104,6 +101,9 @@ from .storage import ObjectStore, StorageError, object_key, s3_client
 from .texts import TextExtractor
 from .web import (CHUNK_SIZE, DOWNLOAD_HEADERS, NO_STORE, PEM_RESPONSES, RETRY_AFTER, SEALING_QUEUE_S,
                   content_disposition, error, log_event, log_rid, pem_response)
+
+if TYPE_CHECKING:    # chỉ cho chú thích kiểu; phần Văn phòng nạp trong create_app khi bật (#489)
+    from .office import api as office_api
 
 # Phần đầu và biên của multipart cộng thêm vào kích thước tệp
 MULTIPART_OVERHEAD = 64 * 1024
@@ -324,19 +324,24 @@ def create_app(
     meili: MeiliClient | None = None,
     anchor_store: AnchorStore | None = None,
     vault: Vault | None = None,
-    reader: office_api.Reader | None = None,
+    reader: "office_api.Reader | None" = None,
     assistant: Assistant | None = None,
     chunk_indexer: ChunkIndexer | None = None,
     ai: AiClient | None = None,
     signer: DocumentSigner | None = None,
     status_board: StatusBoard | None = None,
     import_store: ImportStore | None = None,
-    cold: office_api.ColdStore | None = None,
-    archiver: office_api.Archiver | None = None,
-    archive_stats: office_api.ArchiveStats | None = None,
+    cold: "office_api.ColdStore | None" = None,
+    archiver: "office_api.Archiver | None" = None,
+    archive_stats: "office_api.ArchiveStats | None" = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
+    # Văn phòng tắt thì không nạp mô-đun nào của nó (#489, docs/architecture.md §4.7); ba tên dưới chỉ dùng khi bật
+    if settings.office_enabled:
+        from .assist import similar
+        from .office import api as office_api
+        from .office.hasura import OfficeHasura
     scanner = scanner or ClamAVClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout_s)
     store = store or ObjectStore(
         settings.s3_endpoint, settings.s3_access_key, settings.s3_secret_key, settings.s3_region, settings.bucket

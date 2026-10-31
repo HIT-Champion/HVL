@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import uuid
 from collections.abc import Awaitable
 from datetime import UTC, datetime, timedelta, timezone
@@ -45,6 +44,7 @@ from .flowable import ExternalJob, FlowableClient, FlowableError, Task
 from .hasura import Actor, HasuraClient
 from .notify import Notifier, People, brief_of
 from .office.queries import BRIEF, OVERDUE_DOCUMENTS, READERS
+from .thoi_gian import parse_duration
 
 log = logging.getLogger("svc_workflow")
 
@@ -55,7 +55,6 @@ ACTOR = "svc-workflow"
 TOLERANCE = timedelta(seconds=2)
 VN = timezone(timedelta(hours=7))  # Việt Nam không đổi giờ theo mùa
 
-_DURATION = re.compile(r"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$")
 
 EVENT = """
 mutation GhiSuKien($event: office_document_events_insert_input!) {
@@ -68,19 +67,6 @@ query SlaEvent($doc: uuid!, $kind: String!, $task: jsonb!) {
     id
   }
 }"""
-
-
-def parse_duration(text: str) -> timedelta:
-    """Thời hạn ISO 8601 dạng ngày, giờ, phút, giây (P1D, PT24H, PT1M, PT20S) — đúng phần Flowable hiểu như nhau."""
-    m = _DURATION.match(text or "")
-    if not m or text.endswith("T"):
-        raise ValueError(f"thời hạn không hợp lệ: {text!r} (dạng ISO 8601, ví dụ PT24H, PT1M)")
-    days, hours, minutes, seconds = m.groups()
-    value = timedelta(days=int(days or 0), hours=int(hours or 0), minutes=int(minutes or 0),
-                      seconds=float(seconds or 0))
-    if value <= timedelta(0):
-        raise ValueError(f"thời hạn phải lớn hơn 0: {text!r}")
-    return value
 
 
 def _event(doc_id: str, kind: str, **data: Any) -> dict[str, Any]:

@@ -3,14 +3,8 @@
 # Gỡ được một chỗ dính thì xóa dòng của nó trong cùng PR; không thêm dòng mới trừ khi PR nói rõ vì sao chưa tránh được.
 # Nhóm theo thứ tự tách dự kiến (§4.7 bước 3, #324), mỗi nhóm một hoặc vài PR nhỏ.
 
-# 1. Import: app.py, config.py của hai dịch vụ dựng phần Văn phòng ngay cả khi MOC_OFFICE_ENABLED=false.
-import svc_files/app.py -> svc_files/office/
-import svc_files/app.py -> svc_files/office/hasura.py
-import svc_workflow/app.py -> svc_workflow/files.py
-import svc_workflow/app.py -> svc_workflow/office/api.py
-import svc_workflow/app.py -> svc_workflow/ot.py
-import svc_workflow/config.py -> svc_workflow/sla.py
-import svc_workflow/config.py -> svc_workflow/suggest.py
+# 1. Import: đã gỡ ở #489 — app.py chỉ nạp phần Văn phòng trong create_app khi MOC_OFFICE_ENABLED bật; thời hạn,
+#    ngày nghỉ lễ của config.py ở svc_workflow/thoi_gian.py (lõi).
 
 # 2. CSDL: hàm của core đọc bảng office; trigger nối hai schema; cột in văn bản đi nằm trên core.tenants.
 csdl ham core.app_events_publish -> office.documents
