@@ -1,0 +1,45 @@
+{
+  "$comment": "Ca thử dùng chung cho don.json: trình duyệt (tests/schema-form.test.js) và svc-workflow.",
+  "base": {
+    "loai": "doi-lich",
+    "hocPhan": "Phát triển phần mềm nguồn mở",
+    "lopHocPhan": "20261IT6060001",
+    "ngayCu": "today+2",
+    "tietCu": "1-3",
+    "ngayMoi": "today+5",
+    "tietMoi": "7-9",
+    "phongMoi": "A1-301",
+    "lyDo": "Dự hội thảo khoa học của trường vào buổi sáng"
+  },
+  "valid": [
+    {"name": "đủ các trường"},
+    {"name": "dạy bù buổi đã nghỉ tuần trước", "set": {"loai": "day-bu", "ngayCu": "today-7", "ngayMoi": "today+1"}},
+    {"name": "dạy buổi mới ngay hôm nay", "set": {"ngayMoi": "today"}},
+    {"name": "một tiết, tiết hai chữ số", "set": {"tietCu": "4", "tietMoi": "10-12"}},
+    {"name": "lý do nhiều dòng", "set": {"lyDo": "Đi công tác Đà Nẵng\nvề ngày thứ Sáu"}},
+    {"name": "lý do đúng 500 ký tự có dấu", "set": {"lyDo": {"$repeat": "ệ", "times": 500}}}
+  ],
+  "invalid": [
+    {"name": "thiếu loại đề nghị", "unset": ["loai"], "error": {"loai": "required"}},
+    {"name": "loại không có trong danh sách", "set": {"loai": "huy-buoi"}, "error": {"loai": "enum"}},
+    {"name": "thiếu học phần", "unset": ["hocPhan"], "error": {"hocPhan": "required"}},
+    {"name": "học phần rỗng", "set": {"hocPhan": ""}, "error": {"hocPhan": "minLength"}},
+    {"name": "học phần 121 ký tự", "set": {"hocPhan": {"$repeat": "a", "times": 121}},
+     "error": {"hocPhan": "maxLength"}},
+    {"name": "lớp có khoảng trắng ở đầu", "set": {"lopHocPhan": " 20261IT6060001"}, "error": {"lopHocPhan": "not"}},
+    {"name": "thiếu phòng học", "unset": ["phongMoi"], "error": {"phongMoi": "required"}},
+    {"name": "ngày theo lịch không có thật", "set": {"ngayCu": "2026-02-30"}, "error": {"ngayCu": "format"}},
+    {"name": "ngày viết kiểu dd/mm/yyyy", "set": {"ngayMoi": "27/10/2026"}, "error": {"ngayMoi": "format"}},
+    {"name": "năm gõ nhầm", "set": {"ngayCu": "0026-10-27"}, "error": {"ngayCu": "pattern"}},
+    {"name": "ngày dạy mới đã qua", "set": {"ngayMoi": "today-1"}, "error": {"ngayMoi": "x-moc-date"}},
+    {"name": "ngày là số", "set": {"ngayCu": 20261027}, "error": {"ngayCu": "type"}},
+    {"name": "tiết viết bằng chữ", "set": {"tietCu": "tiết 1"}, "error": {"tietCu": "pattern"}},
+    {"name": "tiết thiếu số cuối", "set": {"tietMoi": "7-"}, "error": {"tietMoi": "pattern"}},
+    {"name": "tiết ba chữ số", "set": {"tietMoi": "123"}, "error": {"tietMoi": "pattern"}},
+    {"name": "lý do rỗng", "set": {"lyDo": ""}, "error": {"lyDo": "minLength"}},
+    {"name": "lý do 501 ký tự", "set": {"lyDo": {"$repeat": "ệ", "times": 501}}, "error": {"lyDo": "maxLength"}},
+    {"name": "lý do có ký tự rộng 0", "set": {"lyDo": "Ốm\u200b"}, "error": {"lyDo": "not"}},
+    {"name": "lý do dạng tổ hợp NFD", "set": {"lyDo": {"$nfd": "Đi công tác"}}, "error": {"lyDo": "x-moc-nfc"}},
+    {"name": "trường không có trong mẫu", "set": {"soTiet": 3}, "error": {"soTiet": "additionalProperties"}}
+  ]
+}

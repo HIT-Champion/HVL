@@ -573,6 +573,13 @@ jobs:
         if: matrix.phan == 'luong-chinh'
         run: make demo-quy-trinh
 
+      # Ứng dụng ngành (Tầng 3) apps/lich-giang cùng cơ chế, hai cấp duyệt: lõi nhận BPMN, ba form; giảng viên gửi
+      # (ngày dạy mới đã qua → 422); bộ môn không đồng ý thì dừng, đồng ý thì lãnh đạo khoa thấy kèm ý kiến bộ môn,
+      # phê duyệt → kết thúc; gỡ; tệp của lõi không đổi. Cài cũng tạo lại apisix, hasura
+      - name: Ứng dụng ngành Đổi, bù lịch giảng qua lõi (make demo-lich-giang)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-lich-giang
+
       # F3.14: bật profile logs (Vector, Parseable; 9 dịch vụ chuyển sang driver fluentd, tạo lại cả CSDL, Hasura,
       # Keycloak, Meilisearch) → một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → Hasura, svc-files, tra
       # Parseable ra đủ dòng của bốn dịch vụ, sổ kiểm toán ghi cùng mã; câu SQL lỗi, lần đăng nhập sai, câu tìm gọi

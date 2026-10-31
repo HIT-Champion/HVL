@@ -41,7 +41,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 TYPES = ("feat", "fix", "perf", "refactor", "docs", "test", "build", "ci", "chore", "revert")
 # docs/git_flow.md mục 3.3 — thêm phạm vi thì thêm ở cả hai nơi
 SCOPES = ("gateway", "auth", "db", "workflow", "files", "realtime", "office", "ca-nhan", "bang-tin", "nghi-phep",
-          "ai", "data", "ops", "cli", "scripts", "e2e", "ci", "deps", "docs", "release")
+          "lich-giang", "ai", "data", "ops", "cli", "scripts", "e2e", "ci", "deps", "docs", "release")
 MAX_TITLE = 72
 TITLE = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^()]*)\))?!?: \S")
 BRANCH = re.compile(r"^(?P<type>[a-z]+)/[a-z0-9][a-z0-9.-]*$")

@@ -130,6 +130,7 @@ biến môi trường để ở PR và tài liệu của tính năng.
 | `ca-nhan` | `apps/ca-nhan` — Không gian cá nhân P.A.R.A, ứng dụng thứ hai trên lõi | Frontend |
 | `bang-tin` | `apps/bang-tin` — Bảng tin đơn vị, ứng dụng thứ ba, cắm bằng `moc app install` | Frontend · Backend |
 | `nghi-phep` | `apps/nghi-phep` — Đơn nghỉ phép, ứng dụng thứ tư, quy trình chạy trên lõi (#301) | Frontend · Backend |
+| `lich-giang` | `apps/lich-giang` — Đổi, bù lịch giảng, ứng dụng ngành (Tầng 3), hai cấp duyệt trên lõi | Frontend · Backend |
 | `ai` | `svc-ai`: RAG, OCR, tác tử | AI |
 | `data` | Kestra, nóng → lạnh, lineage | AI |
 | `ops` | Compose, reconciler, sao lưu, giám sát, OpenBao | Backend |
@@ -189,8 +190,8 @@ trình soạn thảo mở sẵn mẫu; các dòng bắt đầu bằng `#` tự b
 # <loại>(<phạm vi>): <mô tả ngắn bằng tiếng Anh, không chấm cuối; cả dòng ≤ 72 ký tự>
 #
 # Loại:    feat fix perf refactor docs test build ci chore revert
-# Phạm vi: gateway auth db workflow files realtime office ca-nhan bang-tin nghi-phep ai data ops cli scripts e2e ci
-#          deps docs release
+# Phạm vi: gateway auth db workflow files realtime office ca-nhan bang-tin nghi-phep lich-giang ai data ops cli scripts
+#          e2e ci deps docs release
 #
 # Thân (tùy chọn, tiếng Anh): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
 #

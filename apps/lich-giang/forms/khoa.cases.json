@@ -1,0 +1,24 @@
+{
+  "$comment": "Ca thử dùng chung cho forms/khoa.json: trình duyệt (tests/schema-form.test.js) và svc-workflow.",
+  "base": {
+    "quyetDinhKhoa": "dong-y",
+    "ghiChuKhoa": "Đồng ý, phòng đào tạo cập nhật thời khóa biểu"
+  },
+  "valid": [
+    {"name": "đồng ý kèm ghi chú"},
+    {"name": "chỉ quyết định", "unset": ["ghiChuKhoa"]},
+    {"name": "không đồng ý, ghi chú nhiều dòng",
+     "set": {"quyetDinhKhoa": "tu-choi", "ghiChuKhoa": "Trùng lịch thi giữa kỳ.\nChọn tuần sau."}}
+  ],
+  "invalid": [
+    {"name": "thiếu quyết định", "unset": ["quyetDinhKhoa"], "error": {"quyetDinhKhoa": "required"}},
+    {"name": "quyết định viết khác mã", "set": {"quyetDinhKhoa": "Đồng ý"}, "error": {"quyetDinhKhoa": "enum"}},
+    {"name": "quyết định là true", "set": {"quyetDinhKhoa": true}, "error": {"quyetDinhKhoa": "enum"}},
+    {"name": "ghi chú rỗng", "set": {"ghiChuKhoa": ""}, "error": {"ghiChuKhoa": "minLength"}},
+    {"name": "ghi chú 501 ký tự", "set": {"ghiChuKhoa": {"$repeat": "a", "times": 501}},
+     "error": {"ghiChuKhoa": "maxLength"}},
+    {"name": "ghi chú xuống dòng ở cuối", "set": {"ghiChuKhoa": "Đồng ý\n"}, "error": {"ghiChuKhoa": "not"}},
+    {"name": "ghi chú là null", "set": {"ghiChuKhoa": null}, "error": {"ghiChuKhoa": "type"}},
+    {"name": "trường không có trong mẫu", "set": {"nguoiDuyet": "x"}, "error": {"nguoiDuyet": "additionalProperties"}}
+  ]
+}

@@ -117,10 +117,10 @@ Phần song ngữ Việt / Anh hiện có:
 
 - **Văn phòng điện tử** (`apps/office`): mọi câu trên giao diện. Ngôn ngữ chọn bằng nút trên thanh trên; trang công
   khai cũng có nút này.
-- **Không gian cá nhân** (`apps/ca-nhan`), **Bảng tin** (`apps/bang-tin`) và **Đơn nghỉ phép** (`apps/nghi-phep`):
-  mọi câu trên giao diện, bảng dịch ở `public/i18n.js` của từng ứng dụng. Nút đổi ngôn ngữ ở thanh trên; lựa chọn lưu
-  chung với Văn phòng điện tử. Nhãn, lựa chọn của form dựng từ JSON Schema nằm trong `x-moc-ui` `{vi, en}` của tệp
-  form (`schemas/README.md`).
+- **Không gian cá nhân** (`apps/ca-nhan`), **Bảng tin** (`apps/bang-tin`), **Đơn nghỉ phép** (`apps/nghi-phep`) và
+  **Đổi, bù lịch giảng** (`apps/lich-giang`): mọi câu trên giao diện, bảng dịch ở `public/i18n.js` của từng ứng dụng.
+  Nút đổi ngôn ngữ ở thanh trên; lựa chọn lưu chung với Văn phòng điện tử. Nhãn, lựa chọn của form dựng từ JSON Schema
+  nằm trong `x-moc-ui` `{vi, en}` của tệp form (`schemas/README.md`).
 - **Trang đăng nhập**: theme Keycloak `signet`, câu nằm ở `platform/keycloak/themes/signet/login/messages/`
   (`messages_vi.properties`, `messages_en.properties`).
 
