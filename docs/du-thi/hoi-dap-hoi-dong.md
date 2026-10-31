@@ -190,11 +190,13 @@ mục "Checklist trước giờ trình diễn".
 ## 9. Tốn bao nhiêu, máy tối thiểu thế nào?
 
 Không có tiền giấy phép: mọi thành phần là phần mềm nguồn mở, GitHub và Cloudflare gói Free đủ dùng; chi phí là máy và
-điện. Hệ thống mặc định (19 dịch vụ, 18 chạy liên tục) dùng khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình — số đo từ
-trước khi thêm `app-ca-nhan`, `app-tai-lieu-api`, hai trang tĩnh nhỏ; máy chủ đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa, nhưng
-chưa đo thật trên máy 8 GB. Bật mô hình AI cần máy 16 GB (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng
-`MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`). Bản online <https://signet.htechcs.com> chạy trên một laptop của đội (i5-12500H) qua
-Cloudflare Tunnel, không cần IP công khai.
+điện. Đo bằng `docker stats` trên bản online 1.3.0 ngày 31/10/2026: profile mặc định (19 dịch vụ, 18 chạy liên tục) dùng
+khoảng 4,6 GiB RAM, nhiều nhất là ClamAV 0,9 GiB, Meilisearch 0,75 GiB, Keycloak 0,6 GiB; bật Ollama với hai mô hình
+mặc định đã nạp (`qwen3:1.7b`, `qwen3-embedding:0.6b`) thêm 3,2 GiB, tổng khoảng 7,9 GiB. Vì vậy máy chủ đề xuất 4 vCPU,
+8 GB RAM, 40 GB đĩa khi chưa bật AI và 16 GB khi bật (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng
+`MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`). Số đo lấy trên máy nhiều RAM, chưa chạy thử trên máy đúng 8 GB. Bản online
+<https://signet.htechcs.com> chạy trên một máy Windows qua WSL2 từ 31/10/2026 (trước đó là một laptop i5-12500H của
+đội), ra Internet qua Cloudflare Tunnel, không cần IP công khai.
 
 **Bằng chứng:** README mục "Yêu cầu hệ thống"; [`docs/trien-khai.md`](../trien-khai.md) §1, §5b, §8;
 `docker-compose.yml` (dịch vụ `ollama`); `docs/architecture.md` §1.3.
@@ -203,13 +205,19 @@ Cloudflare Tunnel, không cần IP công khai.
 
 Mã của đội theo Apache-2.0: toàn văn ở `LICENSE`, mục đích giấy phép ở `NOTICE`, header SPDX trong từng tệp mã; tệp
 không chèn được header (JSON, ảnh, PDF, tài liệu) khai trong `REUSE.toml`. `DEPENDENCIES.md` ghi từng thành phần thượng
-nguồn với phiên bản ghim, giấy phép, cách nạp và mục kiểm tương thích (kể cả năm gói npm mang giấy phép ngoại lệ, chỉ
-dùng lúc dựng hay lúc phát triển, không nằm trong trang phát hành); GPL, AGPL (ClamAV, PostGIS, Grafana) chỉ chạy như
-dịch vụ độc lập qua mạng, không liên kết mã. Trọng số mô hình kiểm riêng trên model card của đúng cỡ đã chọn (Qwen3:
-Apache-2.0); Llama, Gemma bị loại vì giấy phép trọng số không thuộc danh sách OSI. Repo không kèm mã của dự án khác,
-image dùng nguyên bản; CI kiểm các điều này ở mọi pull request.
+nguồn với phiên bản ghim, giấy phép, cách nạp và mục kiểm tương thích; vài gói npm mang giấy phép dữ liệu (CC0-1.0,
+CC-BY-4.0) chỉ dùng lúc dựng hay lúc phát triển, không nằm trong trang phát hành, và mọi ngoại lệ của bước kiểm giấy
+phép đều ghi lý do trong `.github/license-exceptions.json`. GPL, AGPL (ClamAV, PostGIS, DokuWiki cùng hai plugin,
+Grafana, Parseable) chỉ chạy như dịch vụ độc lập qua mạng, không liên kết mã; PostGIS, DokuWiki, Parseable nằm trong
+profile tắt mặc định. Meilisearch dùng image community (MIT): phần BUSL-1.1 của kho nguồn chỉ biên dịch vào image
+enterprise, Signet không dùng. Scorpio dùng mã dòng 6.x (BSD-3-Clause), không dùng nhánh `master` cũ mang
+BSD-4-Clause. Khi đơn vị bật API ngoài cho trợ lý, mô hình phía đích do đơn vị chọn và tự chịu trách nhiệm. Trọng số mô
+hình kiểm riêng trên model card của đúng cỡ đã chọn (Qwen3: Apache-2.0); Llama, Gemma bị loại vì giấy phép trọng số
+không thuộc danh sách OSI. Repo không kèm mã của dự án khác, image dùng nguyên bản; CI kiểm các điều này ở mọi pull
+request.
 
-**Bằng chứng:** `make license-check`; `uvx --from reuse==5.0.2 reuse lint`; `DEPENDENCIES.md`; CI job `license`
+**Bằng chứng:** `make license-check`; `uvx --from reuse==5.0.2 reuse lint`; `DEPENDENCIES.md` (mục Ghi chú dưới các
+bảng thành phần); `.github/license-exceptions.json`; CI job `license`
 ("Giấy phép (PoF #2)": "Header giấy phép trong từng tệp mã", "Không bundle mã nguồn dự án khác");
 [`pof-checklist.md`](pof-checklist.md) tiêu chí 2, 5.
 
