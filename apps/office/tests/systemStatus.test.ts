@@ -137,6 +137,9 @@ test('tự làm mới mỗi 30 giây khi tab đang mở, dọn bộ đếm khi r
 test('đường tới trang: chân trang công khai, trang đăng nhập lỗi, thanh bên sau đăng nhập', () => {
   assert.match(layout, /<NuxtLink to="\/trang-thai"[^>]*>\{\{ t\('health\.title'\) \}\}<\/NuxtLink>/)
   assert.match(layout, /<NuxtLink to="\/xac-thuc"/)
+  // và từ trang công khai về trang chủ: logo và nút "Trang chủ" ở thanh trên
+  assert.match(layout, /<NuxtLink to="\/" class="moc-public-wordmark/)
+  assert.match(layout, /<NuxtLink to="\/"[^>]*>\{\{ t\('nav\.home'\) \}\}<\/NuxtLink>/)
   assert.match(read('../app/pages/dang-nhap.vue'), /<NuxtLink to="\/trang-thai"/)
   assert.match(read('../app/layouts/default.vue'), /<NuxtLink to="\/trang-thai"/)
 })

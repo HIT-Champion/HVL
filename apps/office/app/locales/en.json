@@ -15,6 +15,7 @@
     "more": "Load more"
   },
   "nav": {
+    "home": "Home",
     "inbox": "My tasks",
     "incoming": "Incoming documents",
     "receive": "Receive document",
