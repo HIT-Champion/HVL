@@ -63,8 +63,9 @@ Signet theo khung ba tầng của đề DX-OS:
   thêm tay vào cấu hình lõi (client Keycloak, route ở cổng, bảng và quyền trong CSDL). Bảng tin đơn vị và Đơn nghỉ phép
   cắm vào bằng một lệnh `moc app install` mà không sửa tệp nào của lõi
   ([`docs/them-ung-dung.md`](docs/them-ung-dung.md)).
-- **Tầng 3 — ứng dụng ngành** (bán hàng, kho, học tập, quan hệ khách hàng…): đề không bắt buộc, Signet chưa làm. Ứng
-  dụng ngành sẽ cắm vào như Bảng tin, bằng `moc app install`.
+- **Tầng 3 — ứng dụng ngành** (bán hàng, kho, học tập, quan hệ khách hàng…): đề không bắt buộc. Ứng dụng đầu tiên là
+  Đổi, bù lịch giảng (`apps/lich-giang`): giảng viên đề nghị, trưởng bộ môn rồi lãnh đạo khoa duyệt trên quy trình của
+  lõi; cắm vào như Bảng tin, bằng `moc app install`.
 
 | Không gian | Màn hình, ứng dụng ở Tầng 2 |
 |---|---|

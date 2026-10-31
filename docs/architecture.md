@@ -14,7 +14,8 @@
 >    `svc-workflow`. Tầng 2 là bốn không gian H-P-D-I có giao diện, mỗi màn hình thuộc một không gian (bảng ở
 >    [`README.md`](../README.md) mục "Kiến trúc"; thành phần theo không gian ở §3): Văn phòng điện tử (một ứng dụng có
 >    màn ở cả bốn không gian), Không gian cá nhân P.A.R.A (hai trang tĩnh), trang tài liệu API, và Bảng tin đơn vị, Nghỉ
->    phép (cắm bằng `moc app install`). Tầng 3, ứng dụng ngành, đề không bắt buộc và Signet chưa làm.
+>    phép (cắm bằng `moc app install`). Tầng 3, ứng dụng ngành, đề không bắt buộc: Đổi, bù lịch giảng
+>    (`apps/lich-giang`) cắm cùng cách.
 > 2. **Chạy thế nào.** Mọi yêu cầu vào qua một cổng APISIX có kiểm token. Dữ liệu có cấu trúc đi qua Hasura, quyền tới
 >    từng dòng; tệp đi qua `svc-files`, quét ClamAV trước khi lưu; bước quy trình do Flowable giữ.
 > 3. **Vì sao chọn vậy.** Không viết lại phần mềm đã có, chạy trên một máy 8 GB, không dịch vụ trả phí (§1); từng lựa
@@ -125,7 +126,7 @@ flowchart LR
     U2["Người nhận văn bản<br/>quét QR, không đăng nhập"]
   end
   GW{{"APISIX 3.18 — cổng duy nhất mở ra ngoài<br/>WAF · kiểm JWT · giới hạn tốc độ<br/>X-Request-Id · quản trị: 404"}}
-  T3["Tầng 3 — ứng dụng ngành: đề không bắt buộc, chưa làm"]
+  T3["Tầng 3 — ứng dụng ngành (đề không bắt buộc)<br/>app-lich-giang · Đổi, bù lịch giảng · cắm bằng moc app install"]
   subgraph TANG2["Tầng 2 — bốn không gian H-P-D-I có giao diện (profile app; mạng apps: chỉ tới APISIX)"]
     OFF["app-office · Văn phòng điện tử · Nuxt 4<br/>màn hình ở cả bốn không gian [H] [P] [D] [I], bảng ở README"]
     CN["[H] app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
@@ -177,6 +178,7 @@ flowchart LR
   GW -->|"/tai-lieu-api, /tai-lieu-api/*"| TL
   GW -->|"/bang-tin/*, /nghi-phep/* — route thêm lúc cài"| APP
   APP -->|"token, GraphQL: chỉ qua cổng"| GW
+  T3 -->|"token: chỉ qua cổng, API quy trình chung"| GW
   GW -.->|"/tu-dong, /tu-dong/* · WebSocket"| NR
   NR -.->|"OIDC, token robot, GraphQL<br/>(Action notifyFromFlow): chỉ qua cổng"| GW
   GW -.->|"/wiki, /wiki/*"| WK
@@ -216,7 +218,6 @@ flowchart LR
   GW -.->|"log 9 dịch vụ, driver fluentd"| LG
   BK -.->|"sao lưu"| PG
   BK -.->|"sao lưu"| SW
-  style T3 stroke-dasharray: 5 4
 ```
 
 - **Một cửa.** Chỉ APISIX mở cổng ra mạng (`MOC_HTTP_PORT`, mặc định 8080). Yêu cầu GET, HEAD tới đường không có trong
