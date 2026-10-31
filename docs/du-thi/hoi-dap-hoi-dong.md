@@ -192,7 +192,7 @@ mục "Checklist trước giờ trình diễn".
 Không có tiền giấy phép: mọi thành phần là phần mềm nguồn mở, GitHub và Cloudflare gói Free đủ dùng; chi phí là máy và
 điện. Đo bằng `docker stats` trên bản online 1.3.0 ngày 31/10/2026: profile mặc định (19 dịch vụ, 18 chạy liên tục) dùng
 khoảng 4,6 GiB RAM, nhiều nhất là ClamAV 0,9 GiB, Meilisearch 0,75 GiB, Keycloak 0,6 GiB; bật Ollama với hai mô hình
-mặc định đã nạp (`qwen3:1.7b`, `qwen3-embedding:0.6b`) thêm 3,2 GiB, tổng khoảng 7,9 GiB. Vì vậy máy chủ đề xuất 4 vCPU,
+mặc định đã nạp (`qwen3:1.7b`, `qwen3-embedding:0.6b`) thêm 3,2 GiB, tổng khoảng 7,8 GiB. Vì vậy máy chủ đề xuất 4 vCPU,
 8 GB RAM, 40 GB đĩa khi chưa bật AI và 16 GB khi bật (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng
 `MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`). Số đo lấy trên máy nhiều RAM, chưa chạy thử trên máy đúng 8 GB. Bản online
 <https://signet.htechcs.com> chạy trên một máy Windows qua WSL2 từ 31/10/2026 (trước đó là một laptop i5-12500H của
