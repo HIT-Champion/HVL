@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Thay đổi
+- Trang đăng nhập: logo nổi bật hơn, bố cục mềm và cân đối hơn, vừa màn hình điện thoại và laptop (#480).
+
 ### Sửa lỗi
 - Thanh bên không cắt mục đang chọn; lịch hạn vừa khung laptop khi phóng to hoặc mở menu (#465).
 
