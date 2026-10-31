@@ -25,3 +25,9 @@ id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-12-31
 # @docusaurus/plugin-svgr → @svgr/webpack → @svgr/plugin-svgo 8.1.0 (bản mới nhất, vẫn cần deepmerge ^4)
 reason = "deepmerge 4.3.1, chưa có bản vá (#387): gộp cấu hình svgo lúc dựng; Pages chỉ nhận HTML tĩnh website/build."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-12-31
+# serve-handler 6.1.7 (máy chủ của `npm run serve`) ghim minimatch 3.1.5; bản vá chỉ có ở minimatch 11 (#461)
+reason = "minimatch 3.1.5: mẫu glob dị dạng làm chậm; chỉ ở máy chủ xem thử bản dựng, Pages chỉ nhận HTML tĩnh."
