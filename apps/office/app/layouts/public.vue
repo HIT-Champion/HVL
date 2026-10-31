@@ -21,7 +21,8 @@ import { useI18n } from 'vue-i18n'
 
 // Khung của trang công khai (cổng xác thực văn bản, trạng thái hệ thống): không cần đăng nhập, không gọi API nào cần
 // token. Trang đặt tiêu đề phụ ở đầu khung bằng `publicTitle` (khóa i18n) và xin khung rộng hơn bằng `wide` trong
-// definePageMeta; chân trang nối các trang công khai với nhau.
+// definePageMeta; chân trang nối các trang công khai với nhau. Logo và nút "Trang chủ" về `/` như khung chính: người
+// chưa đăng nhập thì sang trang đăng nhập (middleware/auth.global.ts).
 const { t, locale } = useI18n()
 const route = useRoute()
 const subtitle = computed(() => t(String(route.meta.publicTitle ?? 'verify.title')))
@@ -39,7 +40,7 @@ function toggleLocale() {
     <header class="border-b border-stone-200 bg-white">
       <div class="mx-auto flex min-h-16 w-full items-center gap-4 px-4 py-2 sm:px-6" :class="width">
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-0.5">
-          <div class="moc-public-wordmark text-brand-800">
+          <NuxtLink to="/" class="moc-public-wordmark text-brand-800">
             <svg
               class="sg-brand-mark" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="9"
               stroke-linecap="round" aria-hidden="true"
@@ -48,12 +49,15 @@ function toggleLocale() {
               <path d="M19 54h19c9 0 16-7 16-16s-7-16-16-16H26" />
             </svg>
             <span>{{ t('app.name') }}</span>
-          </div>
+          </NuxtLink>
           <div class="min-w-0 text-[13px] text-stone-600 sm:border-l sm:border-stone-200 sm:pl-4 sm:text-sm">
             {{ subtitle }}
           </div>
         </div>
-        <button class="btn-ghost text-[13px]" @click="toggleLocale">{{ t('nav.language') }}</button>
+        <div class="flex shrink-0 items-center gap-1">
+          <NuxtLink to="/" class="btn-ghost text-[13px]">{{ t('nav.home') }}</NuxtLink>
+          <button class="btn-ghost text-[13px]" @click="toggleLocale">{{ t('nav.language') }}</button>
+        </div>
       </div>
     </header>
     <main class="mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-10" :class="width">

@@ -19,9 +19,9 @@ import { expect, test } from '@playwright/test'
 import { shot } from './helpers'
 
 // Trạng thái hệ thống (trang công khai): người ngoài không đăng nhập mở /trang-thai, không bị chuyển sang Keycloak,
-// thấy tình trạng chung và từng thành phần theo tầng người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo; từ
-// chân trang của cổng xác thực đi được tới trang. Không đòi mọi thành phần "Hoạt động" ở đây (ca thêm của CI kiểm qua
-// API).
+// thấy tình trạng chung và từng thành phần theo tầng người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo; có nút
+// về trang chủ; từ chân trang của cổng xác thực đi được tới trang. Không đòi mọi thành phần "Hoạt động" ở đây (ca thêm
+// của CI kiểm qua API).
 
 const LAYERS = ['nguoi-dung', 'loi', 'quy-trinh', 'du-lieu', 'tri-tue']
 const COMPONENTS = ['cong-api', 'dang-nhap', 'csdl', 'ket-khoa', 'quet-ma-doc', 'quy-trinh', 'luu-tru', 'tim-kiem',
@@ -46,6 +46,7 @@ test('trạng thái hệ thống: không cần đăng nhập, đủ thành phầ
   await expect(outsider.getByTestId('status-version')).not.toBeEmpty()
   await expect(outsider.getByTestId('status-ai')).toContainText(/Bật|Tắt/)
   await shot(outsider, '36-trang-thai')
+  await expect(outsider.getByRole('link', { name: 'Trang chủ', exact: true })).toHaveAttribute('href', '/')
 
   // từ chân trang của cổng xác thực văn bản (cũng là trang công khai)
   await outsider.goto('/xac-thuc')
