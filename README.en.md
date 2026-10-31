@@ -68,8 +68,9 @@ Signet follows the three tiers of the DX-OS brief:
   service code, but it was added by hand to the core configuration (a Keycloak client, a gateway route, tables and
   permissions in the database). The unit news board and the leave request app plug in with one `moc app install`
   command without changing any core file ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese).
-- **Tier 3, industry applications** (sales, warehouse, learning, customer relations…): optional in the brief, and
-  Signet has none. They would plug in like the news board, with `moc app install`.
+- **Tier 3, industry applications** (sales, warehouse, learning, customer relations…): optional in the brief. The
+  first one is the teaching schedule change app (`apps/lich-giang`): a lecturer asks, the head of department and then
+  the dean approve on the core workflow engine; it plugs in like the news board, with `moc app install`.
 
 | Space | Tier 2 screens and applications |
 |---|---|

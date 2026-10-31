@@ -17,11 +17,11 @@
 """Sinh sơ đồ kiến trúc tổng thể của Signet cho README: SVG có chuyển động và GIF lặp khép kín.
 
 Yêu cầu đi từ trái sang phải: người dùng → cổng APISIX → dịch vụ → dữ liệu; ngoài cùng bên phải là các kênh bên ngoài
-mà svc-workflow gửi thông báo tới (tùy chọn). Trên xuống là ba tầng của đề DX-OS: Tầng 3 (ứng dụng ngành, chưa làm, nét
-đứt), Tầng 2 là bốn không gian năng lực số H → P → D → I liệt kê màn hình, ứng dụng theo bảng Tầng 2 của README, Tầng 1
-là lõi không giao diện. Đường nối chạy nét theo chiều dữ liệu, hai chấm sáng đi theo hai yêu cầu thật (văn bản vào quy
-trình BPMN; tệp qua kiểm dịch). Màu theo không gian H-P-D-I, viền đậm là mã của đội, logo đặt trên phần mềm nguồn mở
-dùng nguyên bản (docs/anh/logo/, nguồn ở NGUON.md).
+mà svc-workflow gửi thông báo tới (tùy chọn). Trên xuống là ba tầng của đề DX-OS: Tầng 3 (ứng dụng ngành:
+Đổi, bù lịch giảng), Tầng 2 là bốn không gian năng lực số H → P → D → I liệt kê màn hình, ứng dụng theo bảng Tầng 2
+của README, Tầng 1 là lõi không giao diện. Đường nối chạy nét theo chiều dữ liệu, hai chấm sáng đi theo hai yêu cầu
+thật (văn bản vào quy trình BPMN; tệp qua kiểm dịch). Màu theo không gian H-P-D-I, viền đậm là mã của đội, logo đặt
+trên phần mềm nguồn mở dùng nguyên bản (docs/anh/logo/, nguồn ở NGUON.md).
 
     python3 scripts/so_do_kien_truc.py svg [vi|en]    SVG có chuyển động ra stdout
     python3 scripts/so_do_kien_truc.py gif            docs/anh/kien-truc-tong-the.gif và kien-truc-tong-the.en.gif
@@ -64,7 +64,8 @@ SO_KHUNG = round(XUNG / BUOC)
 
 T = {
     "vi": dict(
-        users="Người dùng", net="Mạng nội bộ Docker", t3="TẦNG 3 · ỨNG DỤNG NGÀNH — ĐỀ KHÔNG BẮT BUỘC, CHƯA LÀM",
+        users="Người dùng", net="Mạng nội bộ Docker",
+        t3="TẦNG 3 · ỨNG DỤNG NGÀNH — ĐỔI, BÙ LỊCH GIẢNG (apps/lich-giang), MỘT LỆNH moc app install",
         t2="TẦNG 2 · KHÔNG GIAN NĂNG LỰC SỐ H → P → D → I", t1="TẦNG 1 · LÕI KHÔNG GIAO DIỆN",
         band=("Văn phòng điện tử", "app-office · Nuxt 4 · màn hình ở cả bốn không gian"),
         cols=[("id", "[H] Con người", ["Không gian cá nhân P.A.R.A", "Bảng tin đơn vị ⊕", "trang Ứng dụng",
@@ -111,7 +112,7 @@ T = {
     ),
     "en": dict(
         users="Users", net="Internal Docker network",
-        t3="TIER 3 · INDUSTRY APPLICATIONS — OPTIONAL IN THE BRIEF, NOT BUILT",
+        t3="TIER 3 · INDUSTRY APPS — TEACHING SCHEDULE CHANGES (apps/lich-giang), ONE moc app install",
         t2="TIER 2 · DIGITAL CAPABILITY SPACES H → P → D → I", t1="TIER 1 · HEADLESS CORE",
         band=("e-Office", "app-office · Nuxt 4 · screens in all four spaces"),
         cols=[("id", "[H] Human", ["P.A.R.A personal space", "Unit news board ⊕", "Apps page", "DokuWiki (optional)"]),
@@ -277,10 +278,11 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
     a(f'<rect x="460" y="22" width="800" height="{R[9] + bh + 18 - 22}" rx="32" fill="none" stroke="#8c959f" '
       'stroke-dasharray="4 4"/>')
     text(484, 44, tx["net"], 11.5, 400, "#57606a", "start")
-    # Tầng 3: chưa có gì, chỉ một dải nét đứt
-    a(f'<rect x="472" y="{T3Y}" width="776" height="{T3H}" rx="10" fill="none" stroke="#8c959f" '
-      'stroke-dasharray="4 4"/>')
-    text(860, T3Y + 17, tx["t3"], 10.5, 600, "#8c959f", extra=' letter-spacing="0.6"')
+    # Tầng 3: ứng dụng ngành đầu tiên (apps/lich-giang), một dải cùng màu không gian ứng dụng
+    f, s = C["app"]
+    a(f'<rect x="472" y="{T3Y}" width="776" height="{T3H}" rx="10" fill="{f}" stroke="{s}" '
+      'stroke-width="1.4"/>')
+    text(860, T3Y + 17, tx["t3"], 10.5, 600, "#57606a", extra=' letter-spacing="0.6"')
     # Tầng 2: nền, nhãn, dải Văn phòng điện tử, bốn cột H-P-D-I, hai dòng chú thích
     a(f'<rect x="472" y="{P2Y}" width="776" height="{P2_BOT - P2Y}" rx="18" fill="#f6f9ff"/>')
     text(1236, P2Y + 22, tx["t2"], 10.5, 600, "#6c8ebf", "end", ' letter-spacing="0.6"')
