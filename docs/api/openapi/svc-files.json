@@ -2105,7 +2105,7 @@
           "route_reason": {
             "type": "string",
             "title": "Route Reason",
-            "description": "Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp) hoặc `mac-dinh`",
+            "description": "Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp), `mac-dinh`, `khong-khop-huong-dan` hoặc `luoi-an-toan` (câu ngắn không rõ ý, không có đoạn nào: trả lời bằng lời giới thiệu)",
             "examples": [
               "kw:lam-duoc-gi"
             ]

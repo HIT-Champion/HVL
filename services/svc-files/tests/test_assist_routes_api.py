@@ -177,3 +177,25 @@ def test_in_a_document_scope_how_to_words_still_search_that_document(asking):
     env = asking(passages=demo(), env={"MOC_ASK_GUIDE_DIR": GUIDES})
     body = routed(env, "Nộp hồ sơ học bổng ở đâu?", document_id=D88)
     assert body["route"] == "van_ban" and env.retriever.calls[0]["filters"].document_id == D88
+
+
+@pytest.mark.parametrize("mode", ["extract", "generate"])
+def test_a_short_unclear_question_without_evidence_gets_the_intro_not_no_evidence(asking, mode):
+    fake = FakeOllama()
+    env = asking(passages=[], ai=ollama(fake))
+    fake.requests.clear()
+    body = routed(env, "bạn có thể giups gì cho tôi?", mode=mode)
+    assert (body["route"], body["route_reason"], body["status"]) == ("gioi_thieu", "luoi-an-toan", "answered")
+    assert body["answer"]["text"].startswith("“Tôi chưa hiểu rõ câu này") and body["answer"]["model"] is None
+    assert body["sources"][0]["path"].endswith("gioi_thieu/vi.md#chua-ro")
+    assert len(env.retriever.calls) == 1                                   # đã tìm một lần, không ra đoạn nào
+    assert not any("/api/chat" in str(r) for r in fake.requests)          # không gọi mô hình viết
+    (event,) = env.hasura.agent_events
+    assert (event["diff"]["route"], event["diff"]["route_reason"]) == ("gioi_thieu", "luoi-an-toan")
+
+
+def test_a_filtered_or_document_question_without_evidence_stays_no_evidence(asking):
+    env = asking(passages=[])
+    for question, body in (("lịch thi", {"year": 2026}), ("Điều kiện xét học bổng là gì?", {})):
+        got = routed(env, question, **body)
+        assert (got["route"], got["status"], got["answer"]) == ("van_ban", "no_evidence", None)

@@ -641,7 +641,7 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `warnings` | `"embed_unavailable", "model_unavailable", "model_timeout", "model_rejected", "model_declined"[]` | ✓ |  |
 | `duration_ms` | `integer` | ✓ |  |
 | `route` | `"van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi", "viec_cua_toi", "dem_van_ban"` | ✓ | Đường bộ định tuyến đã chọn: van_ban: tìm trong kho văn bản · gioi_thieu: câu về chính trợ lý, câu chào · huong_dan: cách dùng Signet, trả lời từ hướng dẫn sử dụng · ngoai_pham_vi: câu cố định, không tìm · viec_cua_toi: đếm việc trong Hộp việc của người hỏi · dem_van_ban: đếm văn bản người hỏi được xem. Trừ van_ban, huong_dan, các đường không gọi mô hình, cả khi mode=generate |
-| `route_reason` | `string` | ✓ | Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp) hoặc `mac-dinh` |
+| `route_reason` | `string` | ✓ | Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp), `mac-dinh`, `khong-khop-huong-dan` hoặc `luoi-an-toan` (câu ngắn không rõ ý, không có đoạn nào: trả lời bằng lời giới thiệu) |
 | `rewritten` | `string hoặc null` | ✓ | Câu nối tiếp đã ghép với `previous` thành câu độc lập — câu đem đi tìm. null khi không phải câu nối tiếp |
 | `data` | `object hoặc null` |  | Đường viec_cua_toi, dem_van_ban: các số và bộ lọc của câu trả lời `source: data`, máy đọc. viec_cua_toi: `{kind: tasks, on, tasks, overdue, today, soon, no_due}` · dem_van_ban: `{kind: documents, counts: {in?, out?}, type_code, from, to}` (`to` là ngày sau ngày cuối; null: không lọc theo ngày). null với đường khác |
 | `link` | `string hoặc null` |  | Trang trong Signet xem danh sách đã đếm: `/` (Hộp việc, Lịch hạn), `/van-ban-den`, `/van-ban-di`; null khi không có trang nào hợp |

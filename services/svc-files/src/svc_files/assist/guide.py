@@ -45,10 +45,11 @@ GUIDE_TYPE = {"vi": "Hướng dẫn sử dụng", "en": "User guide"}
 INTRO_TYPE = {"vi": "Giới thiệu trợ lý", "en": "About the assistant"}
 # mã lý do của route.py → mục chính của tệp giới thiệu
 INTRO_SECTIONS = {
-    "lam-duoc-gi": "lam-duoc-gi", "what-can-you-do": "lam-duoc-gi",
+    "lam-duoc-gi": "lam-duoc-gi", "what-can-you-do": "lam-duoc-gi", "can-giup": "lam-duoc-gi",
     "dung-mo-hinh": "mo-hinh", "which-model": "mo-hinh",
     "hoi-the-nao": "cach-hoi",
     "cam-on": "cam-on", "thanks": "cam-on",
+    "luoi-an-toan": "chua-ro",              # lưới an toàn của route.fallback: không rõ hỏi gì, không có đoạn nào
 }
 INTRO_DEFAULT = "gioi-thieu"
 INTRO_ORDER = ("gioi-thieu", "lam-duoc-gi", "cach-hoi", "mo-hinh")    # mục kèm theo làm nguồn phụ

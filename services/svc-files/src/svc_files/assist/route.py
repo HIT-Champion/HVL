@@ -31,6 +31,11 @@ Không khớp mẫu nào thì về ``van_ban``, tìm trong kho như trước: t�
 Câu có từ chỉ văn bản ("quyết định", "quy chế", "học bổng"…) không bao giờ thành ``gioi_thieu`` hay ``ngoai_pham_vi``:
 "Em cần làm gì để được học bổng?" là câu hỏi về văn bản dù có "làm gì".
 
+Lưới an toàn (``fallback``): câu về ``van_ban`` theo mặc định mà tìm không ra đoạn nào, ngắn (≤ 8 term), không có từ
+chỉ văn bản, không có số, không lọc, không hỏi trong một văn bản → ``gioi_thieu`` mã ``luoi-an-toan``: câu chào gõ sai
+("bạn có thể giups gì cho tôi") nhận lời giới thiệu thay cho "không tìm thấy văn bản nào". Chỉ chạy sau khi tìm: câu
+hỏi văn bản có đoạn trả lời không bao giờ bị lưới bắt. Bộ câu có nhãn ``seed/hoi-dap/y-dinh.json`` đo cả hai bước.
+
 Câu nối tiếp (``follow_up``): có ``previous`` (câu hỏi lượt trước, máy chủ không lưu), câu mới ngắn (≤ 6 term) và có
 dấu hiệu nối tiếp ("còn … thì sao", "thế còn", "nó", "văn bản đó") thì ghép với câu trước thành một câu độc lập, đọc
 được, để tìm và hiện cho người hỏi ("Đã hiểu là: …"). Ghép bằng quy tắc, không gọi mô hình.
@@ -49,6 +54,8 @@ DATA_ROUTES = ("viec_cua_toi", "dem_van_ban")
 # đường không tìm đoạn, không gọi mô hình: trả lời ngay, cả ở lượt generate (không chờ lượt sinh)
 DIRECT_ROUTES = ("gioi_thieu", "ngoai_pham_vi", *DATA_ROUTES)
 DEFAULT_REASON = "mac-dinh"
+FALLBACK_REASON = "luoi-an-toan"
+FALLBACK_MAX_TERMS = 8
 FOLLOW_UP_MAX_TERMS = 6
 MAX_REWRITTEN = 500         # như MAX_QUESTION của answer.py: dài hơn thì không ghép
 
@@ -77,11 +84,20 @@ DOC_WORDS_RE = re.compile(
 _YOU = r"(?:ban|em|tro ly(?: nay| ao| hoi dap| ai)?|signet|he thong nay|may)"
 
 _INTRO: tuple[tuple[str, str, re.Pattern[str]], ...] = (
-    ("xin-chao", "vi", re.compile(rf"^(?:xin chao|chao)(?: {_YOU})?(?: a| nhe)?$")),
+    ("xin-chao", "vi", re.compile(rf"^(?:xin chao|chao)(?: {_YOU})?(?: a| nhe| oi)?$")),
+    # chào tiếng Anh gọi trợ lý bằng tiếng Việt ("hello em"), gọi trống ("em ơi"): vẫn là câu chào tiếng Việt
+    ("xin-chao", "vi", re.compile(r"^(?:hello|hi|hey|alo) (?:ban|em|tro ly)(?: oi| a| nhe)?$|^(?:ban|em|tro ly) oi$")),
     ("cam-on", "vi", re.compile(rf"^cam on(?: {_YOU})?(?: nhieu| nhe| a)*$")),
     ("lam-duoc-gi", "vi", re.compile(
         rf"^{_YOU} (?:co the |biet |lam duoc |giup duoc |ho tro duoc )?(?:lam|giup|ho tro)(?: duoc)?"
         r"(?: (?:cho )?(?:toi|minh|em|tui))?(?: duoc)? (?:nhung )?(?:gi|viec gi|nhung gi|nhung viec gi)$")),
+    # "giúp gì cho tôi": "gì" đứng trước người được giúp
+    ("lam-duoc-gi", "vi", re.compile(
+        rf"^(?:{_YOU} )?(?:co the |co )?(?:lam|giup|ho tro)(?: duoc)? (?:nhung )?(?:gi|viec gi|nhung gi)"
+        r"(?: duoc)? (?:cho|giup) (?:toi|minh|em|tui)(?: duoc)?(?: (?:khong|ko|vay|the))?$")),
+    ("can-giup", "vi", re.compile(
+        r"^(?:toi |minh |em )?(?:can|muon) (?:duoc )?(?:giup do|ho tro|tro giup|giup)$|"
+        r"^giup (?:toi|minh|em)(?: voi)?$")),
     ("la-ai", "vi", re.compile(rf"^{_YOU} (?:la ai|ten (?:la )?gi|la gi)$")),
     ("dung-mo-hinh", "vi", re.compile(
         rf"^{_YOU} (?:dung|chay(?: bang)?|la) (?:mo hinh|model|llm|ai|tri tue nhan tao)(?: nao| gi)?(?: vay)?$|"
@@ -202,6 +218,18 @@ def route(question: str, *, scoped: bool = False) -> Route:
         if found is not None:
             return found
     return Route("van_ban", DEFAULT_REASON)
+
+
+def fallback(question: str, chosen: Route, *, scoped: bool = False, filtered: bool = False) -> Route | None:
+    """Lưới an toàn sau khi tìm (answer.py gọi khi đường ``van_ban`` không ra đoạn nào): ``gioi_thieu`` mã
+    ``luoi-an-toan`` nếu câu đi ``van_ban`` chỉ vì không khớp mẫu nào, ngắn, không có từ chỉ văn bản, không có số, không
+    lọc theo loại/năm/chiều và không hỏi trong một văn bản; None thì giữ ``no_evidence`` như trước."""
+    if scoped or filtered or chosen.name != "van_ban" or chosen.reason != DEFAULT_REASON:
+        return None
+    text = _LEAD_RE.sub("", folded(question))
+    if DOC_WORDS_RE.search(text) or re.search(r"\d", text) or len(text.split()) > FALLBACK_MAX_TERMS:
+        return None
+    return Route("gioi_thieu", FALLBACK_REASON, chosen.lang)
 
 
 # --- câu nối tiếp ------------------------------------------------------------------------------------------------

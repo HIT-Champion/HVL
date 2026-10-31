@@ -41,7 +41,8 @@ trợ lý, ``ngoai_pham_vi`` trả câu cố định — cả hai không tìm, k
 trong kho hướng dẫn sử dụng (guide.py) thay cho bước 4–5, rồi câu trích và mô hình như văn bản — kho không có mục nào
 khớp thì đi như ``van_ban`` (mã lý do ``khong-khop-huong-dan``); ``van_ban`` như trên. Hai đường dữ liệu (#441, data.py)
 ``viec_cua_toi``, ``dem_van_ban`` đếm thẳng trong CSDL qua Hasura bằng token người hỏi, trả câu có số, ``data`` và
-``link``; không tìm, không gọi mô hình.
+``link``; không tìm, không gọi mô hình. ``van_ban`` mặc định mà không ra đoạn nào thì qua lưới an toàn
+(``route.fallback``): câu ngắn, không chỉ văn bản thành ``gioi_thieu`` mã ``luoi-an-toan``, không gọi mô hình.
 Câu nối tiếp (có ``previous``) được ghép thành câu độc lập trước khi chọn đường; câu ghép thay câu hỏi ở mọi bước sau
 và trả về ở ``rewritten``. Sổ kiểm toán, nhật ký ghi đường và mã lý do, không ghi câu ghép. Nhật ký không bao giờ
 có câu hỏi, câu trả lời, đoạn trích: chỉ độ dài, số term, số đoạn, thời gian.
@@ -234,6 +235,14 @@ class Assistant:
         counted: data.Answer | None = None          # câu có số của đường dữ liệu
         if chosen.name == "van_ban":
             found = await self._search(body, asked, scope, deadline, warnings, request_id)
+            caught = None if found.passages else route.fallback(
+                asked, chosen, scoped=body.document_id is not None,
+                filtered=any(f is not None for f in (body.direction, body.year, body.type_code)))
+            if caught is not None:
+                # lưới an toàn: câu ngắn, không chỉ văn bản, không có đoạn nào → lời giới thiệu thay "không tìm thấy"
+                chosen = caught
+                intro = self.guides.intro(chosen.reason, chosen.lang)
+                found = Retrieval(intro, candidates=found.candidates, semantic=found.semantic)
         else:
             if chosen.name == "huong_dan":
                 found_passages = self.guides.search(asked, s.ask_top_k)

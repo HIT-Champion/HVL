@@ -17,6 +17,8 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ### Đã sửa lỗi
 - Thanh bên không cắt mục đang chọn; lịch hạn vừa khung laptop khi phóng to hoặc mở menu (#465).
+- Trợ lý hỏi đáp nhận ra câu chào, câu hỏi "giúp gì cho tôi" và trả lời giới thiệu cho câu ngắn không rõ ý thay
+  vì "không tìm thấy văn bản" (#PR).
 - Trang Xác thực văn bản và Trạng thái hệ thống có nút về trang chủ; logo ở thanh trên cũng về trang chủ (#494).
 
 ## [1.4.0] - 2026-10-31

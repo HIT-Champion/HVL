@@ -358,7 +358,11 @@ chủ không lưu hội thoại: câu nối tiếp gửi kèm câu hỏi lượt
 **Bộ định tuyến** (`route.py`, `guide.py`, #423). Trước khi tìm, mỗi câu hỏi đi qua các mẫu tất định so trên chữ bỏ
 dấu, có cả tiếng Anh; mỗi mẫu có mã lý do (`route_reason`, vd `kw:lam-duoc-gi`, `kw:o-dau`, `kw:thoi-tiet`; mặc định
 `mac-dinh`). Không mô hình nào chọn đường. Câu có từ chỉ văn bản ("văn bản", "quyết định", "học bổng", "Điều 5"…) luôn
-về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất là như trước khi có bộ định tuyến.
+về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất là như trước khi có bộ định tuyến. Lưới an toàn
+(`route.fallback`): câu về `van_ban` theo mặc định mà không ra đoạn nào, ngắn (≤ 8 term), không có từ chỉ văn bản,
+không có số, không lọc, không hỏi trong một văn bản thì trả mục "Chưa rõ câu hỏi" của tệp Giới thiệu trợ lý (mã
+`luoi-an-toan`) thay cho "không tìm thấy": câu gõ sai như "bạn có thể giups gì cho tôi" không còn nhận câu trả lời
+của một lượt tìm văn bản thất bại.
 
 | `route` | Nhận ra bằng | Trả lời | Tìm trong kho · gọi mô hình |
 |---|---|---|---|

@@ -36,6 +36,12 @@ là phần mềm nguồn mở, giấy phép Apache-2.0. Tôi có thể sai, nên
 
 Rất vui được giúp bạn. Bạn có thể hỏi tiếp về nội dung văn bản hoặc cách dùng Signet.
 
+## Chưa rõ câu hỏi {#chua-ro}
+
+Tôi chưa hiểu rõ câu này và chưa tìm thấy văn bản nào bạn được xem khớp với nó. Tôi trả lời câu hỏi về nội dung văn
+bản, cách dùng Signet, việc của bạn và số văn bản. Bạn hỏi đầy đủ hơn giúp tôi, ví dụ: "Điều kiện xét học bổng là
+gì?", "Nộp đơn nghỉ phép ở đâu?", "Việc nào của tôi sắp quá hạn?".
+
 ## Ngoài phạm vi {#ngoai-pham-vi}
 
 Câu này nằm ngoài phạm vi của tôi. Tôi trả lời câu hỏi về nội dung các văn bản bạn được xem, về cách dùng Signet, về
