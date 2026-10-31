@@ -96,6 +96,18 @@ function keyboard(event: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', keyboard))
 
+// Bề rộng thanh cuộn của menu (0 khi không cuộn, khi thu gọn, hay với thanh cuộn nổi): main.css kéo menu sang lề phải
+// đúng chừng đó để thanh cuộn không lấn vào nền mục. Đo lại khi menu đổi cỡ (màn hình, thu gọn, vai trò)
+const navList = ref<HTMLElement | null>(null)
+const navGutter = ref(0)
+let navResize: ResizeObserver | undefined
+onMounted(() => {
+  const list = navList.value
+  if (!list) return
+  navResize = new ResizeObserver(() => { navGutter.value = list.offsetWidth - list.clientWidth })
+  navResize.observe(list)
+})
+
 // Ngày trên thanh trên, đổi lúc qua nửa đêm
 const calendarDay = ref(today())
 let calendarClock: ReturnType<typeof setInterval> | undefined
@@ -107,6 +119,7 @@ const dateLabel = computed(() => new Intl.DateTimeFormat(locale.value === 'vi' ?
 onBeforeUnmount(() => {
   media?.removeEventListener('change', updateViewport)
   window.removeEventListener('keydown', keyboard)
+  navResize?.disconnect()
   clearInterval(calendarClock)
   clearTimeout(hoverExit)
   document.body.style.overflow = ''
@@ -251,7 +264,9 @@ async function logout() {
           </svg>
         </button>
       </div>
-      <nav class="sg-nav" :aria-label="t('fe.navigation')">
+      <nav
+        ref="navList" class="sg-nav" :style="{ '--sg-nav-gutter': `${navGutter}px` }" :aria-label="t('fe.navigation')"
+      >
         <NuxtLink
           v-for="item in nav" :key="item.to" :to="item.to" class="sg-nav-link" :class="{ 'is-active': active(item.to) }"
           :aria-label="item.label" :title="collapsed ? item.label : undefined"
@@ -329,7 +344,7 @@ async function logout() {
             </svg>
           </button>
           <p class="sg-crumb">
-            <b>{{ tenantName || t('fe.organization') }}</b>
+            <b :title="tenantName || undefined">{{ tenantName || t('fe.organization') }}</b>
             <template v-if="pageLabel">
               <svg
                 width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
